@@ -1,0 +1,36 @@
+                               
+.block.block_banners { 
+	padding-top:0px;
+}                               
+
+.block.block_banners .content { padding:0px; margin:0px;}
+.block.block_banners .content .no-overflow {padding:0px;}
+
+.carousel { margin-bottom:0px!important; }
+
+#myCarousel .carousel-inner .item img { width:100%; }
+#myCarousel .carousel-indicators { display:none; }
+
+#myCarousel .carousel-control {
+	background:none;
+	-webkit-border-radius:0px; 
+  	-moz-border-radius:0px; 
+	border-radius:0px;
+	border:none;
+	opacity:1;
+	top:10%;
+	left:0px;
+}
+
+#myCarousel .carousel-control.right {
+	left:auto;
+	right:0px;
+}
+
+#myCarousel .carousel-control.pause {
+	top:90%;
+}
+
+#myCarousel .carousel-control.addBanner {
+	top:90%;
+}

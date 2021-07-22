@@ -1,0 +1,352 @@
+
+/*@font-face { *//* where FontName and fontname represents the name of the font you want to add */
+    /*font-family: 'Trade Gothic';*/
+    /*src: url([[font:theme|2EBCCB_0_0.eot]]);*/
+    /*src: url([[font:theme|2EBCCB_0_0.eot]]) format('embedded-opentype'),*/
+    /*url([[font:theme|2EBCCB_0_0.woff]]) format('woff'),*/
+    /*url([[font:theme|2EBCCB_0_0.ttf]]) format('truetype'),*/
+    /*font-weight: normal;*/
+    /*font-style: normal;*/
+/*}*/
+
+/*@font-face { *//* where FontName and fontname represents the name of the font you want to add */
+    /*font-family: 'Trade Gothic Bold';*/
+    /*src: url([[font:theme|2EBCCB_1_0.eot]]);*/
+    /*src: url([[font:theme|2EBCCB_1_0.eot]]) format('embedded-opentype'),*/
+    /*url([[font:theme|2EBCCB_1_0.woff]]) format('woff'),*/
+    /*url([[font:theme|2EBCCB_1_0.ttf]]) format('truetype'),*/
+    /*font-weight: bold;*/
+    /*font-style: normal;*/
+/*}*/
+
+
+
+
+a {
+    color: [[setting:linkcolor]];
+}
+.mform .btn-cancel {
+    color: [[setting:linkcolor]];
+}
+a:visited {
+    color: [[setting:linkvisitedcolor]];
+}
+a:hover {
+    color: [[setting:linkcolor-dark]];
+}
+button,
+input.submit,
+input[type="submit"],
+input[type="reset"],
+input[type="button"],
+#id_buttonfield,
+a.link-as-button {
+    /*color: [[setting:buttoncolor-readable-text]];*/
+    color: [[setting:buttontextcolor]];
+    text-shadow:0 1px 1px [[setting:buttoncolor-readable-text-shadow]];
+    background-color: [[setting:buttoncolor]];
+    background-image:-ms-linear-gradient(top, [[setting:buttoncolor-light]], [[setting:buttoncolor]]);
+    background-image:-webkit-gradient(linear, 0 0, 0 100%, from([[setting:buttoncolor-light]]), to([[setting:buttoncolor-dark]]));
+    background-image:-webkit-linear-gradient(top, [[setting:buttoncolor-light]], [[setting:buttoncolor]]);
+    background-image:-o-linear-gradient(top, [[setting:buttoncolor-light]], [[setting:buttoncolor]]);
+    background-image:linear-gradient(top, [[setting:buttoncolor-light]], [[setting:buttoncolor]]);
+    background-image:-moz-linear-gradient(top, [[setting:buttoncolor-light]], [[setting:buttoncolor]]);
+    border:1px solid [[setting:buttoncolor-light]];
+    border-color: [[setting:buttoncolor]] [[setting:buttoncolor]] [[setting:buttoncolor-dark]];
+    -webkit-border-radius:4px;
+    -moz-border-radius:4px;
+    border-radius:4px;
+    -webkit-box-shadow:inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 2px rgba(0,0,0,0.05);
+    -moz-box-shadow:inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 2px rgba(0,0,0,0.05)
+}
+
+input.submit:hover,
+input[type="submit"]:hover,
+input[type="reset"]:hover,
+input[type="button"]:hover,
+#id_buttonfield:hover,
+button:hover,
+a.link-as-button:hover {
+    /*color:[[setting:buttoncolor-readable-text]];*/
+    color: [[setting:buttontextcolor]];
+    background-color:[[setting:buttoncolor-lighter-perc]];
+    background-image:-ms-linear-gradient(top, [[setting:buttoncolor]], [[setting:buttoncolor-light]]);
+    background-image:-webkit-gradient(linear, 0 0, 0 100%, from([[setting:buttoncolor-dark]]), to([[setting:buttoncolor]]));
+    background-image:-webkit-linear-gradient(top, [[setting:buttoncolor]], [[setting:buttoncolor-light]]);
+    background-image:-o-linear-gradient(top, [[setting:buttoncolor]], [[setting:buttoncolor-light]]);
+    background-image:linear-gradient(top, [[setting:buttoncolor]], [[setting:buttoncolor-light]]);
+    background-image:-moz-linear-gradient(top, [[setting:buttoncolor]], [[setting:buttoncolor-light]]);
+}
+button.disabled,
+input.form-submit.disabled,
+input[type="button"].disabled,
+input[type="submit"].disabled,
+input[type="reset"].disabled,
+button[disabled],
+input.form-submit[disabled],
+input[type="button"][disabled],
+input[type="submit"][disabled],
+input[type="reset"][disabled] {
+    color:#888888;
+    background-color:[[setting:buttoncolor-lighter-perc]];
+    background-image:-ms-linear-gradient(top, [[setting:buttoncolor-light-perc]], [[setting:buttoncolor-lighter-perc]]);
+    background-image:-webkit-gradient(linear, 0 0, 0 100%, from([[setting:buttoncolor-light-perc]]), to([[setting:buttoncolor-light-perc]]));
+    background-image:-webkit-linear-gradient(top, [[setting:buttoncolor-light-perc]], [[setting:buttoncolor-lighter-perc]]);
+    background-image:-o-linear-gradient(top, [[setting:buttoncolor-light-perc]], [[setting:buttoncolor-lighter-perc]]);
+    background-image:linear-gradient(top, [[setting:buttoncolor-light-perc]], [[setting:buttoncolor-lighter-perc]]);
+    background-image:-moz-linear-gradient(top, [[setting:buttoncolor-light-perc]], [[setting:buttoncolor-lighter-perc]]);
+}
+#page-footer, .block, .block > .header {
+    background-color: [[setting:headerbgc]];
+}
+
+.navbar-inner, .navbar-inner > .container-fluid {
+    background: -webkit-linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* For Firefox 3.6 to 15 */
+    background: -ms-linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* For IE10 */
+    background: linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* Standard syntax */
+    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr='[[setting:headerbgc]]', endColorstr='[[setting:headergradient]]') !important;/*For IE7-8-9*/  
+}
+
+.block, .block > .header {
+    background: -webkit-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]); /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]); /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]); /* For Firefox 3.6 to 15 */
+    background: -ms-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]) !important;/*For IE10*/
+    background: linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]) !important; /* Standard syntax */
+    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr='[[setting:blockheadergradientstart]]', endColorstr='[[setting:blockheadercolor]]') !important;/*For IE7-8-9*/  
+}
+
+
+#page.container-fluid {
+	max-width:none;
+}
+
+
+th.header,
+td.header,
+div.header h1,
+div.header h2,
+div.header h3,
+div.header h4,
+div.header h5,
+div.header h6 {
+    background-color: [[setting:headerbgc]];
+    color: [[setting:text-on-headerbgc]];
+}
+.totara-dialog .ui-dialog-titlebar {
+    background-color: [[setting:headerbgc]];
+}
+#page-header-wrapper {
+    color: [[setting:text-on-headerbgc]];
+}
+#page-footer .footer-powered {
+    color: [[setting:text-on-headerbgc]];
+}
+
+.navbar-inner {
+    color:#fff;
+}
+
+.navbar { 
+    -moz-box-shadow:    1px 4px 3px rgba(0,0,0, 0.4);
+    -webkit-box-shadow: 1px 4px 3px rgba(0,0,0, 0.4);
+    box-shadow:         1px 4px 3px rgba(0,0,0, 0.4);
+}
+
+.navbar-text { color:#fff; }
+
+.navbar .nav li { float:left; clear:none;}
+
+#cec-nav { margin-bottom:15px; margin-top:20px; }
+
+#cec-nav li {
+    height:40px;
+    line-height:40px;
+}
+
+.header-user a { 
+    line-height:20px; 
+    text-shadow:none!important; 
+    color: [[setting:logged_in_usernamecolor]]!important;
+    margin-top: 15px;
+}
+
+#cec-nav .langmenu { margin-top:6px;}
+
+#cec-search input { font-size:10px; margin-top:18px; height:14px; line-height:16px; }
+
+#cec-search button { font-size:10px; margin-top:18px; height:20px; line-height:10px; }
+
+.block {
+    border-top:none;
+    padding-top:0px; 
+    -webkit-border-radius:4px;
+    -moz-border-radius:4px;
+    border-radius:4px;
+    -moz-box-shadow:    1px 4px 3px rgba(0,0,0, 0.4);
+    -webkit-box-shadow: 1px 4px 3px rgba(0,0,0, 0.4);
+    box-shadow:         1px 4px 3px rgba(0,0,0, 0.4);
+
+
+}
+
+.block .header h2 {
+    text-shadow:none;
+    color:[[setting:blockheadertextcolor]] !important;
+    background: [[setting:blockheadercolor]] !important;
+    background: -webkit-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]) !important; /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]) !important; /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]) !important; /* For Firefox 3.6 to 15 */
+    background: -ms-linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]) !important;/*For IE10*/
+    background: linear-gradient([[setting:blockheadergradientstart]], [[setting:blockheadercolor]]) !important; /* Standard syntax */
+    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr='[[setting:blockheadergradientstart]]', endColorstr='[[setting:blockheadercolor]]') !important;/*For IE7-8-9*/  
+    font-size:16px;
+}
+
+.header-logout button { font-size: 12px;}
+
+.navbar .nav-collapse.active { 
+    height:auto!important;
+}
+.navbar {
+	position:relative;
+	overflow:visible;
+	margin-bottom:0px;
+}
+
+.navbar:before {
+	content: ' ';
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    opacity: [[setting:headerbgimgopacity]];  
+    background-image: url(setting:headerbgimg);
+	background-repeat: no-repeat;
+    background-position: 50% 0;
+    -ms-background-size: cover;
+    -o-background-size: cover;
+    -moz-background-size: cover;
+    -webkit-background-size: cover;
+    background-size: cover;
+}
+
+#navbar-inside {
+	position:relative;
+	z-index:3;
+}
+
+#page { position:relative; overflow:hidden; padding-top: 20px; padding-bottom:1em;}
+
+#gradetreeform { overflow:auto; }
+
+#page:before { 
+	content: ' ';
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+	opacity: [[setting:bodybgimgopacity]];
+	background-image: url(setting:bodybgimg);  
+	background-repeat: no-repeat;
+    background-position: 50% 0;
+    -ms-background-size: cover;
+    -o-background-size: cover;
+    -moz-background-size: cover;
+    -webkit-background-size: cover;
+    background-size: cover;
+}
+
+#page-content, #page-header {
+	position:relative;
+	z-index:2;
+	max-width:1680px;
+	margin: 0 auto;
+}
+
+.navbar .nav-collapse.active>.nav {
+    padding-bottom:40px;
+}
+
+.block .content {
+    background: [[setting:blockcontentcolor]];
+}
+
+#page-footer { margin-top:0em; }
+
+@media (max-width: 767px) { 
+	body { padding-left: 0px; padding-right:0px; }	
+}
+
+div.totara-dialog, #dock, .yui-dialog {
+	z-index:3!important;
+}
+
+.user-enroller-panel, .yui3-overlay, .enrolpanel {
+	z-index:5 !important;
+}
+
+/*.ui-dialog-content {*/
+	/*height: auto !important;*/
+/*}*/
+
+div.totara-dialog td.select div#dialog-tabs, .treeview-wrapper {
+	height:auto !important;
+}
+
+.tabtree .tabrow1 {
+	position:relative;
+}
+
+/**
+ * Headings
+ */
+h1 {
+    font-size:[[setting:h1size]]px;
+    margin:5px 0 15px;
+}
+h2 {
+    font-size:[[setting:h2size]]px;
+    line-height:1em;
+    border:none;
+    padding:0;
+    margin:5px 0 15px;
+}
+h3 {
+    font-size:[[setting:h3size]]px;
+    padding:0;
+    margin:5px 0 15px;
+}
+h4 {
+    font-size:[[setting:h4size]]px;
+    font-weight:normal;
+    padding:0;
+    margin:5px 0 10px;
+}
+h5 {
+    font-size:[[setting:h5size]]px;
+    margin:5px 0 5px;
+}
+h6 {
+    font-size:[[setting:h6size]]px;
+    margin:5px 0 5px;
+}
+
+p {
+    font-size: [[setting:ptagsize]]px;
+}
+
+body, h1, h2, h3, h4, h5, h6, p, ul, ol, dl, input, textarea { font-family: TradeGothicLTPro-Cn18;}
+
+/** Custom CSS defined via theme settings **/
+[[setting:customcss]]
+

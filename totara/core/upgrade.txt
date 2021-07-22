@@ -1,0 +1,25 @@
+List of upgrade and API changes in Totara core
+
+=== 9.6 ===
+
+* updated totara/core/templates/course_progress_bar.mustache
+
+=== 9.4 ===
+
+* updated totara/core/templates/totara_search.mustache
+* totara/core/templates/totara_search.mustache context object has changed, the property ->alt has been deprecated
+
+=== 9.3 ===
+
+* totara_dialog_content_manager has been deprecated, please use totara_job_dialog_assign_manager instead.
+
+=== 2.7 ===
+
+* \totara_core\event\user_firstlogin was removed, use standard \core\event\user_loggedin
+  event instead, in case of first login $USER->firstaccess and $USER->currentlogin are equal.
+
+* \totara_core\event\user_enrolment was removed, use standard \core\event\user_enrolment_created
+  event instead
+
+* MDL-48282 was backported. Do not update user->firstaccess from any auth plugin,
+  the complete_user_login() does it automatically.
