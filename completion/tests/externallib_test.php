@@ -116,7 +116,7 @@ class core_completion_externallib_testcase extends externallib_advanced_testcase
         $cmforum = get_coursemodule_from_id('forum', $forum->cmid);
 
         $studentrole = $DB->get_record('role', array('shortname' => 'student'));
-        $teacherrole = $DB->get_record('role', array('shortname' => 'teacher'));
+        $teacherrole = $DB->get_record('role', array('shortname' => 'editingteacher'));
         $this->getDataGenerator()->enrol_user($student->id, $course->id, $studentrole->id);
         $this->getDataGenerator()->enrol_user($teacher->id, $course->id, $teacherrole->id);
 
@@ -191,6 +191,8 @@ class core_completion_externallib_testcase extends externallib_advanced_testcase
      */
     public function test_get_course_completion_status() {
         global $DB, $CFG, $COMPLETION_CRITERIA_TYPES;
+        // Totara: resolve dependencies for the test
+        require_once($CFG->dirroot.'/completion/criteria/completion_criteria.php');
         require_once($CFG->dirroot.'/completion/criteria/completion_criteria_self.php');
         require_once($CFG->dirroot.'/completion/criteria/completion_criteria_date.php');
         require_once($CFG->dirroot.'/completion/criteria/completion_criteria_activity.php');
@@ -219,7 +221,7 @@ class core_completion_externallib_testcase extends externallib_advanced_testcase
         $cmforum = get_coursemodule_from_id('forum', $forum->cmid);
 
         $studentrole = $DB->get_record('role', array('shortname' => 'student'));
-        $teacherrole = $DB->get_record('role', array('shortname' => 'teacher'));
+        $teacherrole = $DB->get_record('role', array('shortname' => 'editingteacher'));
         $this->getDataGenerator()->enrol_user($student->id, $course->id, $studentrole->id);
         $this->getDataGenerator()->enrol_user($teacher->id, $course->id, $teacherrole->id);
 
@@ -238,7 +240,6 @@ class core_completion_externallib_testcase extends externallib_advanced_testcase
         $completion = new completion_info($course);
 
         $this->setUser($student);
-        $completion::wipe_session_cache();
         completion_criteria_activity::invalidatecache();
         completion_criteria_course::invalidatecache();
 
@@ -293,6 +294,8 @@ class core_completion_externallib_testcase extends externallib_advanced_testcase
      */
     public function test_mark_course_self_completed() {
         global $DB, $CFG;
+        // Totara: resolve dependencies for the test
+        require_once($CFG->dirroot.'/completion/criteria/completion_criteria.php');
         require_once($CFG->dirroot.'/completion/criteria/completion_criteria_self.php');
 
         $this->resetAfterTest(true);

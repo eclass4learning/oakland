@@ -23,7 +23,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot.'/totara/reportbuilder/lib.php');
 require_once($CFG->dirroot.'/totara/plan/lib.php'); // Is this needed?
 
@@ -47,32 +47,24 @@ $PAGE->set_context($context);
 $PAGE->set_pagelayout('report');
 $PAGE->set_url('/totara/plan/record/evidence/index.php', array('userid' => $userid, 'format' => $format));
 
+$menunavitem = '';
+$url = null;
 if ($USER->id == $userid) {
     $strheading = get_string('recordoflearning', 'totara_core');
     $usertype = 'learner';
-    $menuitem = 'recordoflearning';
-    $menunavitem = '';
-    $url = null;
+    $menuitem = '\totara_plan\totara\menu\recordoflearning';
 } else {
     $strheading = get_string('recordoflearningforname', 'totara_core', fullname($user, true));
     $usertype = 'manager';
+    $menuitem = '\totara_core\totara\menu\myteam';
     if (totara_feature_visible('myteam')) {
-        $menuitem = 'myteam';
         $menunavitem = 'team';
         $url = new moodle_url('/my/teammembers.php');
-    } else {
-        $menuitem = null;
-        $menunavitem = '';
-        $url = null;
     }
 }
 
-$reportfilters = array('userid' => $userid);
-$report = reportbuilder_get_embedded_report('plan_evidence', $reportfilters, false, $sid);
-
-if ($debug) {
-    $report->debug($debug);
-}
+$config = (new rb_config())->set_sid($sid)->set_embeddata(['userid' => $userid]);
+$report = reportbuilder::create_embedded('plan_evidence', $config);
 
 $logurl = $PAGE->url->out_as_local_url();
 if ($format != '') {
@@ -97,7 +89,14 @@ $PAGE->set_button($report->edit_button());
 $PAGE->set_totara_menu_selected($menuitem);
 dp_display_plans_menu($userid, 0, $usertype, 'evidence/index', 'none', false);
 
+/** @var totara_reportbuilder_renderer $renderer */
+$renderer = $PAGE->get_renderer('totara_reportbuilder');
+
 echo $OUTPUT->header();
+
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $renderer->report_html($report, $debug);
+echo $debughtml;
 
 echo $OUTPUT->container_start('', 'dp-plan-content');
 
@@ -107,11 +106,7 @@ dp_print_rol_tabs(null, 'evidence', $userid);
 
 $report->display_restrictions();
 
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
-
-$renderer = $PAGE->get_renderer('totara_reportbuilder');
-$heading = $renderer->print_result_count_string($countfiltered, $countall);
+$heading = $renderer->result_count_info($report);
 echo $OUTPUT->heading($heading);
 
 echo $renderer->print_description($report->description, $report->_id);
@@ -127,8 +122,7 @@ print $OUTPUT->single_button(
                 array('id' => 0, 'userid' => $userid)), get_string('addevidence', 'totara_plan'), 'get');
 
 echo $renderer->showhide_button($report->_id, $report->shortname);
-
-$report->display_table();
+echo $reporthtml;
 
 // Export button.
 $renderer->export_select($report, $sid);

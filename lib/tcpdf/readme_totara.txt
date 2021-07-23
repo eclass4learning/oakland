@@ -8,6 +8,6 @@ Totara changes:
 
 Extra patches:
 
-* support for inline SVG images in TCPDF::openHTMLTagHandler()
+* TL-10313: support for inline SVG images in TCPDF::openHTMLTagHandler()
 
 Petr Skoda

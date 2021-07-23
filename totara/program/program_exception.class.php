@@ -131,6 +131,7 @@ abstract class prog_exception {
         if (!empty($assignid)) {
             $learner_assign_todb = new stdClass();
             $learner_assign_todb->id = $assignid;
+            $learner_assign_todb->timeassigned = time();
             $learner_assign_todb->exceptionstatus = PROGRAM_EXCEPTION_RESOLVED;
 
             if (!$DB->update_record('prog_user_assignment', $learner_assign_todb)) {
@@ -183,8 +184,7 @@ abstract class prog_exception {
         $timedue = time() + $total_time_allowed + 604800;
 
         // Update prog_completion.
-        $assignment = new user_assignment($this->userid, $this->assignmentid, $this->programid);
-        if (!$assignment->update($timedue)) {
+        if (!$program->set_timedue($this->userid, $timedue, 'Due date updated while automatically resolving time allowance exception')) {
             return false;
         }
 
@@ -194,6 +194,7 @@ abstract class prog_exception {
         if (!empty($assignid)) {
             $learner_assign_todb = new stdClass();
             $learner_assign_todb->id = $assignid;
+            $learner_assign_todb->timeassigned = time();
             $learner_assign_todb->exceptionstatus = PROGRAM_EXCEPTION_RESOLVED;
 
             $DB->update_record('prog_user_assignment', $learner_assign_todb);

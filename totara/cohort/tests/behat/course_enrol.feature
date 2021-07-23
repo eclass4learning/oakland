@@ -65,7 +65,7 @@ Feature: Users updating course may enrol cohorts
 
   Scenario: Teacher with cohort view capability from category may enrol cohorts via course edit form
     Given I log in as "teacher1"
-    And I follow "Course 01"
+    And I am on "Course 01" course homepage
     And I navigate to "Edit settings" node in "Course administration"
     And I should see "Audience 01-1"
     And I should see "Audience 03-1"
@@ -102,8 +102,7 @@ Feature: Users updating course may enrol cohorts
 
     When I click on "Add enrolled audiences" "button"
     And I click on "Search" "link" in the "Course audiences (enrolled)" "totaradialogue"
-    And I set the field "Search" to "A"
-    And I click on "Search" "button" in the "Course audiences (enrolled)" "totaradialogue"
+    And I search for "A" in the "Course audiences (enrolled)" totara dialogue
     Then I should see "Audience 01-1" in the "Course audiences (enrolled)" "totaradialogue"
     And I should see "Audience 01-2" in the "Course audiences (enrolled)" "totaradialogue"
     And I should not see "Audience 02-" in the "Course audiences (enrolled)" "totaradialogue"
@@ -115,7 +114,7 @@ Feature: Users updating course may enrol cohorts
 
   Scenario: Teacher with cohort view capability from subcategory may enrol cohorts via course edit form
     Given I log in as "teacher2"
-    And I follow "Course 11"
+    And I am on "Course 11" course homepage
     And I navigate to "Edit settings" node in "Course administration"
     And I should see "Audience 01-1"
     And I should see "Audience 11-1"
@@ -149,8 +148,7 @@ Feature: Users updating course may enrol cohorts
 
     When I click on "Add enrolled audiences" "button"
     And I click on "Search" "link" in the "Course audiences (enrolled)" "totaradialogue"
-    And I set the field "Search" to "A"
-    And I click on "Search" "button" in the "Course audiences (enrolled)" "totaradialogue"
+    And I search for "A" in the "Course audiences (enrolled)" totara dialogue
     Then I should see "Audience 11-1" in the "Course audiences (enrolled)" "totaradialogue"
     And I should see "Audience 11-2" in the "Course audiences (enrolled)" "totaradialogue"
     And I should not see "Audience 01-" in the "Course audiences (enrolled)" "totaradialogue"
@@ -163,7 +161,7 @@ Feature: Users updating course may enrol cohorts
 
   Scenario: Teacher with cohort view capability from system may enrol cohorts via course edit form
     Given I log in as "teacher3"
-    And I follow "Course 11"
+    And I am on "Course 11" course homepage
     And I navigate to "Edit settings" node in "Course administration"
     And I should see "Audience 01-1"
     And I should see "Audience 11-1"
@@ -202,8 +200,7 @@ Feature: Users updating course may enrol cohorts
 
     When I click on "Add enrolled audiences" "button"
     And I click on "Search" "link" in the "Course audiences (enrolled)" "totaradialogue"
-    And I set the field "Search" to "A"
-    And I click on "Search" "button" in the "Course audiences (enrolled)" "totaradialogue"
+    And I search for "A" in the "Course audiences (enrolled)" totara dialogue
     Then I should see "Audience 01-1" in the "Course audiences (enrolled)" "totaradialogue"
     And I should see "Audience 01-2" in the "Course audiences (enrolled)" "totaradialogue"
     And I should see "Audience 11-1" in the "Course audiences (enrolled)" "totaradialogue"
@@ -231,7 +228,7 @@ Feature: Users updating course may enrol cohorts
 
   Scenario: Teacher without cohort view capability may not enrol cohorts via course edit form
     Given I log in as "teacher4"
-    And I follow "Course 01"
+    And I am on "Course 01" course homepage
     And I navigate to "Edit settings" node in "Course administration"
     And I should see "Audience 01-1"
     And I should see "Audience 03-1"
@@ -246,7 +243,7 @@ Feature: Users updating course may enrol cohorts
     And I should not see "System Audience 2" in the "Course audiences (enrolled)" "totaradialogue"
 
     When I click on "Search" "link" in the "Course audiences (enrolled)" "totaradialogue"
-    And I set the field "Search" to "A"
+    And I search for "A" in the "Course audiences (enrolled)" totara dialogue
     Then I should not see "Audience 01-" in the "Course audiences (enrolled)" "totaradialogue"
     And I should not see "Audience 02-" in the "Course audiences (enrolled)" "totaradialogue"
     And I should not see "Audience 03-" in the "Course audiences (enrolled)" "totaradialogue"

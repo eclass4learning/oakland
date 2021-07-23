@@ -26,12 +26,12 @@ $string['accessnoticesheader'] = 'You can preview this quiz, but if this were a 
 $string['action'] = 'Action';
 $string['activityoverview'] = 'You have quizzes that are due';
 $string['adaptive'] = 'Adaptive mode';
-$string['adaptive_help'] = 'If enabled, multiple responses to a question are allowed within the same attempt at the quiz. So for example if a response is marked as incorrect, the student will be allowed to try again immediately. However, depending on the "Apply penalties" setting, a penalty will usually be subtracted for each wrong attempt.';
+$string['adaptive_help'] = 'If enabled, multiple responses to a question are allowed within the same attempt at the quiz. So for example if a response is marked as incorrect, the learner will be allowed to try again immediately. However, depending on the **Apply penalties** setting, a penalty will usually be subtracted for each wrong attempt.';
 $string['add'] = 'Add';
 $string['addaquestion'] = 'a new question';
 $string['addasection'] = 'a new section heading';
 $string['addarandomquestion'] = 'a random question';
-$string['addarandomquestion_help'] = 'When a random question is added, it results in a randomly-chosen question from the category being inserted into the quiz. This means that different students are likely to get a different selection of questions, and when a quiz allows multiple attempts then each attempt is likely to contain a new selection of questions.';
+$string['addarandomquestion_help'] = 'When a random question is added, it results in a randomly-chosen question from the category being inserted into the quiz. This means that different learners are likely to get a different selection of questions, and when a quiz allows multiple attempts then each attempt is likely to contain a new selection of questions.';
 $string['addarandomselectedquestion'] = 'Add a random selected question ...';
 $string['adddescriptionlabel'] = 'Add a description item';
 $string['addingquestion'] = 'Adding a question';
@@ -52,7 +52,7 @@ $string['addquestionstoquiz'] = 'Add questions to current quiz';
 $string['addrandom'] = 'Add {$a} random questions';
 $string['addrandomfromcategory'] = 'Add random questions from category:';
 $string['addrandomquestion'] = 'Add random question';
-$string['addarandomquestion_help'] = 'When a random question is added, it results in a randomly-chosen question from the category being inserted into the quiz. This means that different students are likely to get a different selection of questions, and when a quiz allows multiple attempts then each attempt is likely to contain a new selection of questions.';
+$string['addarandomquestion_help'] = 'When a random question is added, it results in a randomly-chosen question from the category being inserted into the quiz. This means that different learners are likely to get a different selection of questions, and when a quiz allows multiple attempts then each attempt is likely to contain a new selection of questions.';
 $string['addrandomquestionatend'] = 'Add a random question at the end';
 $string['addrandomquestiontopage'] = 'Add a random question to page {$a}';
 $string['addrandomquestiontoquiz'] = 'Add a random question to quiz {$a}';
@@ -89,6 +89,9 @@ $string['attemptclosed'] = 'Attempt has not closed yet';
 $string['attemptduration'] = 'Time taken';
 $string['attemptedon'] = 'Attempted on';
 $string['attempterror'] = 'You are not allowed to attempt this quiz at this time because: {$a}';
+$string['attempterrorinvalid'] = 'Invalid quiz attempt ID';
+$string['attempterrorcontentchange'] = 'This quiz preview no longer exists. (When a quiz is edited, any in-progress previews are automatically deleted.)';
+$string['attempterrorcontentchangeforuser'] = 'This quiz attempt no longer exists.';
 $string['attemptfirst'] = 'First attempt';
 $string['attemptincomplete'] = 'That attempt (by {$a}) is not yet completed.';
 $string['attemptlast'] = 'Last attempt';
@@ -102,25 +105,25 @@ $string['attemptsexist'] = 'You can no longer add or remove questions.';
 $string['attemptsnum'] = 'Attempts: {$a}';
 $string['attemptsnumthisgroup'] = 'Attempts: {$a->total} ({$a->group} from this group)';
 $string['attemptsnumyourgroups'] = 'Attempts: {$a->total} ({$a->group} from your groups)';
-$string['attemptsonly'] = 'Show only students with attempts';
+$string['attemptsonly'] = 'Show only learners with attempts';
 $string['attemptstate'] = 'State';
 $string['attemptstillinprogress'] = 'Attempt still in progress';
 $string['attemptsunlimited'] = 'Unlimited attempts';
 $string['autosaveperiod'] = 'Auto-save delay';
-$string['autosaveperiod_desc'] = 'Responses can be saved automatically during quiz attempts. The responses are saved whenever one is changed, and then after this delay. There is a trade-off: a shorter delay increases the server load, but reduces the chance that students lose their work. If you are going to make this delay much shorter, you should change the value gradually and monitor the server load. If the load gets too high, make the delay longer again. Setting the delay to 0 turns off auto-saving.';
+$string['autosaveperiod_desc'] = 'Responses can be saved automatically during quiz attempts. The responses are saved whenever one is changed, and then after this delay. There is a trade-off: a shorter delay increases the server load, but reduces the chance that learners lose their work. If you are going to make this delay much shorter, you should change the value gradually and monitor the server load. If the load gets too high, make the delay longer again. Setting the delay to 0 turns off auto-saving.';
 $string['back'] = 'Back to preview question';
 $string['backtocourse'] = 'Back to the course';
 $string['backtoquestionlist'] = 'Back to question list';
 $string['backtoquiz'] = 'Back to quiz editing';
 $string['basicideasofquiz'] = 'The basic ideas of quiz-making';
 $string['bestgrade'] = 'Best grade';
-$string['bothattempts'] = 'Show students with and without attempts';
+$string['bothattempts'] = 'Show learners with and without attempts';
 $string['browsersecurity'] = 'Browser security';
-$string['browsersecurity_help'] = 'If "Full screen pop-up with some JavaScript security" is selected,
+$string['browsersecurity_help'] = 'If **Full screen pop-up with some JavaScript security** is selected:
 
-* The quiz will only start if the student has a JavaScript-enabled web-browser
-* The quiz appears in a full screen popup window that covers all the other windows and has no navigation controls
-* Students are prevented, as far as is possible, from using facilities like copy and paste';
+* The quiz will only start if the learner has a JavaScript-enabled web-browser.
+* The quiz appears in a full screen popup window that covers all the other windows and has no navigation controls.
+* Learners are prevented, as far as is possible, from using facilities like copy and paste.';
 $string['calculated'] = 'Calculated';
 $string['calculatedquestion'] = 'Calculated question not supported at line {$a}. The question will be ignored';
 $string['cannotcreatepath'] = 'Path cannot be created ({$a})';
@@ -144,13 +147,13 @@ $string['cannotstartmissingquestion'] = 'Cannot start an attempt at this quiz. T
 $string['cannotstartnoquestions'] = 'Cannot start an attempt at this quiz. The quiz has not been set up yet. No questions have been added.';
 $string['cannotwrite'] = 'Cannot write to export file ({$a})';
 $string['canredoquestions'] = 'Allow redo within an attempt';
-$string['canredoquestions_desc'] = 'If enabled, then when students have finished attempting particular question, they will see a Redo question button. This allows them to attempt another version of the same question, without having to submit the entire quiz attempt and start another one. This option is mainly useful for practice quizzes.
+$string['canredoquestions_desc'] = 'If enabled, when learners have finished attempting particular question, they will see a **Redo question** button. This allows them to attempt another version of the same question (or another question from the question bank in case of the *Random* question), without having to submit the entire quiz attempt and start another one. This option is mainly useful for practice quizzes.
 
-This setting only affects questions (for example not Essay questions) and behaviours (for example Immediate feedback, or Interactive with multiple tries) where it is possible for student to finish the question before the attempt is submitted.';
-$string['canredoquestions_help'] = 'If enabled, then when students have finished attempting particular question, they will see a Redo question button. This allows them to attempt another version of the same question, without having to submit the entire quiz attempt and start another one. This option is mainly useful for practice quizzes.
+This setting only affects questions (for example not *Essay* questions) and behaviours (for example Immediate feedback, or Interactive with multiple tries) where it is possible for learner to finish the question before the attempt is submitted.';
+$string['canredoquestions_help'] = 'If enabled, when learners have finished attempting particular question, they will see a **Redo question** button. This allows them to attempt another version of the same question (or another question from the question bank in case of the *Random* question), without having to submit the entire quiz attempt and start another one. This option is mainly useful for practice quizzes.
 
-This setting only affects questions (for example not Essay questions) and behaviours (for example Immediate feedback, or Interactive with multiple tries) where it is possible for student to finish the question before the attempt is submitted.';
-$string['canredoquestionsyes'] = 'Students may redo another version of any finished question';
+This setting only affects questions (for example not *Essay* questions) and behaviours (for example **Immediate feedback**, or **Interactive with multiple tries**) where it is possible for learner to finish the question before the attempt is submitted.';
+$string['canredoquestionsyes'] = 'Learners may redo questions';
 $string['caseno'] = 'No, case is unimportant';
 $string['casesensitive'] = 'Case sensitivity';
 $string['caseyes'] = 'Yes, case must match';
@@ -168,20 +171,20 @@ $string['commentorgrade'] = 'Make comment or override grade';
 $string['comments'] = 'Comments';
 $string['completedon'] = 'Completed on';
 $string['completionpass'] = 'Require passing grade';
-$string['completionpass_help'] = 'If enabled, this activity is considered complete when the student receives a passing grade, with the pass grade set in the gradebook.';
+$string['completionpass_help'] = 'If enabled, this activity is considered complete when the learner receives a passing grade, with the pass grade set in the gradebook.';
 $string['completionattemptsexhausted'] = 'Or all available attempts completed';
-$string['completionattemptsexhausted_help'] = 'Mark quiz complete when the student has exhausted the maximum number of attempts.';
-$string['configadaptive'] = 'If you choose Yes for this option then the student will be allowed multiple responses to a question even within the same attempt at the quiz.';
-$string['configattemptsallowed'] = 'Restriction on the number of attempts students are allowed at the quiz.';
+$string['completionattemptsexhausted_help'] = 'Mark quiz complete when the learner has exhausted the maximum number of attempts.';
+$string['configadaptive'] = 'If you choose Yes for this option then the learner will be allowed multiple responses to a question even within the same attempt at the quiz.';
+$string['configattemptsallowed'] = 'Restriction on the number of attempts learners are allowed at the quiz.';
 $string['configdecimaldigits'] = 'Number of digits that should be shown after the decimal point when displaying grades.';
 $string['configdecimalplaces'] = 'Number of digits that should be shown after the decimal point when displaying grades for the quiz.';
 $string['configdecimalplacesquestion'] = 'Number of digits that should be shown after the decimal point when displaying the grade for individual questions.';
-$string['configdelaylater'] = 'If you set a time delay here, the student cannot start their third, fourth, ... attempt until this much time has passed since the end of their previous attempt.';
-$string['configdelay1'] = 'If you set a time delay, then a student has to wait for that time before they can attempt a quiz after the first attempt.';
-$string['configdelay1st2nd'] = 'If you set a time delay here, the student cannot start their second attempt until this much time has passed since the end of their first attempt.';
-$string['configdelay2'] = 'If you set a time delay here, then a student has to wait for that time before they can attempt their third or later attempts.';
+$string['configdelaylater'] = 'If you set a time delay here, the learner cannot start their third, fourth, ... attempt until this much time has passed since the end of their previous attempt.';
+$string['configdelay1'] = 'If you set a time delay, then a learner has to wait for that time before they can attempt a quiz after the first attempt.';
+$string['configdelay1st2nd'] = 'If you set a time delay here, the learner cannot start their second attempt until this much time has passed since the end of their first attempt.';
+$string['configdelay2'] = 'If you set a time delay here, then a learner has to wait for that time before they can attempt their third or later attempts.';
 $string['configeachattemptbuildsonthelast'] = 'If multiple attempts are allowed then each new attempt contains the results of the previous attempt.';
-$string['configgrademethod'] = 'When multiple attempts are allowed, which method should be used to calculate the student\'s final grade for the quiz.';
+$string['configgrademethod'] = 'When multiple attempts are allowed, which method should be used to calculate the learner\'s final grade for the quiz.';
 $string['configintro'] = 'The values you set here define the default values that are used in the settings form when you create a new quiz. You can also configure which quiz settings are considered advanced.';
 $string['configmaximumgrade'] = 'The default grade that the quiz grade is scaled to be out of.';
 $string['confignewpageevery'] = 'When adding questions to the quiz page breaks will automatically be inserted according to the setting you choose here.';
@@ -189,12 +192,12 @@ $string['confignavmethod'] = 'In Free navigation, questions may be answered in a
 $string['configoutcomesadvanced'] = 'If this option is turned on, then the Outcomes on the quiz editing form are advanced settings.';
 $string['configpenaltyscheme'] = 'Penalty subtracted for each wrong response in adaptive mode.';
 $string['configpopup'] = 'Force the attempt to open in a popup window, and use JavaScript tricks to try to restrict copy and paste, etc. during quiz attempts.';
-$string['configrequirepassword'] = 'Students must enter this password before they can attempt the quiz.';
-$string['configrequiresubnet'] = 'Students can only attempt the quiz from these computers.';
+$string['configrequirepassword'] = 'Learners must enter this password before they can attempt the quiz.';
+$string['configrequiresubnet'] = 'Learners can only attempt the quiz from these computers.';
 $string['configreviewoptions'] = 'These options control what information users can see when they review a quiz attempt or look at the quiz reports.';
 $string['configshowblocks'] = 'Show blocks during quiz attempts.';
 $string['configshowuserpicture'] = 'Show the user\'s picture on screen during attempts.';
-$string['configshufflewithin'] = 'If you enable this option, then the parts making up the individual questions will be randomly shuffled each time a student starts an attempt at this quiz, provided the option is also enabled in the question settings.';
+$string['configshufflewithin'] = 'If you enable this option, then the parts making up the individual questions will be randomly shuffled each time a learner starts an attempt at this quiz, provided the option is also enabled in the question settings.';
 $string['configtimelimit'] = 'Default time limit for quizzes in minutes. 0 mean no time limit.';
 $string['configtimelimitsec'] = 'Default time limit for quizzes in seconds. 0 mean no time limit.';
 $string['configurerandomquestion'] = 'Configure question';
@@ -202,9 +205,6 @@ $string['confirmclose'] = 'Once you submit, you will no longer be able to change
 $string['confirmremovequestion'] = 'Are you sure you want to remove this {$a} question?';
 $string['confirmremovesectionheading'] = 'Are you sure you want to remove the \'{$a}\' section heading?';
 $string['confirmserverdelete'] = 'Are you sure you want to remove the server <b>{$a}</b> from the list?';
-$string['confirmstartattemptlimit'] = 'Number of attempts allowed:  {$a}. You are about to start a new attempt.  Do you wish to proceed?';
-$string['confirmstartattempttimelimit'] = 'This quiz has a time limit and is limited to {$a} attempt(s). You are about to start a new attempt.  Do you wish to proceed?';
-$string['confirmstarttimelimit'] = 'The quiz has a time limit. Are you sure that you wish to start?';
 $string['connectionok'] = 'Network connection restored. You may continue safely.';
 $string['connectionerror'] = 'Network connection lost. (Autosave failed).
 
@@ -248,10 +248,10 @@ $string['default'] = 'Default';
 $string['defaultgrade'] = 'Default question grade';
 $string['defaultinfo'] = 'The default category for questions.';
 $string['delaylater'] = 'Enforced delay between later attempts';
-$string['delaylater_help'] = 'If enabled, a student must wait for the specified time to elapse before attempting the quiz a third time and any subsequent times.';
+$string['delaylater_help'] = 'If enabled, a learner must wait for the specified time to elapse before attempting the quiz a third time and any subsequent times.';
 $string['delay1'] = 'Time delay between first and second attempt';
 $string['delay1st2nd'] = 'Enforced delay between 1st and 2nd attempts';
-$string['delay1st2nd_help'] = 'If enabled, a student must wait for the specified time to elapse before being able to attempt the quiz a second time.';
+$string['delay1st2nd_help'] = 'If enabled, a learner must wait for the specified time to elapse before being able to attempt the quiz a second time.';
 $string['delay2'] = 'Time delay between later attempts';
 $string['deleteattemptcheck'] = 'Are you absolutely sure you want to completely delete these attempts?';
 $string['deleteselected'] = 'Delete selected';
@@ -274,11 +274,12 @@ $string['editingquestion'] = 'Editing a question';
 $string['editingquiz'] = 'Editing quiz';
 $string['editingquiz_help'] = 'When creating a quiz, the main concepts are:
 
-* The quiz, containing questions over one or more pages
-* The question bank, which stores copies of all questions organised into categories
-* Random questions -  A student gets different questions each time they attempt the quiz and different students can get different questions';
-$string['editingquiz_link'] = 'mod/quiz/edit';
+* The quiz, containing questions over one or more pages.
+* The question bank, which stores copies of all questions organised into categories.
+* Random questions, where a learner gets different questions each time they attempt the quiz and different learners can get different questions.';
+$string['editingquiz_link'] = 'Quiz';
 $string['editingquizx'] = 'Editing quiz: {$a}';
+$string['editingquizneedrandomquestions'] = 'This quiz contains one or more random questions drawn from question categories that contain an insufficient number of questions. Learners will not be able to attempt this quiz until this is resolved.';
 $string['editmaxmark'] = 'Edit maximum mark';
 $string['editoverride'] = 'Edit override';
 $string['editqcats'] = 'Edit questions categories';
@@ -321,7 +322,7 @@ $string['emailoverduesmall'] = 'You did not submit your attempt at {$a->quizname
 $string['emailoverduesubject'] = 'Attempt now overdue: {$a->quizname}';
 $string['empty'] = 'Empty';
 $string['enabled'] = 'Enabled';
-$string['endtest'] = 'Finish attempt ...';
+$string['endtest'] = 'Finish attempt';
 $string['erroraccessingreport'] = 'You cannot access this report';
 $string['errorinquestion'] = 'Error in question';
 $string['errormissingquestion'] = 'Error: The system is missing the question with id {$a}';
@@ -335,9 +336,12 @@ $string['eventattemptreviewed'] = 'Quiz attempt reviewed';
 $string['eventattemptsummaryviewed'] = 'Quiz attempt summary viewed';
 $string['eventattemptviewed'] = 'Quiz attempt viewed';
 $string['eventeditpageviewed'] = 'Quiz edit page viewed';
-$string['eventoverridecreated'] = 'Quiz override created';
-$string['eventoverridedeleted'] = 'Quiz override deleted';
-$string['eventoverrideupdated'] = 'Quiz override updated';
+$string['eventoverridecreated'] = 'Quiz user override created';
+$string['eventoverridecreatedgroup'] = 'Quiz group override created';
+$string['eventoverridedeleted'] = 'Quiz user override deleted';
+$string['eventoverridedeletedgroup'] = 'Quiz group override deleted';
+$string['eventoverrideupdated'] = 'Quiz user override updated';
+$string['eventoverrideupdatedgroup'] = 'Quiz group override updated';
 $string['eventquestionmanuallygraded'] = 'Question manually graded';
 $string['eventquizattemptabandoned'] = 'Quiz attempt abandoned';
 $string['eventquizattempttimelimitexceeded'] = 'Quiz attempt time limit exceeded';
@@ -363,7 +367,7 @@ $string['feedbackerrororder'] = 'Feedback grade boundaries must be in order, hig
 $string['file'] = 'File';
 $string['fileformat'] = 'File format';
 $string['fillcorrect'] = 'Fill with correct';
-$string['filloutnumericalanswer'] = 'You provide at least one possible answer and tolerance. The first matching answer will be used to determine the grade and feedback. If you supply some feedback with no answer at the end, that will be shown to students whose response is not matched by any of the other answers.';
+$string['filloutnumericalanswer'] = 'You provide at least one possible answer and tolerance. The first matching answer will be used to determine the grade and feedback. If you supply some feedback with no answer at the end, that will be shown to learners whose response is not matched by any of the other answers.';
 $string['filloutoneanswer'] = 'You must provide at least one possible answer. Answers left blank will not be used. \'*\' can be used as a wildcard to match any characters. The first matching answer will be used to determine the grade and feedback.';
 $string['filloutthreequestions'] = 'You must provide at least three questions with matching answers. You can provide extra wrong answers by giving an answer with a blank question. Entries where both the question and the answer are blank will be ignored.';
 $string['fillouttwochoices'] = 'You must fill out at least two choices.  Choices left blank will not be used.';
@@ -380,9 +384,9 @@ $string['generalfeedback'] = 'General feedback';
 $string['generalfeedback_help'] = 'General feedback is text which is shown after a question has been attempted. Unlike feedback for a specific question which depends on the response given, the same general feedback is always shown.';
 $string['graceperiod'] = 'Submission grace period';
 $string['graceperiod_desc'] = 'If what to do when time expires is set to \'Allow a grace period to submit, but not change any responses\', this is the default amount of extra time that is allowed.';
-$string['graceperiod_help'] = 'If what to do when time expires is set to \'Allow a grace period to submit, but not change any responses\', this is the amount of extra time that is allowed.';
+$string['graceperiod_help'] = 'If what to do when time expires is set to **Allow a grace period to submit, but not change any responses**, this is the amount of extra time that is allowed.';
 $string['graceperiodmin'] = 'Last submission grace period';
-$string['graceperiodmin_desc'] = 'There is a potential problem right at the end of the quiz. On the one hand, we want to let students continue working right up until the last second - with the help of the timer that automatically submits the quiz when time runs out. On the other hand, the server may then be overloaded, and take some time to get to process the responses. Therefore, we will accept responses for up to this long after time expires, so they are not penalised for the server being slow. However, the student could cheat and get this many seconds to answer the quiz. You have to make a trade-off based on how much you trust the performance of your server during quizzes.';
+$string['graceperiodmin_desc'] = 'There is a potential problem right at the end of the quiz. On the one hand, we want to let learners continue working right up until the last second - with the help of the timer that automatically submits the quiz when time runs out. On the other hand, the server may then be overloaded, and take some time to get to process the responses. Therefore, we will accept responses for up to this long after time expires, so they are not penalised for the server being slow. However, the learner could cheat and get this many seconds to answer the quiz. You have to make a trade-off based on how much you trust the performance of your server during quizzes.';
 $string['graceperiodtoosmall'] = 'The grace period must be more than {$a}.';
 $string['grade'] = 'Grade';
 $string['gradeall'] = 'Grade all';
@@ -393,13 +397,15 @@ $string['gradehighest'] = 'Highest grade';
 $string['grademethod'] = 'Grading method';
 $string['grademethod_help'] = 'When multiple attempts are allowed, the following methods are available for calculating the final quiz grade:
 
-* Highest grade of all attempts
-* Average (mean) grade of all attempts
-* First attempt (all other attempts are ignored)
-* Last attempt (all other attempts are ignored)';
+* Highest grade of all attempts.
+* Average (mean) grade of all attempts.
+* First attempt (all other attempts are ignored).
+* Last attempt (all other attempts are ignored).';
 $string['gradepassrequiredforcompletion'] = '\'Grade to pass\' must be greater than 0 when \'Require passing grade\' activity completion setting is enabled.';
 $string['gradesdeleted'] = 'Quiz grades deleted';
 $string['gradesofar'] = '{$a->method}: {$a->mygrade} / {$a->quizgrade}.';
+$string['gradetopassnotset'] = 'This quiz does not have a grade to pass set so you cannot use this option. Please use the require grade setting instead.';
+$string['gradetopassmustbeset'] = 'Grade to pass cannot be zero as this quiz has its completion method set to require passing grade. Please set a non-zero value.';
 $string['gradingdetails'] = 'Marks for this submission: {$a->raw}/{$a->max}.';
 $string['gradingdetailsadjustment'] = 'With previous penalties this gives <strong>{$a->cur}/{$a->max}</strong>.';
 $string['gradingdetailspenalty'] = 'This submission attracted a penalty of {$a}.';
@@ -416,10 +422,10 @@ $string['howquestionsbehave_desc'] = 'Default setting for how questions behave i
 $string['imagedisplay'] = 'Image to display';
 $string['import_help'] = 'This function allows you to import questions from external text files.
 
-If your file contains non-ascii characters then it must use UTF-8 encoding. Be particularly cautious with files generated by Microsoft Office applications, as these commonly use special encoding which will not be handled correctly.
+If your file contains non-ASCII characters then it must use UTF-8 encoding. Be particularly cautious with files generated by Microsoft Office applications, as these commonly use special encoding which will not be handled correctly.
 
 Import and Export formats are a pluggable resource. Other optional formats may be available in the Modules and Plugins database.';
-$string['import_link'] = 'question/import';
+$string['import_link'] = 'Quiz';
 $string['importcategory'] = 'import category';
 $string['importerror'] = 'An error occurred during import processing';
 $string['importfilearea'] = 'Import from file already in course files...';
@@ -429,7 +435,7 @@ $string['importingquestions'] = 'Importing {$a} questions from file';
 $string['importmaxerror'] = 'There is an error in the question. There are too many answers.';
 $string['importmax10error'] = 'There is an error in the question. You may not have more than ten answers';
 $string['importquestions'] = 'Import questions from file';
-$string['inactiveoverridehelp'] = '* Student does not have the correct group or role to attempt the quiz';
+$string['inactiveoverridehelp'] = '* Learner does not have the correct group or role to attempt the quiz';
 $string['incorrect'] = 'Incorrect';
 $string['indivresp'] = 'Responses of individuals to each item';
 $string['info'] = 'Info';
@@ -478,31 +484,34 @@ $string['missingcorrectanswer'] = 'Correct answer must be specified';
 $string['missingitemtypename'] = 'Missing name';
 $string['missingquestion'] = 'This question no longer seems to exist';
 $string['modulename'] = 'Quiz';
-$string['modulename_help'] = 'The quiz activity enables a teacher to create quizzes comprising questions of various types, including multiple choice, matching, short-answer and numerical.
+$string['modulename_help'] = 'The quiz activity enables a trainer to create quizzes comprising questions of various types, including multiple choice, matching, short-answer and numerical.
 
-The teacher can allow the quiz to be attempted multiple times, with the questions shuffled or randomly selected from the question bank. A time limit may be set.
+The trainer can allow the quiz to be attempted multiple times, with the questions shuffled or randomly selected from the question bank. A time limit may be set.
 
 Each attempt is marked automatically, with the exception of essay questions, and the grade is recorded in the gradebook.
 
-The teacher can choose when and if hints, feedback and correct answers are shown to students.
+The trainer can choose when and if hints, feedback and correct answers are shown to learners.
 
 Quizzes may be used
 
-* As course exams
-* As mini tests for reading assignments or at the end of a topic
-* As exam practice using questions from past exams
-* To deliver immediate feedback about performance
-* For self-assessment';
-$string['modulename_link'] = 'mod/quiz/view';
+* As course exams.
+* As mini tests, for example at the end of a topic.
+* As exam practice.
+* To deliver immediate feedback about performance.
+* For self-assessment.';
+$string['modulename_link'] = 'Quiz';
 $string['modulenameplural'] = 'Quizzes';
 $string['moveselectedonpage'] = 'Move selected questions to page: {$a}';
 $string['multichoice'] = 'Multiple choice';
 $string['multipleanswers'] = 'Choose at least one answer.';
 $string['mustbesubmittedby'] = 'This attempt must be submitted by {$a}.';
 $string['name'] = 'Name';
+$string['navigatenext'] = 'Next page';
+$string['navigateprevious'] = 'Previous page';
+$string['navnextwarning'] = 'Please be aware that on this quiz there is no going back after moving to the next page.';
 $string['navmethod'] = 'Navigation method';
 $string['navmethod_free'] = 'Free';
-$string['navmethod_help'] = 'When sequential navigation is enabled a student must progress through the quiz in order and may not return to previous pages nor skip ahead.';
+$string['navmethod_help'] = 'When sequential navigation is enabled a learner must progress through the quiz in order and may not return to previous pages nor skip ahead.';
 $string['navmethod_seq'] = 'Sequential';
 $string['navnojswarning'] = 'Warning: these links will not save your answers. Use the next button at the bottom of the page.';
 $string['neverallononepage'] = 'Never, all questions on one page';
@@ -510,6 +519,8 @@ $string['newattemptfail'] = 'Error: Could not start a new attempt at the quiz';
 $string['newpage'] = 'New page';
 $string['newpage_help'] = 'For longer quizzes it makes sense to stretch the quiz over several pages by limiting the number of questions per page. When adding questions to the quiz, page breaks will automatically be inserted according to this setting. However page breaks may later be moved manually on the editing page.';
 $string['newpageevery'] = 'Automatically start a new page';
+$string['newresponse'] = 'New Quiz responses';
+$string['newsectionheading'] = 'New heading';
 $string['noanswers'] = 'No answers were selected!';
 $string['noattempts'] = 'No attempts have been made on this quiz';
 $string['noattemptsfound'] = 'No attempts found.';
@@ -540,7 +551,7 @@ $string['noreviewshort'] = 'Not permitted';
 $string['noreviewuntil'] = 'You are not allowed to review this quiz until {$a}';
 $string['noreviewuntilshort'] = 'Available {$a}';
 $string['noscript'] = 'JavaScript must be enabled to continue!';
-$string['notavailabletostudents'] = 'Note: This quiz is not currently available to your students';
+$string['notavailabletostudents'] = 'Note: This quiz is not currently available to your learners';
 $string['notenoughrandomquestions'] = 'There are not enough questions in category {$a->category} to create the question {$a->name} ({$a->id}).';
 $string['notenoughsubquestions'] = 'Not enough sub-questions have been defined!<br />Do you want to go back and fix this question?';
 $string['notimedependentitems'] = 'Time dependent items are not currently supported by the quiz module. As a work around, set a time limit for the whole quiz. Do you wish to choose a different item (or use the current item regardless)?';
@@ -554,18 +565,18 @@ $string['numberabbr'] = '#';
 $string['numerical'] = 'Numerical';
 $string['numquestionsx'] = 'Questions: {$a}';
 $string['oneminute'] = '1 minute';
-$string['onlyteachersexport'] = 'Only teachers can export questions';
-$string['onlyteachersimport'] = 'Only teachers with editing rights can import questions';
+$string['onlyteachersexport'] = 'Only trainers can export questions';
+$string['onlyteachersimport'] = 'Only trainers with editing rights can import questions';
 $string['onthispage'] = 'This page';
 $string['open'] = 'Not answered';
 $string['openclosedatesupdated'] = 'Quiz open and close dates updated';
 $string['optional'] = 'optional';
 $string['orderandpaging'] = 'Order and paging';
-$string['orderandpaging_help'] = 'The numbers 10, 20, 30, ... opposite each question indicate the order of the questions. The numbers increase in steps of 10 to leave space for additional questions to be inserted. To reorder the questions, change the numbers then click the "Reorder questions" button.
+$string['orderandpaging_help'] = 'The numbers 10, 20, 30, etc. opposite each question indicate the order of the questions. The numbers increase in steps of ten to leave space for additional questions to be inserted. To reorder the questions, change the numbers then click the **Reorder questions** button.
 
-To add page breaks after particular questions, tick the checkboxes next to the questions then click the "Add new pages after selected questions" button.
+To add page breaks after particular questions, tick the checkboxes next to the questions then click the **Add new pages after selected questions** button.
 
-To arrange the questions over a number of pages, click the Repaginate button and select the desired number of questions per page.';
+To arrange the questions over a number of pages, click the **Repaginate** button and select the desired number of questions per page.';
 $string['orderingquiz'] = 'Order and paging';
 $string['orderingquizx'] = 'Order and paging: {$a}';
 $string['outcomesadvanced'] = 'Outcomes are advanced settings';
@@ -576,9 +587,9 @@ $string['overallfeedback'] = 'Overall feedback';
 $string['overallfeedback_help'] = 'Overall feedback is text that is shown after a quiz has been attempted. By specifying additional grade boundaries (as a percentage or as a number), the text shown can depend on the grade obtained.';
 $string['overdue'] = 'Overdue';
 $string['overduehandling'] = 'When time expires';
-$string['overduehandling_desc'] = 'What should happen by default if a student does not submit the quiz before time expires.';
-$string['overduehandling_help'] = 'This setting controls what happens if the Student fails to submit their quiz attempt before time expires. If the student is actively working on the quiz at the time, then the countdown timer will always automatically submit the attempt for them, but if they have logged out, then this setting controls what happens.';
-$string['overduehandling_link'] = 'mod/quiz/timing';
+$string['overduehandling_desc'] = 'What should happen by default if a learner does not submit the quiz before time expires.';
+$string['overduehandling_help'] = 'This setting controls what happens if the learner fails to submit their quiz attempt before time expires. If the learner is actively working on the quiz at the time, then the countdown timer will always automatically submit the attempt for them, but if they have logged out, then this setting controls what happens.';
+$string['overduehandling_link'] = 'Quiz';
 $string['overduehandlingautosubmit'] = 'Open attempts are submitted automatically';
 $string['overduehandlinggraceperiod'] = 'There is a grace period when open attempts can be submitted, but no more questions answered';
 $string['overduehandlingautoabandon'] = 'Attempts must be submitted before time expires, or they are not counted';
@@ -614,7 +625,7 @@ $string['pluginadministration'] = 'Quiz administration';
 $string['pluginname'] = 'Quiz';
 $string['popup'] = 'Show quiz in a &quot;secure&quot; window';
 $string['popupblockerwarning'] = 'This section of the test is in secure mode, this means that you need to take the quiz in a secure window. Please turn off your popup blocker. Thank you.';
-$string['popupnotice'] = 'Students will see this quiz in a secure window';
+$string['popupnotice'] = 'Learners will see this quiz in a secure window';
 $string['preprocesserror'] = 'Error occurred during pre-processing!';
 $string['preview'] = 'Preview';
 $string['previewquestion'] = 'Preview question';
@@ -632,7 +643,7 @@ $string['questionbank'] = 'from question bank';
 $string['questionbankmanagement'] = 'Question bank management';
 $string['questionbehaviour'] = 'Question behaviour';
 $string['questioncats'] = 'Question categories';
-$string['questiondeleted'] = 'This question has been deleted. Please contact your teacher';
+$string['questiondeleted'] = 'This question has been deleted. Please contact your trainer';
 $string['questiondependencyadd'] = 'No restriction on when question {$a->thisq} can be attempted • Click to change';
 $string['questiondependencyfree'] = 'No restriction on this question';
 $string['questiondependencyremove'] = 'Question {$a->thisq} cannot be attempted until the previous question {$a->previousq} has been completed • Click to change';
@@ -677,8 +688,8 @@ $string['quiz:manageoverrides'] = 'Manage quiz overrides';
 $string['quiznavigation'] = 'Quiz navigation';
 $string['quizopen'] = 'Open the quiz';
 $string['quizopenclose'] = 'Open and close dates';
-$string['quizopenclose_help'] = 'Students can only start their attempt(s) after the open time and they must complete their attempts before the close time.';
-$string['quizopenclose_link'] = 'mod/quiz/timing';
+$string['quizopenclose_help'] = 'Learners can only start their attempt(s) after the open time and they must complete their attempts before the close time.';
+$string['quizopenclose_link'] = 'Quiz';
 $string['quizopened'] = 'This quiz is open.';
 $string['quizopenedon'] = 'This quiz opened at {$a}';
 $string['quizopens'] = 'Quiz opens';
@@ -699,6 +710,8 @@ $string['randomfromcategory'] = 'Random question from category:';
 $string['randomfromexistingcategory'] = 'Random question from an existing category';
 $string['randomnumber'] = 'Number of random questions';
 $string['randomnosubcat'] = 'Questions from this category only, not its subcategories.';
+$string['randomnotenough'] = 'The selected category does not contain enough questions. Either add questions to the selected category or reduce the number of random questions drawn from it.';
+$string['randomquestioncategorynotenough'] = 'Category doesn\'t contain enough questions';
 $string['randomquestionusinganewcategory'] = 'Random question using a new category';
 $string['randomwithsubcat'] = 'Questions from this category and its subcategories.';
 $string['readytosend'] = 'You are about to send your whole quiz to be graded.  Are you sure you want to continue?';
@@ -737,7 +750,7 @@ $string['reportattemptsthatare'] = 'Attempts that are';
 $string['reportdisplayoptions'] = 'Display options';
 $string['reportfullstat'] = 'Detailed statistics';
 $string['reportmulti_percent'] = 'Multi-percentages';
-$string['reportmulti_q_x_student'] = 'Multi-student choices';
+$string['reportmulti_q_x_student'] = 'Multi-learner choices';
 $string['reportmulti_resp'] = 'Individual responses';
 $string['reportmustselectstate'] = 'You must select at least one state.';
 $string['reportnotfound'] = 'Report not known ({$a})';
@@ -754,7 +767,7 @@ $string['reportuserswithorwithout'] = 'enrolled users who have, or have not, att
 $string['reportuserswithout'] = 'enrolled users who have not attempted the quiz';
 $string['reportwhattoinclude'] = 'What to include in the report';
 $string['requirepassword'] = 'Require password';
-$string['requirepassword_help'] = 'If a password is specified, a student must enter it in order to attempt the quiz.';
+$string['requirepassword_help'] = 'If a password is specified, a learner must enter it in order to attempt the quiz.';
 $string['requiresubnet'] = 'Require network address';
 $string['requiresubnet_help'] = 'Quiz access may be restricted to particular subnets on the LAN or Internet by specifying a comma-separated list of partial or full IP address numbers. This can be useful for an invigilated (proctored) quiz, to ensure that only people in a certain location can access the quiz.';
 $string['response'] = 'Response';
@@ -776,19 +789,19 @@ $string['reviewofattempt'] = 'Review of attempt {$a}';
 $string['reviewofpreview'] = 'Review of preview';
 $string['reviewofquestion'] = 'Review of question {$a->question} in {$a->quiz} by {$a->user}';
 $string['reviewopen'] = 'Later, while the quiz is still open';
-$string['reviewoptions'] = 'Students may review';
+$string['reviewoptions'] = 'Learners may review';
 $string['reviewoptionsheading'] = 'Review options';
-$string['reviewoptionsheading_help'] = 'These options control what information students can see when they review a quiz attempt or look at the quiz reports.
+$string['reviewoptionsheading_help'] = 'These options control what information learners can see when they review a quiz attempt or look at the quiz reports.
 
 **During the attempt** settings are only relevant for some behaviours, like \'interactive with multiple tries\', which may display feedback during the attempt.
 
-**Immediately after the attempt** settings apply for the first two minutes after \'Submit all and finish\' is clicked.
+**Immediately after the attempt** settings apply for the first two minutes after **Submit all and finish** is clicked.
 
 **Later, while the quiz is still open** settings apply after this, and before the quiz close date.
 
 **After the quiz is closed** settings apply after the quiz close date has passed. If the quiz does not have a close date, this state is never reached.';
 $string['reviewoverallfeedback'] = 'Overall feedback';
-$string['reviewoverallfeedback_help'] = 'The feedback given at the end of the attempt, depending on the student\'s total mark.';
+$string['reviewoverallfeedback_help'] = 'The feedback given at the end of the attempt, depending on the learner\'s total mark.';
 $string['reviewresponse'] = 'Review response';
 $string['reviewresponsetoq'] = 'Review response (question {$a})';
 $string['reviewthisattempt'] = 'Review your responses to this attempt';
@@ -809,6 +822,7 @@ $string['savingnewgradeforquestion'] = 'Saving new grade for question id {$a}.';
 $string['savingnewmaximumgrade'] = 'Saving new maximum grade.';
 $string['score'] = 'Raw score';
 $string['scores'] = 'Scores';
+$string['search:activity'] = 'Quiz - activity information';
 $string['sectionheadingedit'] = 'Edit heading \'{$a}\'';
 $string['sectionheadingremove'] = 'Remove heading \'{$a}\'';
 $string['seequestions'] = '(See questions)';
@@ -816,6 +830,8 @@ $string['select'] = 'Select';
 $string['selectall'] = 'Select all';
 $string['selectcategory'] = 'Select category';
 $string['selectedattempts'] = 'Selected attempts...';
+$string['selectmultipleitems'] = 'Select multiple items';
+$string['selectmultipletoolbar'] = 'Select multiple toolbar';
 $string['selectnone'] = 'Deselect all';
 $string['selectquestiontype'] = '-- Select question type --';
 $string['serveradded'] = 'Server added';
@@ -837,23 +853,23 @@ $string['showeachpage'] = 'Show one page at a time';
 $string['showfeedback'] = 'After answering, show feedback?';
 $string['showinsecurepopup'] = 'Use a \'secure\' popup window for attempts';
 $string['showlargeimage'] = 'Large image';
-$string['shownoattempts'] = 'Show students with no attempts';
-$string['shownoattemptsonly'] = 'Show only students with no attempts';
+$string['shownoattempts'] = 'Show learners with no attempts';
+$string['shownoattemptsonly'] = 'Show only learners with no attempts';
 $string['shownoimage'] = 'No image';
 $string['showreport'] = 'Show report';
 $string['showsmallimage'] = 'Small image';
-$string['showteacherattempts'] = 'Show teacher attempts';
+$string['showteacherattempts'] = 'Show trainer attempts';
 $string['showuserpicture'] = 'Show the user\'s picture';
-$string['showuserpicture_help'] = 'If enabled, the student\'s name and picture will be shown on-screen during the attempt, and on the review screen, making it easier to check that the student is logged in as themself in an invigilated (proctored) exam.';
+$string['showuserpicture_help'] = 'If enabled, the learner\'s name and picture will be shown on-screen during the attempt, and on the review screen, making it easier to check that the learner is logged in as themself in an invigilated (proctored) exam.';
 $string['shuffle'] = 'Shuffle';
 $string['shuffleanswers'] = 'Shuffle answers';
 $string['shuffledrandomly'] = 'Shuffled randomly';
 $string['shufflequestions'] = 'Shuffle';
 $string['shufflequestions_help'] = 'If you turn this on, then every time the quiz is attempted, the order of the questions in this section will be shuffled into a different random order.
 
-This can make it harder for students to share answers, but it also makes it harder for students discuss a particular question with you.';
+This can make it harder for learners to share answers, but it also makes it harder for learners discuss a particular question with you.';
 $string['shufflewithin'] = 'Shuffle within questions';
-$string['shufflewithin_help'] = 'If enabled, the parts making up each question will be randomly shuffled each time a student attempts the quiz, provided the option is also enabled in the question settings. This setting only applies to questions that have multiple parts, such as multiple choice or matching questions.';
+$string['shufflewithin_help'] = 'If enabled, the parts making up each question will be randomly shuffled each time a learner attempts the quiz, provided the option is also enabled in the question settings. This setting only applies to questions that have multiple parts, such as multiple choice or matching questions.';
 $string['singleanswer'] = 'Choose one answer.';
 $string['sortage'] = 'Sort by age';
 $string['sortalpha'] = 'Sort by name';
@@ -877,7 +893,7 @@ $string['status'] = 'Status';
 $string['stoponerror'] = 'Stop on error';
 $string['submitallandfinish'] = 'Submit all and finish';
 $string['subneterror'] = 'Sorry, this quiz has been locked so that it is only accessible from certain locations.  Currently your computer is not one of those allowed to use this quiz.';
-$string['subnetnotice'] = 'This quiz has been locked so that it is only accessible from certain locations. Your computer is not on an allowed subnet. As teacher you are allowed to preview anyway.';
+$string['subnetnotice'] = 'This quiz has been locked so that it is only accessible from certain locations. Your computer is not on an allowed subnet. As trainer you are allowed to preview anyway.';
 $string['subplugintype_quiz'] = 'Report';
 $string['subplugintype_quiz_plural'] = 'Reports';
 $string['subplugintype_quizaccess'] = 'Access rule';
@@ -887,14 +903,14 @@ $string['summaryofattempt'] = 'Summary of attempt';
 $string['summaryofattempts'] = 'Summary of your previous attempts';
 $string['temporaryblocked'] = 'You are temporarily not allowed to re-attempt the quiz.<br /> You will be able to take another attempt on:';
 $string['theattempt'] = 'The attempt';
-$string['theattempt_help'] = 'Whether the student can review the attempt at all.';
+$string['theattempt_help'] = 'Whether the learner can review the attempt at all.';
 $string['time'] = 'Time';
 $string['timecompleted'] = 'Completed';
 $string['timedelay'] = 'You are not allowed to do the quiz since you have not passed the time delay before attempting another quiz';
 $string['timeleft'] = 'Time left';
 $string['timelimit'] = 'Time limit';
 $string['timelimit_help'] = 'If enabled, the time limit is stated on the initial quiz page and a countdown timer is displayed in the quiz navigation block.';
-$string['timelimit_link'] = 'mod/quiz/timing';
+$string['timelimit_link'] = 'Quiz';
 $string['timelimitexeeded'] = 'Sorry! Quiz time limit exceeded!';
 $string['timestr'] = '%H:%M:%S on %d/%m/%y';
 $string['timesup'] = 'Time is up!';
@@ -922,9 +938,10 @@ $string['upgradingquizattempts'] = 'Upgrading quiz attempts: quiz {$a->done}/{$a
 $string['upgradingveryoldquizattempts'] = 'Upgrading very old quiz attempts: {$a->done}/{$a->outof}';
 $string['url'] = 'URL';
 $string['usedcategorymoved'] = 'This category has been preserved and moved to the site level because it is a published category still in use by other courses.';
+$string['userdataitemattempts'] = 'Quiz attempts';
 $string['useroverrides'] = 'User overrides';
 $string['useroverridesdeleted'] = 'User overrides deleted';
-$string['usersnone'] = 'No students have access to this quiz';
+$string['usersnone'] = 'No learners have access to this quiz';
 $string['validate'] = 'Validate';
 $string['viewallanswers'] = 'View {$a} quiz attempts';
 $string['viewallreports'] = 'View reports for {$a} attempts';
@@ -938,8 +955,3 @@ $string['wronguse'] = 'You can not use this page like that';
 $string['xhtml'] = 'XHTML';
 $string['youneedtoenrol'] = 'You need to enrol in this course before you can attempt this quiz';
 $string['yourfinalgradeis'] = 'Your final grade for this quiz is {$a}.';
-
-// Deprecated since Moodle 2.9.
-
-$string['timelimitmin'] = 'Time limit (minutes)';
-$string['timelimitsec'] = 'Time limit (seconds)';

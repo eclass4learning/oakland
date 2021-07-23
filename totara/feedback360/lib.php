@@ -19,6 +19,7 @@
  *
  * @author David Curry <david.curry@totaralms.com>
  * @author Valerii Kuznetsov <valerii.kuznetsov@totaralms.com>
+ * @author Simon Player <simon.player@totaralearning.com>
  * @package totara
  * @subpackage feedback360
  */
@@ -49,16 +50,29 @@ class feedback360 {
     const STATUS_COMPLETED = 3;
 
     /**
-     * Feedback360 status
-     * @var int
+     * Selfevaluation status
      */
-    private $status = self::STATUS_DRAFT;
+    const SELF_EVALUATION_DISABLED = 0;
+    const SELF_EVALUATION_OPTIONAL = 1;
+    const SELF_EVALUATION_REQUIRED = 2;
 
     /**
      * Feedback360 id
      * @var int
      */
     protected $id = 0;
+
+    /**
+     * Feedback360 status
+     * @var int
+     */
+    private $status = self::STATUS_DRAFT;
+
+    /**
+     * Can the learner can self evaluate
+     * @var int
+     */
+    public $selfevaluation = self::SELF_EVALUATION_OPTIONAL;
 
     /**
      * User->id of the creator of the feedback
@@ -138,6 +152,9 @@ class feedback360 {
         if (isset($todb->anonymous)) {
             $this->anonymous = $todb->anonymous;
         }
+        if (isset($todb->selfevaluation)) {
+            $this->selfevaluation = $todb->selfevaluation;
+        }
         return $this;
     }
 
@@ -155,6 +172,7 @@ class feedback360 {
         $obj->id = $this->id;
         $obj->recipients = $this->recipients;
         $obj->anonymous = $this->anonymous;
+        $obj->selfevaluation = $this->selfevaluation;
 
         return $obj;
     }
@@ -194,6 +212,7 @@ class feedback360 {
         if ($this->status == self::STATUS_ACTIVE) {
             throw new feedback360_exception('Cannot delete active feedback');
         }
+
         // Delete question data table.
         sql_drop_table_if_exists('{feedback360_quest_data_' . $this->id . '}');
 
@@ -205,6 +224,7 @@ class feedback360 {
 
         // Delete grps, and all user/resp/email assignments.
         $assign = new totara_assign_feedback360('feedback360', $this);
+        $assign->lockoverride = false;
         $assign->delete();
 
         // Delete files.
@@ -310,6 +330,21 @@ class feedback360 {
             $answers = $question->get_element()->set_as_form($formdata)->get_as_db($answers);
         }
         return $answers;
+    }
+
+    /**
+     * Counts the number of completed responder assignments this feedback360 has
+     *
+     * @return int
+     */
+    public function count_completed_answers() {
+        global $DB;
+        $completed_responses = $DB->count_records_sql('SELECT COUNT(f.id)
+                FROM {feedback360} f
+                JOIN {feedback360_user_assignment} fua ON (f.id = fua.feedback360id)
+                JOIN {feedback360_resp_assignment} fra ON (fua.id = fra.feedback360userassignmentid AND fra.timecompleted != 0)
+                WHERE f.id = :feedback360id', array('feedback360id' => $this->id));
+        return $completed_responses;
     }
 
     /*
@@ -545,6 +580,28 @@ class feedback360 {
         return $result;
     }
 
+    /**
+     * Retrieve the appropriate string for the self evaluation status
+     *
+     * @param int $status   An instance of feedback360::SELF_EVALUATION_X
+     * @return string   corresponding string
+     */
+    public static function get_selfevaluation_status($status) {
+        switch ($status) {
+            case self::SELF_EVALUATION_DISABLED:
+                $result = get_string('notallowed', 'totara_feedback360');
+                break;
+            case self::SELF_EVALUATION_OPTIONAL:
+                $result = get_string('optional', 'totara_feedback360');
+                break;
+            case self::SELF_EVALUATION_REQUIRED:
+                $result = get_string('required', 'totara_feedback360');
+                break;
+        }
+
+        return $result;
+    }
+
 
     public static function can_view_feedback360s($userid = null) {
         global $USER, $DB;
@@ -599,6 +656,84 @@ class feedback360 {
         }
 
         return false;
+    }
+
+    /**
+     * Is self evaluation enabled.
+     *
+     * @param $userassignmentid
+     * @return bool
+     */
+    public static function self_evaluation_enabled($userassignmentid) {
+        global $DB;
+
+        $params = array(
+            'userassignmentid' => $userassignmentid,
+            'selfevaluation' => feedback360::SELF_EVALUATION_DISABLED,
+        );
+
+        $sql = "SELECT 1
+                  FROM {feedback360_user_assignment} fua
+                  JOIN {feedback360} f
+                      ON f.id = fua.feedback360id
+                 WHERE fua.id = :userassignmentid
+                   AND f.selfevaluation != :selfevaluation";
+
+        return $DB->record_exists_sql($sql, $params);
+    }
+
+    /**
+     * Can the user self evaluate.
+     *
+     * @param $userassignmentid
+     * @param $userid
+     * @return bool
+     */
+    public static function can_self_evaluate($userassignmentid, $userid) {
+        global $DB;
+
+        $params = array(
+            'feedback360userassignmentid' => $userassignmentid,
+            'userid' => $userid,
+            'selfevaluation' => feedback360::SELF_EVALUATION_DISABLED,
+        );
+
+        $sql = "SELECT 1
+                  FROM {feedback360_resp_assignment} fra
+                  JOIN {feedback360_user_assignment} fua
+                      ON fua.id = fra.feedback360userassignmentid
+                  JOIN {feedback360} f
+                      ON f.id = fua.feedback360id
+                 WHERE  fra.feedback360userassignmentid = :feedback360userassignmentid
+                   AND fra.userid = :userid
+                   AND fra.timecompleted = 0
+                   AND f.selfevaluation != :selfevaluation";
+
+        return $DB->record_exists_sql($sql, $params);
+    }
+
+    /**
+     * Has a self evaluation been completed.
+     *
+     * @param $userassignmentid
+     * @param $userid
+     * @return bool
+     */
+    public static function self_evaluation_completed($userassignmentid, $userid) {
+        global $DB;
+
+        $sql = "SELECT 1
+                  FROM {feedback360_resp_assignment}
+                 WHERE feedback360userassignmentid = :userassignmentid
+                   AND userid = :userid
+                   AND timecompleted != 0";
+
+        $params = array(
+            'userassignmentid' => $userassignmentid,
+            'userid' => $userid,
+        );
+
+        return $DB->record_exists_sql($sql, $params);
     }
 
     /**
@@ -745,37 +880,6 @@ class feedback360 {
 
         $params = array('feedback360id' => $feedback360id, 'userid' => $userid);
         return $DB->record_exists('feedback360_user_assignment', $params);
-    }
-
-    /**
-     * Return feedback360s that are assigned to the user, but not assigned for response
-     *
-     * @param int $userid
-     * @return array
-     */
-    public static function get_available_forms($userid) {
-        global $DB, $TEXTAREA_OPTIONS;
-
-        $sql = "SELECT f.*, fa.id AS assigid
-                FROM {feedback360_user_assignment} fa
-                JOIN {feedback360} f
-                ON fa.feedback360id = f.id
-                WHERE fa.userid = ?
-                AND f.status = ?";
-        $forms = $DB->get_records_sql($sql, array($userid, self::STATUS_ACTIVE));
-        $available_forms = array();
-        foreach ($forms as $form) {
-            $existingrequests = $DB->count_records('feedback360_resp_assignment',
-                    array('feedback360userassignmentid' => $form->assigid));
-            if ($existingrequests > 0) {
-                continue;
-            }
-            $form->description = file_rewrite_pluginfile_urls($form->description, 'pluginfile.php',
-                $TEXTAREA_OPTIONS['context']->id, 'totara_feedback360', 'feedback360', $form->id);
-            $available_forms[$form->id] = $form;
-        }
-
-        return $available_forms;
     }
 
     /**
@@ -1112,18 +1216,21 @@ class feedback360_question extends question_storage {
     }
 
     /**
-     * Check if user can view answer by assignment
+     * Check if user can view answer by assignment.
+     * Ignores email assignments as a token is required for this
      *
      * @param int $assignmentid Responder assignment id
      * @param int $userid
      * @return bool
      */
     public function user_can_view($assignmentid, $userid) {
-        $resp = new feedback360_responder($assignmentid);
-        if (in_array($userid , array((int)$resp->userid, $resp->subjectid))) {
-            return true;
+        // If there is no assignment.
+        if (empty($assignmentid)) {
+            return false;
         }
-        if (isguestuser($userid) && $resp->type == feedback360_responder::TYPE_EMAIL) {
+        $resp = new feedback360_responder($assignmentid);
+        // Check that the user is the subject or the responder.
+        if (in_array($userid , array((int)$resp->userid, $resp->subjectid))) {
             return true;
         }
         return false;
@@ -1227,6 +1334,11 @@ class feedback360_responder {
     public $tokenaccess = false;
 
     /**
+     * @var string used for when a user who has requested feedback is viewing responses
+     */
+    protected $requestertoken;
+
+    /**
      * Constructor
      * @param int $id feedback360_resp_assignment.id
      */
@@ -1269,6 +1381,26 @@ class feedback360_responder {
         if (!$resp) {
             return false;
         }
+        return new feedback360_responder($resp->id);
+    }
+
+    /**
+     * Get a feedback_responder object based on the 'requestertoken' associated with a response.
+     *
+     * This should only be used when the response is being viewed by the user who requested feedback.
+     * It should NOT be used by the user giving the feedback.
+     *
+     * @param $token
+     * @return bool|feedback360_responder
+     */
+    public static function get_by_requester_token($requestertoken) {
+        global $DB;
+
+        $resp = $DB->get_record('feedback360_resp_assignment', array('requestertoken' => $requestertoken));
+        if (!$resp) {
+            return false;
+        }
+
         return new feedback360_responder($resp->id);
     }
 
@@ -1342,6 +1474,7 @@ class feedback360_responder {
         $this->timeassigned = $respdata->timeassigned;
         $this->timecompleted = $respdata->timecompleted;
         $this->timedue = $respdata->timedue;
+        $this->requestertoken = $respdata->requestertoken;
 
         if ($respdata->feedback360emailassignmentid > 0) {
             if (empty($respdata->email) || empty($respdata->token)) {
@@ -1368,6 +1501,7 @@ class feedback360_responder {
         $data->timeassigned = $this->timeassigned;
         $data->viewed = $this->viewed;
         $data->timecompleted = $this->timecompleted;
+        $data->requestertoken = $this->get_requestertoken();
         if ($this->type == self::TYPE_USER) {
             $data->userid = $this->userid;
         } else {
@@ -1469,6 +1603,7 @@ class feedback360_responder {
         $keep = array();
         $cancel = array();
 
+        // Invalid users.
         if (empty($userids)) {
             $invaliduserids = array();
         } else {
@@ -1478,9 +1613,12 @@ class feedback360_responder {
 
         $guest = guest_user();
         $invaliduserids[] = $guest->id;
-        $requesteruserid = $DB->get_field('feedback360_user_assignment', 'userid', array('id' => $userassignmentid));
-        if (!empty($requesteruserid)) {
-            $invaliduserids[] = $requesteruserid;
+
+        if (!feedback360::self_evaluation_enabled($userassignmentid)) {
+            $requesteruserid = $DB->get_field('feedback360_user_assignment', 'userid', array('id' => $userassignmentid));
+            if (!empty($requesteruserid)) {
+                $invaliduserids[] = $requesteruserid;
+            }
         }
 
         $existingusers = self::get_system_users_by_assignment($userassignmentid);
@@ -1547,6 +1685,11 @@ class feedback360_responder {
         // Create new resp_assignments for all users selected in the system.
         $systemnew = !empty($data->systemnew) ? explode(',', $data->systemnew) : array();
         $systemkeep = !empty($data->systemkeep) ? explode(',', $data->systemkeep) : array();
+
+        // If user is self evaluating, add them as well.
+        if (!empty($data->selfevaluation)) {
+            $systemnew[] = $data->userid;
+        }
 
         // We need to validate the data to ensure new, keep and cancel lists are genuine.
         $newandkeep = array_merge($systemnew, $systemkeep);
@@ -1632,6 +1775,7 @@ class feedback360_responder {
         // Loop through the users to add and assign them where appropriate.
         foreach ($new as $userid) {
             $resp_assignment->userid = $userid;
+            $resp_assignment->requestertoken = self::create_requestertoken();
             $resp_assignment->id = $DB->insert_record('feedback360_resp_assignment', $resp_assignment);
 
             $userto = $DB->get_record('user', array('id' => $userid));
@@ -1640,13 +1784,42 @@ class feedback360_responder {
             $url = new moodle_url('/totara/feedback360/feedback.php', $params);
             $taskvars->link = html_writer::link($url, $url->out());
             $taskvars->url = $url->out();
+            $taskvars->feedbackname = format_string($feedback360->name);
+
+            // Time due.
+            if (!empty($user_assignment->timedue)) {
+                $duedate = userdate($user_assignment->timedue, get_string('strftimedatefulllong', 'langconfig'));
+                $taskvars->timedue = get_string('byduedate' , 'totara_feedback360', $duedate);
+            } else {
+                $taskvars->timedue = '';
+            }
 
             // Send a task to the requested user.
             $eventdata = new stdClass();
             $eventdata->userto = $userto;
             $eventdata->userfrom = ($asmanager) ? $USER : $userfrom;
             $eventdata->icon = 'feedback360-request';
-            if ($asmanager) {
+
+            if ($userto->id == $USER->id) {
+                // This is a self evaluation.
+                if ($feedback360->selfevaluation == feedback360::SELF_EVALUATION_OPTIONAL) {
+                    // Optional self evaluation.
+                    $eventdata->subject = $stringmanager->get_string('selfevaluationemailrequestsubject', 'totara_feedback360',
+                        $taskvars, $userto->lang);
+                    $eventdata->fullmessage = $stringmanager->get_string('selfevaluationemailrequestoptionalbody',
+                        'totara_feedback360', $taskvars, $userto->lang);
+                    $eventdata->fullmessagehtml = $stringmanager->get_string('selfevaluationemailrequestoptionalbodyhtml',
+                        'totara_feedback360', $taskvars, $userto->lang);
+                } else {
+                    // Required self evaluation.
+                    $eventdata->subject = $stringmanager->get_string('selfevaluationemailrequestsubject', 'totara_feedback360',
+                        $taskvars, $userto->lang);
+                    $eventdata->fullmessage = $stringmanager->get_string('selfevaluationemailrequestrequiredbody',
+                        'totara_feedback360', $taskvars, $userto->lang);
+                    $eventdata->fullmessagehtml = $stringmanager->get_string('selfevaluationemailrequestrequiredbodyhtml',
+                        'totara_feedback360', $taskvars, $userto->lang);
+                }
+            } else if ($asmanager) {
                 $eventdata->subject = $stringmanager->get_string('manageremailrequestsubject', 'totara_feedback360',
                         $taskvars, $userto->lang);
                 $eventdata->fullmessage = $stringmanager->get_string('manageremailrequeststr', 'totara_feedback360',
@@ -1676,7 +1849,43 @@ class feedback360_responder {
 
                 feedback360::cancel_resp_assignment($resp_assignment, $asmanager);
             }
+        } else if (in_array($user_assignment->userid, $cancel)) {
+            // Ok to remove for uncompleted self evaluation, if not complete.
+            $resp_params = array('userid' => $user_assignment->userid, 'feedback360userassignmentid' => $userformid);
+            $resp_assignment = $DB->get_record('feedback360_resp_assignment', $resp_params);
+
+            if (empty($resp_assignment->timecompleted)) {
+                feedback360::cancel_resp_assignment($resp_assignment, $asmanager);
+            }
         }
+    }
+
+    /**
+     * Get the 'requestertoken' associated with a feedback response. This will create a token if
+     * no token is found. This does not check the database. Ensure you use this classes load method
+     * to pull any data from the database if necessary.
+     *
+     * The requestertoken is used for accessing of responses by the user who requested feedback.
+     * This should NOT be used for users who will be giving responses.
+     *
+     * @return string the requester token (a 40 character sha1 hash).
+     */
+    protected function get_requestertoken() {
+        if (empty($this->requestertoken)) {
+            $this->requestertoken = self::create_requestertoken();
+        }
+
+        return $this->requestertoken;
+    }
+
+    /**
+     * Creates a random, unique 40 character sha1 hash to be used as the 'requestertoken'.
+     *
+     * @return string the requester token (a 40 character sha1 hash).
+     */
+    private static function create_requestertoken() {
+        $stringtohash = 'requester' . time() . random_string() . get_site_identifier();
+        return sha1($stringtohash);
     }
 
     /**
@@ -1825,12 +2034,18 @@ class feedback360_responder {
             // Create the feedback360_email_assignment.
             $email_assignment = new stdClass();
             $email_assignment->email = $email;
-            $email_assignment->token = sha1($email . ',' . 'feedback360_user_assignment:' . $userformid . ',' . time());
+
+            // Create a string that would be very difficult to replicate.
+            // The token generated here is for use by the user giving feedback (opposite to 'requestertoken').
+            $responderstringtohash = $email . 'responder' . $userformid . time() . get_site_identifier();
+            $email_assignment->token = sha1($responderstringtohash);
+
             $emailid = $DB->insert_record('feedback360_email_assignment', $email_assignment);
 
             // Create and link the feedback360_resp_assignment.
             $resp_assignment->userid = $CFG->siteguest; // They aren't a user so we'll put them down as guests.
             $resp_assignment->feedback360emailassignmentid = $emailid;
+            $resp_assignment->requestertoken = self::create_requestertoken();
             $resp_assignment->id = $DB->insert_record('feedback360_resp_assignment', $resp_assignment);
 
             // Set up some variables for the email.
@@ -1856,6 +2071,7 @@ class feedback360_responder {
             $message = new stdClass();
             $message->component         = 'moodle';
             $message->name              = 'instantmessage';
+            $message->courseid          = SITEID;
             $message->userfrom          = $userfrom;
             $message->userto            = $userto;
             $message->subject           = $emailsubject;
@@ -2002,11 +2218,10 @@ class feedback360_event_handler {
 /**
  * Serves the folder files.
  *
- * @package  mod_folder
  * @category files
  * @param stdClass $course course object
  * @param stdClass $cm course module
- * @param stdClass $context context object
+ * @param context $context context object
  * @param string $filearea file area
  * @param array $args extra arguments
  * @param bool $forcedownload whether or not force download
@@ -2014,34 +2229,123 @@ class feedback360_event_handler {
  * @return bool false if file not found, does not return if found - just send the file
  */
 function totara_feedback360_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options=array()) {
-    global $USER;
-    // Itemid used as assignmentid.
-    $assignmentid = (int)array_shift($args);
-    $filename = array_shift($args);
+    global $USER, $DB, $SESSION;
 
     if (strpos($filearea, 'quest_') === 0) {
+        // This is 0 if the image was not uploaded by the responder ie static image.
+        $responderassignmentid = (int)$args[0];
         $questionid = (int)str_replace('quest_', '', $filearea);
-        if (!$question = new feedback360_question($questionid)) {
+
+        $question = new feedback360_question($questionid);
+
+        if (!($question)) {
             send_file_not_found();
         }
 
-        $systemcontext = context_system::instance();
-        if (!has_capability('totara/feedback360:managefeedback360', $systemcontext)) {
-            if ($assignmentid != 0 && !$question->user_can_view($assignmentid, $USER->id)) {
+        /** @var array $visibleforusers list of user ids that can see file in the feedback that are subordinates to the current user */
+        $visibleforusers = array();
+        if (!has_capability('totara/feedback360:managefeedback360', context_system::instance())) {
+            $users = \totara_job\job_assignment::get_direct_staff_userids($USER->id);
+            foreach ($users as $user) {
+                $usercontext = context_user::instance($user);
+                if ((has_capability('totara/feedback360:viewmanagestafffeedback', $usercontext)
+                        || has_capability('totara/feedback360:viewstaffreceivedfeedback360', $usercontext)
+                        || has_capability('totara/feedback360:viewstaffrequestedfeedback360', $usercontext))
+                    && ($responderassignmentid == 0 || $question->user_can_view($responderassignmentid, $user))
+                ) {
+                    $visibleforusers[] = $user;
+                }
+
+            }
+            if (count($visibleforusers) == 0 && !($responderassignmentid == 0 || $question->user_can_view($responderassignmentid, $USER->id))) {
                 send_file_not_found();
             }
+        }
+
+        $visibleforusers[] = $USER->id;
+
+        // List SQL for users that the feedback has a user assignment for a user that the current user can view their feedback.
+        list($uamatchsql, $uaparams) = $DB->get_in_or_equal($visibleforusers, SQL_PARAMS_NAMED);
+
+        // List SQL for users that the feedback has a responder assignment for a user that the current user can view their feedback.
+        list($ramatchsql, $raparams) = $DB->get_in_or_equal($visibleforusers, SQL_PARAMS_NAMED);
+
+        /*
+         * Check if the feedback has a user assignment responder assignment for the current user or one of their subordinates
+         * that they can see the feedbacks of.
+         */
+        $sql = "SELECT 1
+                  FROM {feedback360_quest_field} qf
+            INNER JOIN {feedback360_user_assignment} ua ON ua.feedback360id = qf.feedback360id
+             LEFT JOIN {feedback360_resp_assignment} ra ON ra.feedback360userassignmentid = ua.id
+                 WHERE qf.id = :questionid AND ((ra.userid {$ramatchsql} AND ra.userid <> :guestid) OR ua.userid {$uamatchsql}) ";
+        $params = array_merge($raparams, $uaparams, array('questionid' => $questionid, 'guestid' => guest_user()->id));
+
+        $user_can_view = is_siteadmin($USER) || $DB->record_exists_sql($sql, $params);
+
+        // Checks if the user has being assigned by email to the feedback
+        // This is a hack to get around authenticating anonymous users when viewing files in feeback360.
+        if (!empty($SESSION->totara_feedback360_usertoken)) {
+            // Make sure the token is valid.
+            if ($DB->record_exists_sql("
+                SELECT 1
+                  FROM {feedback360_email_assignment} fea
+            INNER JOIN {feedback360_resp_assignment} fra ON fea.id = fra.feedback360emailassignmentid
+            INNER JOIN {feedback360_user_assignment} fua ON fua.id = fra.feedback360userassignmentid
+            INNER JOIN {feedback360} f ON fua.feedback360id = f.id
+            INNER JOIN {feedback360_quest_field} qf ON qf.feedback360id = f.id
+                 WHERE fea.token = :token AND qf.id = :questionid", ['token' => $SESSION->totara_feedback360_usertoken, 'questionid' => $questionid])) {
+                $user_can_view = true;
+            }
+        }
+
+        // If the user can neither view the feedback through being assigned, subordinate being assigned or email assignment.
+        if (!$user_can_view) {
+            send_file_not_found();
+        }
+    } else {
+        // Assumes that the file is in the description for the feedback.
+        $feedback360id = (int)$args[0];
+        if (!isloggedin()) {
+            send_file_not_found();
+        }
+
+        $canview = false;
+        // If the have the capability to manage their feedbacks and are assigned to the feedback.
+        if (has_capability('totara/feedback360:manageownfeedback360', $context)
+            && $DB->record_exists('feedback360_user_assignment', array('userid' => $USER->id, 'feedback360id' => $feedback360id))) {
+            $canview = true;
+        }
+
+        // They should be able to see the files if they can request feedback from someone.
+        $users = \totara_job\job_assignment::get_direct_staff_userids($USER->id);
+        foreach ($users as $user) {
+            $usercontext = context_user::instance($user);
+            if (has_capability('totara/feedback360:managestafffeedback', $usercontext)
+                && $DB->record_exists('feedback360_user_assignment', array('userid' => $user, 'feedback360id' => $feedback360id))) {
+                $canview = true;
+                break;
+            }
+        }
+
+        // If they can manage any feedback.
+        if (has_capability('totara/feedback360:managefeedback360', $context)) {
+            $canview = true;
+        }
+
+        if (!$canview) {
+            send_file_not_found();
         }
     }
 
     $fs = get_file_storage();
-    if (!$file = $fs->get_file($context->id, 'totara_feedback360', $filearea, $assignmentid, '/', $filename)) {
+    if (!$file = $fs->get_file($context->id, 'totara_feedback360', $filearea, $args[0], '/', $args[1])) {
         send_file_not_found();
     }
 
     \core\session\manager::write_close();
     send_stored_file($file, 60*60, 0, true, $options);
 }
-
 
 require_once($CFG->dirroot . '/user/selector/lib.php');
 

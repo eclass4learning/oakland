@@ -51,8 +51,8 @@ class delete_unconfirmed_users_task extends scheduled_task {
             $cuttime = $timenow - ($CFG->deleteunconfirmed * 3600);
             $rs = $DB->get_recordset_sql ("SELECT *
                                              FROM {user}
-                                            WHERE confirmed = 0 AND firstaccess > 0
-                                                  AND firstaccess < ? AND deleted = 0", array($cuttime));
+                                            WHERE confirmed = 0 AND timecreated > 0
+                                                  AND timecreated < ? AND deleted = 0", array($cuttime));
             foreach ($rs as $user) {
                 // TOTARA: we never ever delete the user record from the database, doing so can leave orphaned data in the system
                 // as things like completion data, log records, and much more is left for users, even those that have never confirmed

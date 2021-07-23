@@ -25,31 +25,49 @@ namespace totara_core\output;
 
 defined('MOODLE_INTERNAL') || die();
 
+/**
+ * @deprecated since 12.0
+ */
 class totara_menu implements \renderable, \templatable {
 
     public $menuitems = array();
 
+    /**
+     * @deprecated since 12.0
+     */
     public function __construct($menudata, $parent=null, $selected_items=array()) {
-        global $PAGE;
+        global $PAGE, $FULLME;
+
+        debugging('Class totara_core\output\totara_menu has been deprecated since 12.0');
 
         // Gets selected items, only done first time
         if (!$selected_items && $PAGE->totara_menu_selected) {
-            $relationships = array();
             foreach ($menudata as $item) {
-                $relationships[$item->name] = array($item->name);
-                if ($item->parent) {
-                    $relationships[$item->name][] = $item->parent;
-                    if (!empty($relationships[$item->parent])) {
-                        $relationships[$item->name] = array_merge($relationships[$item->name], $relationships[$item->parent]);
-                    } elseif (!isset($relationships[$item->parent])) {
-                        throw new \coding_exception('Totara menu definition is incorrect');
+                if ($PAGE->totara_menu_selected == $item->name) {
+                    $selected_items = array($item->name);
+                }
+            }
+        }
+
+        if (!$selected_items) {
+            $urlcache = [];
+            foreach ($menudata as $item) {
+                $url = new \moodle_url($item->url);
+                $urlcache[$item->name] = $url;
+                if ($PAGE->url->compare($url)) {
+                    $selected_items = array($item->name);
+                    break;
+                }
+            }
+            if (!$selected_items) {
+                foreach ($menudata as $item) {
+                    if ($urlcache[$item->name]->compare(new \moodle_url($FULLME), URL_MATCH_EXACT)) {
+                        $selected_items = array($item->name);
+                        break;
                     }
                 }
             }
-
-            if (array_key_exists($PAGE->totara_menu_selected, $relationships)) {
-                $selected_items = $relationships[$PAGE->totara_menu_selected];
-            }
+            unset($urlcache);
         }
 
         $currentlevel = array();
@@ -65,16 +83,14 @@ class totara_menu implements \renderable, \templatable {
         if ($numitems > 0) {
             // Create Structure
             foreach ($currentlevel as $menuitem) {
-                $url = new \moodle_url($menuitem->url);
-
                 $class_isfirst = ($count == 0 ? true : false);
-                $class_islast = ($count == $numitems - 1 ? true : false);
+                $class_islast  = ($count == $numitems - 1 ? true : false);
                 // If the menu item is known to be selected or it if its a direct match to the current pages URL.
-                $class_isselected = (in_array($menuitem->name, $selected_items) || $PAGE->url->compare($url) ? true : false);
+                $class_isselected = (in_array($menuitem->name, $selected_items) ? true : false);
 
                 $children = new self($menudata, $menuitem->name, $selected_items);
                 $haschildren = ($children->has_children() ? true : false);
-
+                $url = new \moodle_url($menuitem->url);
                 $this->menuitems[] = array(
                     'class_name' => $menuitem->name,
                     'class_isfirst' => $class_isfirst,

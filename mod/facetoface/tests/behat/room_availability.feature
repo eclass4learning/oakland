@@ -22,25 +22,23 @@ Feature: Seminar room availability
     And I press "Add a new room"
     And I set the following fields to these values:
       | Name                         | Room 1          |
-      | Maximum bookings             | 10              |
+      | Room capacity                | 10              |
       | Allow room booking conflicts | 0               |
     And I press "Add a room"
     And I press "Add a new room"
     And I set the following fields to these values:
       | Name                         | Room 2          |
-      | Maximum bookings             | 10              |
+      | Room capacity                | 10              |
       | Allow room booking conflicts | 1               |
     And I press "Add a room"
     And I press "Add a new room"
     And I set the following fields to these values:
       | Name                         | Room 3          |
-      | Maximum bookings             | 10              |
+      | Room capacity                | 10              |
       | Allow room booking conflicts | 0               |
     And I press "Add a room"
     And I click on "Hide from users when choosing a room on the Add/Edit event page" "link" in the "Room 3" "table_row"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Test Seminar 1 |
       | Description | test           |
@@ -51,20 +49,19 @@ Feature: Seminar room availability
 
   Scenario: Time based seminar room conflicts
     Given I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -79,20 +76,20 @@ Feature: Seminar room availability
     And I should see "Room 2 (Capacity: 10)"
     And I should not see "Room 3 (Capacity: 10)"
     And I click on "OK" "button" in the "Choose a room" "totaradialogue"
-    And I press "Add a new date"
+    And I press "Add a new session"
     # The UI is not usable much here, we just save this and go back and the last added session will be listed first.
     And I press "Save changes"
     And I click on "Edit event" "link" in the "0 / 10" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2026 |
+      | timestart[month]   | 2    |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2026 |
+      | timefinish[month]  | 2    |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -102,20 +99,20 @@ Feature: Seminar room availability
     And I should not see "Room 3 (Capacity: 10)"
     And I click on "Room 2 (Capacity: 10)" "text" in the "Choose a room" "totaradialogue"
     And I click on "OK" "button" in the "Choose a room" "totaradialogue"
-    And I press "Add a new date"
+    And I press "Add a new session"
     # The UI is not usable much here, we just save this and go back and the last added session will be listed first.
     And I press "Save changes"
     And I click on "Edit event" "link" in the "0 / 10" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 12   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 13   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -125,24 +122,24 @@ Feature: Seminar room availability
     And I should not see "Room 3 (Capacity: 10)"
     And I click on "Room 1 (Capacity: 10)" "text" in the "Choose a room" "totaradialogue"
     And I click on "OK" "button" in the "Choose a room" "totaradialogue"
-    And I should see "Room 1 (10)" in the "1 January 2025 1:00 PM" "table_row"
-    And I should see "Room 1 (10)" in the "1 January 2025 11:00 AM" "table_row"
-    And I should see "Room 2 (10)" in the "January 2026" "table_row"
+    And I should see "Room 1 (10)" in the "1:00 PM" "table_row"
+    And I should see "Room 1 (10)" in the "11:00 AM -1 January" "table_row"
+    And I should see "Room 2 (10)" in the "1 February" "table_row"
     And I press "Save changes"
 
     When I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 20 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 10   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 11   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -158,16 +155,16 @@ Feature: Seminar room availability
     When I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 30 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 13   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 14   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -183,16 +180,16 @@ Feature: Seminar room availability
     When I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 40 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2026 |
+      | timestart[month]   | 2    |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2026 |
+      | timefinish[month]  | 2    |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -208,16 +205,16 @@ Feature: Seminar room availability
     When I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 50 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -227,16 +224,16 @@ Feature: Seminar room availability
     And I press "Cancel"
 
     And I click on "Edit event" "link" in the "0 / 20" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -246,22 +243,21 @@ Feature: Seminar room availability
 
   Scenario: Hiding related seminar room availability
     Given I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 20 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -283,21 +279,20 @@ Feature: Seminar room availability
     And I click on "Hide from users when choosing a room on the Add/Edit event page" "link" in the "Room 1" "table_row"
     And I log out
     And I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
 
     When I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2026 |
+      | timestart[month]   | 2    |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2026 |
+      | timefinish[month]  | 2    |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -314,20 +309,20 @@ Feature: Seminar room availability
     And I should see "Room 2 (Capacity: 10)"
     And I should not see "Room 3 (Capacity: 10)"
     And I click on "Cancel" "button" in the "Choose a room" "totaradialogue"
-    And I press "Add a new date"
+    And I press "Add a new session"
     # The UI is not usable much here, we just save this and go back and the last added session will be listed first.
     And I press "Save changes"
     And I click on "Edit event" "link" in the "0 / 20" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2026 |
+      | timestart[month]   | 2    |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2026 |
+      | timefinish[month]  | 2    |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -342,22 +337,21 @@ Feature: Seminar room availability
 
   Scenario: Custom seminar room availability
     Given I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 30 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -367,22 +361,22 @@ Feature: Seminar room availability
       | Name                         | Zimmer 1 |
       | roomcapacity                 | 30       |
       | Allow room booking conflicts | 0        |
-    And I click on "OK" "button" in the "Create new room" "totaradialogue"
+    And I click on "//div[@aria-describedby='editcustomroom0-dialog']//div[@class='ui-dialog-buttonset']/button[contains(.,'OK')]" "xpath_element"
 
-    When  I press "Add a new date"
+    When  I press "Add a new session"
     # The UI is not usable much here, we just save this and go back and the last added session will be listed first.
     And I press "Save changes"
     And I click on "Edit event" "link" in the "0 / 30" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 12   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 13   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -399,16 +393,16 @@ Feature: Seminar room availability
     When I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 40 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -422,7 +416,7 @@ Feature: Seminar room availability
       | Name                         | Zimmer 2 |
       | roomcapacity                 | 40       |
       | Allow room booking conflicts | 0        |
-    And I click on "OK" "button" in the "Create new room" "totaradialogue"
+    And I click on "//div[@aria-describedby='editcustomroom0-dialog']//div[@class='ui-dialog-buttonset']/button[contains(.,'OK')]" "xpath_element"
     And I click on "Delete" "link" in the "Zimmer 2" "table_row"
     And I press "Save changes"
     And I should not see "Zimmer 2" in the "0 / 40" "table_row"
@@ -437,8 +431,7 @@ Feature: Seminar room availability
     And I click on "Cancel" "button" in the "Choose a room" "totaradialogue"
     And I press "Cancel"
 
-    When I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    When I am on "Course 1" course homepage
     And I follow "Test Seminar 2"
     And I follow "Add a new event"
     And I click on "Select room" "link"
@@ -452,8 +445,7 @@ Feature: Seminar room availability
     And I log out
 
     When I log in as "teacher2"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 2"
     And I follow "Add a new event"
     And I click on "Select room" "link"
@@ -465,8 +457,7 @@ Feature: Seminar room availability
     And I click on "Cancel" "button" in the "Choose a room" "totaradialogue"
     And I press "Cancel"
 
-    When I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    When I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I follow "Add a new event"
     And I click on "Select room" "link"
@@ -480,22 +471,21 @@ Feature: Seminar room availability
 
   Scenario: Seminar switch site room to not allow conflicts
     Given I log in as "admin"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 20 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -506,16 +496,16 @@ Feature: Seminar room availability
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 30 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -534,20 +524,19 @@ Feature: Seminar room availability
     Then I should see "Room has conflicting usage"
     And I press "Cancel"
 
-    When I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    When I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I click on "Edit event" "link" in the "0 / 30" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 12   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 13   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -561,22 +550,21 @@ Feature: Seminar room availability
 
   Scenario: Seminar switch custom room to not allow conflicts
     Given I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 40 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -586,21 +574,21 @@ Feature: Seminar room availability
       | Name                         | Zimmer 1 |
       | roomcapacity                 | 40       |
       | Allow room booking conflicts | 1        |
-    And I click on "OK" "button" in the "Create new room" "totaradialogue"
+    And I click on "//div[@aria-describedby='editcustomroom0-dialog']//div[@class='ui-dialog-buttonset']/button[contains(.,'OK')]" "xpath_element"
     And I press "Save changes"
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 50 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -615,20 +603,19 @@ Feature: Seminar room availability
     And I click on "Edit room" "link" in the "Zimmer 1 (40)" "table_row"
     And I set the following fields to these values:
       | Allow room booking conflicts | 0 |
-    # TODO TL-9503 fix dialog name to be 'Edit room'
-    And I click on "OK" "button" in the "Edit room" "totaradialogue"
+    And I click on "//div[@aria-describedby='editcustomroom0-dialog']//div[@class='ui-dialog-buttonset']/button[contains(.,'OK')]" "xpath_element"
     Then I should see "Room has conflicting usage" in the "Edit room" "totaradialogue"
     And I click on "Cancel" "button" in the "Edit room" "totaradialogue"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 12   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 13   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -637,29 +624,27 @@ Feature: Seminar room availability
     And I click on "Edit room" "link" in the "Zimmer 1 (40)" "table_row"
     And I set the following fields to these values:
       | Allow room booking conflicts | 0 |
-    # TODO TL-9503 fix dialog name to be 'Edit room'
-    And I click on "OK" "button" in the "Edit room" "totaradialogue"
+    And I click on "//div[@aria-describedby='editcustomroom0-dialog']//div[@class='ui-dialog-buttonset']/button[contains(.,'OK')]" "xpath_element"
     Then I should not see "Room has conflicting usage"
     And I press "Save changes"
 
   Scenario: Reportbuilder seminar room availability filter
     Given I log in as "admin"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "Test Seminar 1"
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 20 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -670,16 +655,16 @@ Feature: Seminar room availability
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 30 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 13   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 14   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -690,16 +675,16 @@ Feature: Seminar room availability
     And I follow "Add a new event"
     And I set the following fields to these values:
       | Maximum bookings | 30 |
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2025 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 15   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2025 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 16   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -715,12 +700,12 @@ Feature: Seminar room availability
       | room-roomavailable_enable        | Free between the following times |
       | room-roomavailable_start[day]    | 1                                |
       | room-roomavailable_start[month]  | January                          |
-      | room-roomavailable_start[year]   | 2025                             |
+      | room-roomavailable_start[year]   | ## next year ## Y ##             |
       | room-roomavailable_start[hour]   | 10                               |
       | room-roomavailable_start[minute] | 00                               |
       | room-roomavailable_end[day]      | 1                                |
       | room-roomavailable_end[month]    | January                          |
-      | room-roomavailable_end[year]     | 2025                             |
+      | room-roomavailable_end[year]     | ## next year ## Y ##             |
       | room-roomavailable_end[hour]     | 11                               |
       | room-roomavailable_end[minute]   | 00                               |
     And I press "submitgroupstandard[addfilter]"
@@ -731,12 +716,12 @@ Feature: Seminar room availability
     When I set the following fields to these values:
       | room-roomavailable_start[day]    | 1                                |
       | room-roomavailable_start[month]  | January                          |
-      | room-roomavailable_start[year]   | 2025                             |
+      | room-roomavailable_start[year]   | ## next year ## Y ##             |
       | room-roomavailable_start[hour]   | 10                               |
       | room-roomavailable_start[minute] | 00                               |
       | room-roomavailable_end[day]      | 1                                |
       | room-roomavailable_end[month]    | January                          |
-      | room-roomavailable_end[year]     | 2025                             |
+      | room-roomavailable_end[year]     | ## next year ## Y ##             |
       | room-roomavailable_end[hour]     | 11                               |
       | room-roomavailable_end[minute]   | 01                               |
     And I press "submitgroupstandard[addfilter]"
@@ -747,12 +732,12 @@ Feature: Seminar room availability
     When I set the following fields to these values:
       | room-roomavailable_start[day]    | 1                                |
       | room-roomavailable_start[month]  | January                          |
-      | room-roomavailable_start[year]   | 2025                             |
+      | room-roomavailable_start[year]   | ## next year ## Y ##             |
       | room-roomavailable_start[hour]   | 11                               |
       | room-roomavailable_start[minute] | 30                               |
       | room-roomavailable_end[day]      | 1                                |
       | room-roomavailable_end[month]    | January                          |
-      | room-roomavailable_end[year]     | 2025                             |
+      | room-roomavailable_end[year]     | ## next year ## Y ##             |
       | room-roomavailable_end[hour]     | 12                               |
       | room-roomavailable_end[minute]   | 30                               |
     And I press "submitgroupstandard[addfilter]"
@@ -763,12 +748,12 @@ Feature: Seminar room availability
     When I set the following fields to these values:
       | room-roomavailable_start[day]    | 1                                |
       | room-roomavailable_start[month]  | January                          |
-      | room-roomavailable_start[year]   | 2025                             |
+      | room-roomavailable_start[year]   | ## next year ## Y ##             |
       | room-roomavailable_start[hour]   | 12                               |
       | room-roomavailable_start[minute] | 59                               |
       | room-roomavailable_end[day]      | 1                                |
       | room-roomavailable_end[month]    | January                          |
-      | room-roomavailable_end[year]     | 2025                             |
+      | room-roomavailable_end[year]     | ## next year ## Y ##             |
       | room-roomavailable_end[hour]     | 14                               |
       | room-roomavailable_end[minute]   | 00                               |
     And I press "submitgroupstandard[addfilter]"
@@ -779,12 +764,12 @@ Feature: Seminar room availability
     When I set the following fields to these values:
       | room-roomavailable_start[day]    | 1                                |
       | room-roomavailable_start[month]  | January                          |
-      | room-roomavailable_start[year]   | 2025                             |
+      | room-roomavailable_start[year]   | ## next year ## Y ##             |
       | room-roomavailable_start[hour]   | 10                               |
       | room-roomavailable_start[minute] | 00                               |
       | room-roomavailable_end[day]      | 1                                |
       | room-roomavailable_end[month]    | January                          |
-      | room-roomavailable_end[year]     | 2025                             |
+      | room-roomavailable_end[year]     | ## next year ## Y ##             |
       | room-roomavailable_end[hour]     | 14                               |
       | room-roomavailable_end[minute]   | 00                               |
     And I press "submitgroupstandard[addfilter]"
@@ -795,12 +780,12 @@ Feature: Seminar room availability
     When I set the following fields to these values:
       | room-roomavailable_start[day]    | 1                                |
       | room-roomavailable_start[month]  | January                          |
-      | room-roomavailable_start[year]   | 2025                             |
+      | room-roomavailable_start[year]   | ## next year ## Y ##             |
       | room-roomavailable_start[hour]   | 14                               |
       | room-roomavailable_start[minute] | 00                               |
       | room-roomavailable_end[day]      | 1                                |
       | room-roomavailable_end[month]    | January                          |
-      | room-roomavailable_end[year]     | 2025                             |
+      | room-roomavailable_end[year]     | ## next year ## Y ##             |
       | room-roomavailable_end[hour]     | 15                               |
       | room-roomavailable_end[minute]   | 00                               |
     And I press "submitgroupstandard[addfilter]"
@@ -811,12 +796,12 @@ Feature: Seminar room availability
     When I set the following fields to these values:
       | room-roomavailable_start[day]    | 1                                |
       | room-roomavailable_start[month]  | January                          |
-      | room-roomavailable_start[year]   | 2001                             |
+      | room-roomavailable_start[year]   | ## 2 years ago ## Y ##           |
       | room-roomavailable_start[hour]   | 10                               |
       | room-roomavailable_start[minute] | 00                               |
       | room-roomavailable_end[day]      | 1                                |
       | room-roomavailable_end[month]    | January                          |
-      | room-roomavailable_end[year]     | 2030                             |
+      | room-roomavailable_end[year]     | ## 2 years ## Y ##               |
       | room-roomavailable_end[hour]     | 14                               |
       | room-roomavailable_end[minute]   | 00                               |
     And I press "submitgroupstandard[addfilter]"

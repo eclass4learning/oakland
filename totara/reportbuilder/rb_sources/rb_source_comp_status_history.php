@@ -25,9 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 class rb_source_comp_status_history extends rb_base_source {
-    public $base, $joinlist, $columnoptions, $filteroptions;
-    public $contentoptions, $paramoptions, $defaultcolumns;
-    public $defaultfilters, $requiredcolumns, $sourcetitle;
+    use \totara_job\rb\source\report_trait;
 
     public function __construct($groupid, rb_global_restriction_set $globalrestrictionset = null) {
         if ($groupid instanceof rb_global_restriction_set) {
@@ -60,7 +58,7 @@ class rb_source_comp_status_history extends rb_base_source {
         return true;
     }
 
-    public function is_ignored() {
+    public static function is_source_ignored() {
         return !totara_feature_visible('competencies');
     }
 
@@ -103,9 +101,8 @@ class rb_source_comp_status_history extends rb_base_source {
             )
         );
 
-        $this->add_user_table_to_joinlist($joinlist, 'base', 'userid');
-        $this->add_job_assignment_tables_to_joinlist($joinlist, 'base', 'userid');
-        $this->add_cohort_user_tables_to_joinlist($joinlist, 'base', 'userid');
+        $this->add_core_user_tables($joinlist, 'base', 'userid');
+        $this->add_totara_job_tables($joinlist, 'base', 'userid');
 
         return $joinlist;
     }
@@ -139,7 +136,8 @@ class rb_source_comp_status_history extends rb_base_source {
                 array('defaultheading' => get_string('compnameheading', 'rb_source_comp_status_history'),
                       'joins' => 'competency',
                       'dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'format_string')
             ),
             new rb_column_option(
                 'history',
@@ -149,7 +147,15 @@ class rb_source_comp_status_history extends rb_base_source {
                 array('joins' => 'scalevalue',
                       'defaultheading' => get_string('compscalevalueheading', 'rb_source_comp_status_history'),
                       'dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'format_string')
+            ),
+            new rb_column_option(
+                'history',
+                'proficientdate',
+                get_string('proficientdate', 'rb_source_competency_evidence'),
+                'base.timeproficient',
+                array('displayfunc' => 'nice_date', 'dbdatatype' => 'timestamp')
             ),
             new rb_column_option(
                 'history',
@@ -167,16 +173,15 @@ class rb_source_comp_status_history extends rb_base_source {
                 $DB->sql_concat_join("' '", $usednamefields),
                 array('defaultheading' => get_string('compusermodifiedheading', 'rb_source_comp_status_history'),
                       'joins' => 'usermodified',
-                      'displayfunc' => 'link_user',
-                      'extrafields' => array_merge(array('id' => 'usermodified.id'),
+                      'displayfunc' => 'user_link',
+                      'extrafields' => array_merge(array('id' => 'usermodified.id', 'deleted' => 'usermodified.deleted'),
                                                    $allnamefields)
                 )
             )
         );
 
-        $this->add_user_fields_to_columns($columnoptions);
-        $this->add_job_assignment_fields_to_columns($columnoptions);
-        $this->add_cohort_user_fields_to_columns($columnoptions);
+        $this->add_core_user_columns($columnoptions);
+        $this->add_totara_job_columns($columnoptions);
 
         return $columnoptions;
     }
@@ -198,12 +203,19 @@ class rb_source_comp_status_history extends rb_base_source {
                 get_string('comptimemodifiedcolumn', 'rb_source_comp_status_history'),
                 'date',
                 array('includetime' => true)
-            )
+            ),
+            new rb_filter_option(
+                'history',
+                'proficientdate',
+                get_string('proficientdate', 'rb_source_competency_evidence'),
+                'date',
+                array()
+            ),
+
         );
 
-        $this->add_user_fields_to_filters($filteroptions);
-        $this->add_job_assignment_fields_to_filters($filteroptions);
-        $this->add_cohort_user_fields_to_filters($filteroptions);
+        $this->add_core_user_filters($filteroptions);
+        $this->add_totara_job_filters($filteroptions, 'base', 'userid');
 
         return $filteroptions;
     }

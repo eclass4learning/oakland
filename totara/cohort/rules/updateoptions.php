@@ -26,7 +26,7 @@
 // This file is an ajax back-end for updating membership options.
 
 define('AJAX_SCRIPT', true);
-require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot.'/cohort/lib.php');
 
 $id = required_param('id', PARAM_INT);
@@ -36,8 +36,10 @@ $removeoldmembers = optional_param('removeoldmembers', null, PARAM_INT);
 require_login();
 require_sesskey();
 
-$syscontext = context_system::instance();
-require_capability('totara/cohort:managerules', $syscontext);
+$contextid = $DB->get_field('cohort','contextid',  array('id' => $id), MUST_EXIST);
+$context = context::instance_by_id($contextid, MUST_EXIST);
+
+require_capability('totara/cohort:managerules', $context);
 
 $result = totara_cohort_update_membership_options($id, $addnewmembers, $removeoldmembers);
 

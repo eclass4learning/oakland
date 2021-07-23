@@ -37,12 +37,13 @@ class totara_core_messaging_testcase extends advanced_testcase {
     protected function tearDown() {
         $this->plangenerator = null;
         $this->programgenerator = null;
-        $this->user1 = null;
+        $this->user1 = $this->user2 = $this->user3 = null;
+        $this->manager1 = $this->manager2 = null;
+
         parent::tearDown();
     }
 
     public function setUp() {
-        global $UNITTEST;
         parent::setup();
 
         $this->programgenerator = $this->getDataGenerator()->get_plugin_generator('totara_program');
@@ -63,73 +64,40 @@ class totara_core_messaging_testcase extends advanced_testcase {
         \totara_job\job_assignment::create_default($this->user1->id, array('managerjaid' => $manager1ja->id));
         \totara_job\job_assignment::create_default($this->user2->id, array('managerjaid' => $manager2ja->id));
         \totara_job\job_assignment::create_default($this->user3->id, array('managerjaid' => $manager1ja->id));
-
-        // Function in lib/moodlelib.php email_to_user require this.
-        if (!isset($UNITTEST)) {
-            $UNITTEST = new stdClass();
-            $UNITTEST->running = true;
-        }
-
-        unset_config('noemailever');
-    }
-
-    /**
-     * Data provider for the facetoface_messages function.
-     *
-     * @return array $data Data to be used by test_facetoface_messages.
-     */
-    public function messages_setting() {
-        $data = array(
-            array(1, 'no-reply@example.com'),
-            array(1, ''),
-            array(0, 'no-reply@example.com'),
-            array(0, ''),
-        );
-        return $data;
     }
 
     /**
      * Test from user is correctly set according to settings.
-     * @param int $emailonlyfromnoreplyaddress Setting to use only from no reply address
-     * @param string $noreplyaddress No-reply address
-     * @dataProvider messages_setting
      */
-    public function test_messages_from_no_reply($emailonlyfromnoreplyaddress, $noreplyaddress) {
+    public function test_messages_from_no_reply() {
         global $USER, $CFG;
         $this->preventResetByRollback();
         $this->resetAfterTest(true);
         $this->setAdminUser();
 
-        // Set email only from no reply address.
-        set_config('emailonlyfromnoreplyaddress', $emailonlyfromnoreplyaddress);
+        $noreplyaddress = 'no-reply@example.com';
 
         // Set the no reply address.
         set_config('noreplyaddress', $noreplyaddress);
 
         $sink = $this->redirectEmails();
 
-        ob_start(); // Start a buffer to catch all the mtraces in the task.
-
         // Messages in Programs.
         $program1 = $this->programgenerator->create_program();
         $this->programgenerator->assign_program($program1->id, array($this->user1->id, $this->user2->id));
 
-        sleep(1); // Messages are only sent if they were created before "now", so we need to wait one second.
+        $this->waitForSecond(); // Messages are only sent if they were created before "now", so we need to wait one second.
 
         // Attempt to send any program messages.
         $task = new \totara_program\task\send_messages_task();
+        ob_start(); // Start a buffer to catch all the mtraces in the task.
         $task->execute();
+        ob_end_clean();
 
         // Check user from.
         $fromuser = $USER;
-        if ($noreplyaddress === '') {
-            // Messaging now forces a default email address of noreply@{wwwroot} if the no reply email
-            // has not been set.
-            // Within PHPUNIT the administrators email address is set the same as the default.
-            $noreplyaddress = 'noreply@' . get_host_from_url($CFG->wwwroot);
-        }
-        $expectedname = sprintf("%s %s", $fromuser->firstname, $fromuser->lastname);
-        $expectedemail = $emailonlyfromnoreplyaddress ? $noreplyaddress : $fromuser->email;
+        $expectedname = fullname($fromuser);
+        $expectedemail = $noreplyaddress;
         $checkformat = '%s (%s)';
         $expected = sprintf($checkformat, $expectedname, $expectedemail);
 
@@ -155,6 +123,5 @@ class totara_core_messaging_testcase extends advanced_testcase {
             $this->assertEquals($expected, $actual);
         }
         $sink->clear();
-        ob_end_clean();
     }
 }

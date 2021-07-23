@@ -26,20 +26,21 @@
  * Page for displaying user generated reports
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
 require_once($CFG->dirroot . '/totara/core/js/lib/setup.php');
 
-$format    = optional_param('format', '', PARAM_ALPHANUM);
+$format = optional_param('format', '', PARAM_ALPHANUM);
 $id = required_param('id', PARAM_INT);
 $sid = optional_param('sid', '0', PARAM_INT);
 $debug = optional_param('debug', 0, PARAM_INT);
 
 require_login();
 
-$PAGE->set_context(context_system::instance());
+$context = context_system::instance();
+$PAGE->set_context($context);
 $PAGE->set_url('/totara/reportbuilder/report.php', array('id' => $id));
-$PAGE->set_totara_menu_selected('myreports');
+$PAGE->set_totara_menu_selected('\totara_core\totara\menu\myreports');
 $PAGE->set_pagelayout('noblocks');
 
 // We can rely on the report builder record existing here as there is no way to get directly to report.php.
@@ -54,10 +55,10 @@ if ($reportrecord->embedded) {
 $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($reportrecord);
 
 // New report object.
-$report = new reportbuilder($id, null, false, $sid, null, false, array(), $globalrestrictionset);
-if (!$report->is_capable($id)) {
-    print_error('nopermission', 'totara_reportbuilder');
-}
+$config = new rb_config();
+$config->set_sid($sid)->set_global_restriction_set($globalrestrictionset);
+$report = reportbuilder::create($id, $config, true);
+
 $report->handle_pre_display_actions();
 
 if ($format != '') {
@@ -70,15 +71,8 @@ if ($format != '') {
 $PAGE->requires->string_for_js('reviewitems', 'block_totara_alerts');
 $report->include_js();
 
-// display results as graph if report uses the graphical_feedback_questions source
-$graph = (substr($report->source, 0, strlen('graphical_feedback_questions')) ==
-    'graphical_feedback_questions');
-
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
-
-$fullname = format_string($report->fullname);
-$pagetitle = format_string(get_string('report', 'totara_reportbuilder').': '.$fullname);
+$fullname = format_string($report->fullname, true, ['context' => $context]);
+$pagetitle = get_string('report', 'totara_reportbuilder').': '.$fullname;
 
 $PAGE->set_title($pagetitle);
 $PAGE->set_button($report->edit_button());
@@ -86,25 +80,26 @@ $PAGE->navbar->add(get_string('reports', 'totara_core'), new moodle_url('/my/rep
 $PAGE->navbar->add($fullname);
 $PAGE->set_heading(format_string($SITE->fullname));
 
+/** @var totara_reportbuilder_renderer $output */
 $output = $PAGE->get_renderer('totara_reportbuilder');
 
 echo $output->header();
 
-$report->display_redirect_link();
+if ($report->has_disabled_filters()) {
+    global $OUTPUT;
+    echo $OUTPUT->notification(get_string('filterdisabledwarning', 'totara_reportbuilder'), 'warning');
+}
 
+// This must be done after the header and before any other use of the report.
+list($tablehtml, $debughtml) = $output->report_html($report, $debug);
+
+$report->display_redirect_link();
 $report->display_restrictions();
 
 // Display heading including filtering stats.
-if ($graph) {
-    echo $output->heading($fullname);
-} else {
-    echo $output->heading("$fullname: " .
-        $output->print_result_count_string($countfiltered, $countall));
-}
-
-if ($debug) {
-    $report->debug($debug);
-}
+$heading = $fullname . ': ' . $output->result_count_info($report);
+echo $output->heading($heading);
+echo $debughtml;
 
 // print report description if set
 echo $output->print_description($report->description, $report->_id);
@@ -117,12 +112,9 @@ $report->display_sidebar_search();
 echo $report->display_saved_search_options();
 
 // Show results.
-if ($graph) {
-    print $report->print_feedback_results();
-} else {
-    echo $output->showhide_button($report->_id, $report->shortname);
-    $report->display_table();
-}
+echo $output->showhide_button($report->_id, $report->shortname);
+echo $tablehtml;
+
 
 // Export button.
 $output->export_select($report, $sid);

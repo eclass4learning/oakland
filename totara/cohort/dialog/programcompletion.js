@@ -105,13 +105,12 @@ M.totara_cohortprogramcompletion = M.totara_cohortprogramcompletion || {
                           '&completiontimehour=' + completiontimehour +
                           '&completiontimeminute=' + completiontimeminute +
                           '&completionevent=' + completionevent +
-                          '&completioninstance=' + completioninstance +
-                          '&sesskey=' + M.cfg.sesskey;
+                          '&completioninstance=' + completioninstance;
 
                 var original = this.completionlink.html();
                 this.completionlink.html('Loading..');
 
-                $.get(url, function(data) {
+                $.post(url, { sesskey: M.cfg.sesskey }, function(data) {
                     if (data == 'error') {
                         // Put back to the original
                         this.completionlink.html(original);

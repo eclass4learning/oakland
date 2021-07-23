@@ -84,7 +84,7 @@ abstract class cohort_rule_sqlhandler_in extends cohort_rule_sqlhandler {
      * @return stdClass
      */
     public function get_query_base_operator($operator, $query, $lov, $defaultdata = null) {
-        global $CFG;
+        global $CFG, $DB;
         require_once($CFG->dirroot.'/totara/core/searchlib.php');
 
         // Create object to be returned
@@ -115,7 +115,8 @@ abstract class cohort_rule_sqlhandler_in extends cohort_rule_sqlhandler {
                 list($sqlhandler->sql, $sqlhandler->params) = search_get_keyword_where_clause_options($query, $lov, false, 'endswith');
                 break;
             case COHORT_RULES_OP_IN_ISEMPTY:
-                list($sqlhandler->sql, $sqlhandler->params) = array("({$query} = :empty OR ({$query}) IS NULL)", array('empty' => ''));
+                $emptyparam = $DB->get_unique_param('empty');
+                list($sqlhandler->sql, $sqlhandler->params) = array("({$query} = :{$emptyparam} OR ({$query}) IS NULL)", array($emptyparam => ''));
                 break;
             case COHORT_RULES_OP_IN_NOTEQUALTO:
                 list($sql, $params) = search_get_keyword_where_clause_options($query, $lov, true, 'notequal');
@@ -446,21 +447,6 @@ class cohort_rule_sqlhandler_in_poscustomfield extends cohort_rule_sqlhandler_in
 }
 
 /**
- * @deprecated Since v9.0
- *
- * This class was deprecated as part of the multiple jobs patch and replaced with
- * the cohort_rule_sqlhandler_in_orgfield class, please use that instead.
- */
-class cohort_rule_sqlhandler_in_posorgfield extends cohort_rule_sqlhandler_in_orgfield {
-
-    public function __construct(){
-        debugging('Class cohort_rule_sqlhandler_in_posorgfield has been replaced and is now deprecated.
-            Please use the cohort_rule_sqlhandler_in_orgfield class instead', DEBUG_DEVELOPER);
-        parent::__construct();
-    }
-}
-
-/**
  * SQL snippet for a field from mdl_org, joined across all of the users job assignments.
  */
 class cohort_rule_sqlhandler_in_orgfield extends cohort_rule_sqlhandler_in {
@@ -487,21 +473,6 @@ class cohort_rule_sqlhandler_in_orgfield extends cohort_rule_sqlhandler_in {
         }
 
         return $sqlhandler;
-    }
-}
-
-/**
- * @deprecated Since v9.0
- *
- * This class was deprecated as part of the multiple jobs patch and replaced with
- * the cohort_rule_sqlhandler_in_orgcustomfield class, please use that instead.
- */
-class cohort_rule_sqlhandler_in_posorgcustomfield extends cohort_rule_sqlhandler_in_orgcustomfield {
-
-    public function __construct(){
-        debugging('Class cohort_rule_sqlhandler_in_posorgcustomfield has been replaced and is now deprecated.
-            Please use the cohort_rule_sqlhandler_in_orgcustomfield class instead', DEBUG_DEVELOPER);
-        parent::__construct();
     }
 }
 

@@ -27,7 +27,7 @@
  * Workflow settings page for development plan templates
  */
 
-require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot.'/totara/plan/lib.php');
 require_once('template_forms.php');
@@ -46,7 +46,7 @@ if ($currentcomponent == 'competency') {
 
 admin_externalpage_setup('managetemplates');
 
-$template = $DB->get_record('dp_template', array('id' => $id));
+$template = $DB->get_record('dp_template', array('id' => $id), '*', MUST_EXIST);
 
 $components = $DB->get_records('dp_component_settings', array('templateid' => $id), 'sortorder');
 $plans = $DB->count_records('dp_plan', array('templateid' => $id));

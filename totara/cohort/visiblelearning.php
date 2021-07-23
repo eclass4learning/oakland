@@ -24,7 +24,7 @@
 /**
  * This page displays the embedded report for the "visible learning" items for a single cohort
  */
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
 require_once($CFG->dirroot . '/cohort/lib.php');
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
@@ -35,7 +35,7 @@ require_login();
 $sid    = optional_param('sid', '0', PARAM_INT);
 $id     = optional_param('id', false, PARAM_INT);
 $format = optional_param('format', '', PARAM_TEXT);
-$debug  = optional_param('debug', false, PARAM_BOOL);
+$debug  = optional_param('debug', 0, PARAM_INT);
 
 if (!$id) {
     $context = context_system::instance();
@@ -85,7 +85,8 @@ if ($context->contextlevel == CONTEXT_SYSTEM) {
     $PAGE->set_url($url);
 }
 
-$report = reportbuilder_get_embedded_report('cohort_associations_visible', array('cohortid' => $id), false, $sid);
+$config = (new rb_config())->set_sid($sid)->set_embeddata(['cohortid' => $id]);
+$report = reportbuilder::create_embedded('cohort_associations_visible', $config);
 $report->include_js();
 
 // Handle a request for export.
@@ -116,13 +117,16 @@ $args = array('args' => '{"cohortid":' . $cohort->id . ',' .
             '"saveurl":"/totara/cohort/visiblelearning.php" }');
 $PAGE->requires->js_init_call('M.totara_cohortlearning.init', $args, false, $jsmodule);
 
+/** @var totara_reportbuilder_renderer $renderer */
+$renderer = $PAGE->get_renderer('totara_reportbuilder');
+
 $strheading = get_string('visiblelearning', 'totara_cohort');
 totara_cohort_navlinks($cohort->id, format_string($cohort->name), $strheading);
 echo $OUTPUT->header();
 
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $renderer->report_html($report, $debug);
+echo $debughtml;
 
 echo $OUTPUT->heading(format_string($cohort->name));
 echo cohort_print_tabs('visiblelearning', $cohort->id, $cohort->cohorttype, $cohort);
@@ -163,10 +167,7 @@ $report->display_sidebar_search();
 
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
-
-$report->display_table();
-
-$output = $PAGE->get_renderer('totara_reportbuilder');
-$output->export_select($report, $sid);
+echo $reporthtml;
+$renderer->export_select($report, $sid);
 
 echo $OUTPUT->footer();

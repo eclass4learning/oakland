@@ -22,7 +22,7 @@
  * @subpackage totara_appraisal
  */
 
-require_once(dirname(dirname(dirname(dirname(__FILE__)))).'/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot.'/totara/appraisal/lib.php');
 require_once($CFG->dirroot.'/totara/appraisal/appraisal_forms.php');
 require_once($CFG->dirroot.'/totara/question/lib.php');
@@ -197,7 +197,14 @@ switch ($action) {
             if ($fromaddelemform = $mnewform->get_data()) {
                 $question->attach_element($fromaddelemform);
             } else {
-                $datatype = required_param('datatype', PARAM_ACTION);
+                $datatype = required_param('datatype', PARAM_ALPHANUMEXT);
+                if (empty($datatype)) {
+                    throw new moodle_exception('selectquestiontype_notselected', 'totara_appraisal');
+                }
+                $questtypes = question_manager::get_registered_elements(false);
+                if (!isset($questtypes[$datatype])) {
+                    throw new coding_exception('Invalid question type provided');
+                }
                 $question->attach_element($datatype);
             }
         }
@@ -251,6 +258,14 @@ switch($action) {
         break;
     default:
         if (appraisal::is_draft($stage->appraisalid)) {
+            // Display a warning if there are too many questions.
+            if (appraisal_question::has_too_many_questions($stage->appraisalid)) {
+                echo '<p>' .
+                    $output->pix_icon('i/warning', '') . ' ' .
+                    get_string('toomanyquestionswarning', 'totara_appraisal') .
+                    $output->help_icon('toomanyquestions', 'totara_appraisal', null) .
+                    '</p>';
+            }
             echo $mnewform->display();
         }
         echo $output->list_questions($questions, $stage);

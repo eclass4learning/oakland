@@ -66,6 +66,19 @@ class totara_appraisal_generator extends component_generator_base {
     private $messagecount = 0;
 
     /**
+     * To be called from data reset code only, do not use in tests.
+     * @return void
+     */
+    public function reset() {
+        parent::reset();
+        $this->appraisalcount = 0;
+        $this->stagecount = 0;
+        $this->pagecount = 0;
+        $this->questioncount = 0;
+        $this->messagecount = 0;
+    }
+
+    /**
      * Create an appraisal.
      *
      * @param  array    $data Optional data.
@@ -534,10 +547,12 @@ class totara_appraisal_generator extends component_generator_base {
             // For now - learner gets cananswer, other gets cananswer and canviewother
             $roles = explode(',', $data['roles']);
             unset($data['roles']);
-            $data['roles'] = array(appraisal::ROLE_LEARNER => appraisal::ACCESS_CANANSWER);
 
             foreach ($roles as $role) {
                 switch ($role) {
+                    case 'learner':
+                        $data['roles'][appraisal::ROLE_LEARNER] = appraisal::ACCESS_CANANSWER;
+                        break;
                     case 'manager':
                         $data['roles'][appraisal::ROLE_MANAGER] = appraisal::ACCESS_CANANSWER + appraisal::ACCESS_CANVIEWOTHER;
                         break;
@@ -866,6 +881,34 @@ class totara_appraisal_generator extends component_generator_base {
 
         $appraisal = new appraisal($appraisalid);
         $appraisal->activate();
+    }
+
+    /**
+     * Assign an appraisal to a job assignment.
+     *
+     * @param  array $data
+     * @return void
+     */
+    public function create_appraisal_job_assignments_for_behat($data = array()) {
+        global $DB;
+
+        // Get the appraisal object.
+        if (isset($data['appraisal'])) {
+            $appraisalid = $DB->get_field('appraisal', 'id', array('name' => $data['appraisal']), MUST_EXIST);
+            $appraisal = new appraisal($appraisalid);
+        } else {
+            return false;
+        }
+
+        // Get the job assignment.
+        if (isset($data['jobassignment'])) {
+            $jobassignment = $DB->get_record('job_assignment', array('idnumber' => $data['jobassignment']));
+        } else {
+            return false;
+        }
+
+        $appraisal_user_assignment = appraisal_user_assignment::get_user($appraisalid, $jobassignment->userid);
+        $appraisal_user_assignment->with_job_assignment($jobassignment->id);
     }
 
 }

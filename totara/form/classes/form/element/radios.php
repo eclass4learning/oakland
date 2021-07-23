@@ -27,7 +27,8 @@ use totara_form\element,
     totara_form\form\validator\attribute_required,
     totara_form\form\validator\valid_selection,
     totara_form\item,
-    totara_form\model;
+    totara_form\model,
+    totara_form\form\clientaction\supports_onchange_clientactions;
 
 /**
  * Group of radio buttons.
@@ -37,7 +38,7 @@ use totara_form\element,
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @author    Petr Skoda <petr.skoda@totaralms.com>
  */
-class radios extends element {
+class radios extends element implements supports_onchange_clientactions {
     /** @var array $options */
     private $options;
 
@@ -177,6 +178,11 @@ class radios extends element {
         );
 
         $checked = $this->get_field_value();
+        if ($checked !== null) {
+            // We need string to do strict comparison later.
+            $checked = strval($checked);
+        }
+
         $i = 0;
         foreach ($this->options as $value => $text) {
             $value = (string)$value; // PHP converts type of numeric keys it seems.

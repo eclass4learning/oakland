@@ -40,7 +40,7 @@ if (isset($certrecord->timearchived)) {
 
 $pdf = new PDF($certificate->orientation, 'mm', 'A4', true, 'UTF-8', false);
 
-$pdf->SetTitle($certificate->name);
+$pdf->SetTitle(format_string($certificate->name));
 $pdf->SetProtection(array('modify'));
 $pdf->setPrintHeader(false);
 $pdf->setPrintFooter(false);
@@ -106,21 +106,33 @@ certificate_print_text($pdf, $x, $y + 36, 'C', 'Helvetica', '', 30, fullname($US
 certificate_print_text($pdf, $x, $y + 55, 'C', 'Helvetica', '', 20, get_string('statement', 'certificate'));
 certificate_print_text($pdf, $x, $y + 72, 'C', 'Helvetica', '', 20, format_string($course->fullname));
 certificate_print_text($pdf, $x, $y + 92, 'C', 'Helvetica', '', 14, $timecompleted);
-certificate_print_text($pdf, $x, $y + 102, 'C', 'Times', '', 10, $grade);
-certificate_print_text($pdf, $x, $y + 112, 'C', 'Times', '', 10, $outcome);
+
+// Conditionally increase $y by a set value to print out additional info. Leave $y as is if nothing to print.
+$ycond = $y + 92 + 10; // Left as a sum on purpose to show a set increase.
+certificate_print_text($pdf, $x, $ycond, 'C', 'Times', '', 10, $grade);
+if ($outcome !== '') {
+    $ycond = $ycond + 10;
+    certificate_print_text($pdf, $x, $ycond, 'C', 'Times', '', 10, $outcome);
+}
 if ($certificate->printhours) {
-    certificate_print_text($pdf, $x, $y + 122, 'C', 'Times', '', 10, get_string('credithours', 'certificate') . ': ' . $certificate->printhours);
+    $ycond = $ycond + 10;
+    certificate_print_text($pdf, $x, $ycond, 'C', 'Times', '', 10, get_string('credithours', 'certificate') . ': ' . $certificate->printhours);
 }
 certificate_print_text($pdf, $x, $codey, 'C', 'Times', '', 10, $code);
-$i = 0;
 if ($certificate->printteacher) {
     $context = context_module::instance($cm->id);
     if ($teachers = get_users_by_capability($context, 'mod/certificate:printteacher', '', $sort = 'u.lastname ASC', '', '', '', '', false)) {
+        $i = 0;
         foreach ($teachers as $teacher) {
-            $i++;
             certificate_print_text($pdf, $sigx, $sigy + ($i * 4), 'L', 'Times', '', 12, fullname($teacher));
+            $i++;
         }
     }
 }
 
-certificate_print_text($pdf, $custx, $custy, 'L', null, null, null, $certificate->customtext);
+// If we have printed trainers already, treat custom text as a custom text. Otherwise, print it in place of trainers list.
+if ($certificate->printteacher) {
+    certificate_print_text($pdf, $x, $ycond + 10, 'C', null, null, null, format_text($certificate->customtext));
+} else {
+    certificate_print_text($pdf, $custx, $custy, 'L', 'Times', '', 12, format_text($certificate->customtext));
+}

@@ -34,12 +34,12 @@ $string['displayoptions'] = 'Available display options';
 $string['displayselect'] = 'Display';
 $string['displayselect_help'] = 'This setting, together with the URL file type and whether the browser allows embedding, determines how the URL is displayed. Options may include:
 
-* Automatic - The best display option for the URL is selected automatically
-* Embed - The URL is displayed within the page below the navigation bar together with the URL description and any blocks
-* Open - Only the URL is displayed in the browser window
-* In pop-up - The URL is displayed in a new browser window without menus or an address bar
-* In frame - The URL is displayed within a frame below the navigation bar and URL description
-* New window - The URL is displayed in a new browser window with menus and an address bar';
+* **Automatic**: The best display option for the URL is selected automatically.
+* **Embed**: The URL is displayed within the page below the navigation bar together with the URL description and any blocks.
+* **Open**: Only the URL is displayed in the browser window.
+* **In pop-up**: The URL is displayed in a new browser window without menus or an address bar.
+* **In frame**: The URL is displayed within a frame below the navigation bar and URL description.
+* **New window**: The URL is displayed in a new browser window with menus and an address bar.';
 $string['displayselectexplain'] = 'Choose display type, unfortunately not all types are suitable for all URLs.';
 $string['externalurl'] = 'External URL';
 $string['framesize'] = 'Frame height';
@@ -47,12 +47,12 @@ $string['invalidstoredurl'] = 'Cannot display this resource, URL is invalid.';
 $string['chooseavariable'] = 'Choose a variable...';
 $string['invalidurl'] = 'Entered URL is invalid';
 $string['modulename'] = 'URL';
-$string['modulename_help'] = 'The URL module enables a teacher to provide a web link as a course resource. Anything that is freely available online, such as documents or images, can be linked to; the URL doesn’t have to be the home page of a website. The URL of a particular web page may be copied and pasted or a teacher can use the file picker and choose a link from a repository such as Flickr, YouTube or Wikimedia (depending upon which repositories are enabled for the site).
+$string['modulename_help'] = 'The URL module enables a trainer to provide a web link as a course resource. Anything that is freely available online, such as documents or images, can be linked to; the URL doesn\'t have to be the home page of a website. The URL of a particular web page may be copied and pasted or a trainer can use the file picker and choose a link from a repository such as Flickr, YouTube, or Wikimedia (depending upon which repositories are enabled for the site).
 
-There are a number of display options for the URL, such as embedded or opening in a new window and advanced options for passing information, such as a student\'s name, to the URL if required.
+There are a number of display options for the URL, such as embedded or opening in a new window and advanced options for passing information, such as a learner\'s name, to the URL if required.
 
 Note that URLs can also be added to any other resource or activity type through the text editor.';
-$string['modulename_link'] = 'mod/url/view';
+$string['modulename_link'] = 'URL';
 $string['modulenameplural'] = 'URLs';
 $string['page-mod-url-x'] = 'Any URL module page';
 $string['parameterinfo'] = '&amp;parameter=variable';
@@ -67,6 +67,7 @@ $string['popupwidthexplain'] = 'Specifies default width of popup windows.';
 $string['printintro'] = 'Display URL description';
 $string['printintroexplain'] = 'Display URL description below content? Some display types may not display description even if enabled.';
 $string['rolesinparams'] = 'Include role names in parameters';
+$string['search:activity'] = 'URL';
 $string['serverurl'] = 'Server URL';
 $string['url:addinstance'] = 'Add a new URL resource';
 $string['url:view'] = 'View URL';

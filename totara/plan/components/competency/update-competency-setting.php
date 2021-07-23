@@ -24,7 +24,7 @@
  */
 
 header("Content-Type:text/plain");
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))).'/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot.'/totara/hierarchy/prefix/position/lib.php');
 require_once($CFG->dirroot.'/totara/hierarchy/prefix/competency/evidence/lib.php');
 require_once($CFG->dirroot.'/totara/plan/development_plan.class.php');
@@ -39,6 +39,7 @@ $planid = required_param('planid', PARAM_INT);
 
 // Permissions check
 require_login();
+require_sesskey();
 
 // Check permission to access the plan
 $plan = new development_plan($planid);

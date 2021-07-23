@@ -20,6 +20,7 @@
  * @package totara_form
  */
 
+/* eslint-disable */
 /* jshint ignore:start */
 define(['jquery', 'jqueryui'], function($){
     /*! jQuery Timepicker Addon - v1.6.1 - 2015-11-14
@@ -322,7 +323,7 @@ define(['jquery', 'jqueryui'], function($){
             if (tp_inst._defaults.maxDateTime !== undefined && tp_inst._defaults.maxDateTime instanceof Date) {
                 tp_inst._defaults.maxDate = new Date(tp_inst._defaults.maxDateTime.getTime());
             }
-            tp_inst.$input.bind('focus', function () {
+            tp_inst.$input.on('focus', function () {
                 tp_inst._onFocus();
             });
 
@@ -1443,16 +1444,17 @@ define(['jquery', 'jqueryui'], function($){
     $.datepicker._selectDate = function (id, dateStr) {
         var inst = this._getInst($(id)[0]),
             tp_inst = this._get(inst, 'timepicker'),
-            was_inline;
+            was_inline, was_stay_open;
 
         if (tp_inst && inst.settings.showTimepicker) {
             tp_inst._limitMinMaxDateTime(inst, true);
             was_inline = inst.inline;
+            was_stay_open = inst.stay_open;
             inst.inline = inst.stay_open = true;
             //This way the onSelect handler called from calendarpicker get the full dateTime
             this._base_selectDate(id, dateStr);
             inst.inline = was_inline;
-            inst.stay_open = false;
+            inst.stay_open = was_stay_open;
             this._notifyChange(inst);
             this._updateDatepicker(inst);
         } else {
@@ -2283,12 +2285,12 @@ define(['jquery', 'jqueryui'], function($){
     */
     $.timepicker.version = "1.6.1";
 
-    datepoly = {
+    var datepoly = {
         initcalled: false,
         language: {},
         inited: null,
 
-        init: function(id) {
+        init: function(id, hastime) {
             if (datepoly.initcalled === false) {
                 // Load language strings.
                 datepoly.inited = $.Deferred();
@@ -2325,8 +2327,17 @@ define(['jquery', 'jqueryui'], function($){
             }
 
             datepoly.inited.done(function() {
+                if (!hastime) {
+                    datepoly.language.showTimepicker = false;
+                    datepoly.language.timeFormat = '';
+                    datepoly.language.showTime = false;
+                    datepoly.language.showTimezone = false;
+                    datepoly.language.separator = '';
+                }
                 $('#' + id).datetimepicker(datepoly.language);
             });
+
+            return datepoly.inited;
         }
     };
 

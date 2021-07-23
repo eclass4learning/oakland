@@ -90,6 +90,17 @@ class core_role_permissions_table extends core_role_capability_table_base {
             unset($forbitable[$id]);
         }
 
+        $flexicon_prevent = new \core\output\flex_icon('delete-ns', array('alt'=> 'prevent'));
+        $flexicon_unprohibit = new \core\output\flex_icon('delete-ns', array('alt'=> 'unprohibit'));
+        $data_flexicon_prevent = [
+            'template' => $flexicon_prevent->get_template(),
+            'context' => $flexicon_prevent->export_for_template($OUTPUT)
+        ];
+        $data_flexicon_unprohibit = [
+            'template' => $flexicon_unprohibit->get_template(),
+            'context' => $flexicon_unprohibit->export_for_template($OUTPUT)
+        ];
+
         foreach ($roles as $id => $name) {
             if (isset($needed[$id])) {
                 $templatecontext = array(
@@ -99,12 +110,14 @@ class core_role_permissions_table extends core_role_capability_table_base {
                     "spanclass" => "label label-success allowed",
                     "linkclass" => "preventlink",
                     "adminurl" => '#',
-                    "imageurl" => ""
+                    "imageurl" => "",
+                    "deleteicon" => ""
                 );
                 if (isset($overridableroles[$id]) and ($allowoverrides or ($allowsafeoverrides and is_safe_capability($capability)))) {
                     $adminurl = new moodle_url($PAGE->url, array('contextid'=>$contextid, 'roleid'=>$id, 'capability'=>$capability->name, 'prevent'=>1));
                     $templatecontext['adminurl'] = $adminurl->out(false); // Cleaned in the template.
                     $templatecontext['imageurl'] = 'delete-ns';
+                    $templatecontext['deleteicon'] = $data_flexicon_prevent;
                 }
                 $neededroles[$id] = $renderer->render_from_template('core/permissionmanager_role', $templatecontext);
             }
@@ -119,12 +132,14 @@ class core_role_permissions_table extends core_role_capability_table_base {
                     "spanclass" => "label label-danger forbidden",
                     "linkclass" => "unprohibitlink",
                     "adminurl" => '#',
-                    "imageurl" => ""
+                    "imageurl" => "",
+                    "deleteicon" => ""
                 );
                 if (isset($overridableroles[$id]) and prohibit_is_removable($id, $context, $capability->name)) {
                     $adminurl = new moodle_url($PAGE->url, array('contextid'=>$contextid, 'roleid'=>$id, 'capability'=>$capability->name, 'unprohibit'=>1));
                     $templatecontext['adminurl'] = $adminurl->out(false); // Cleaned in the template.
                     $templatecontext['imageurl'] = 'delete-ns';
+                    $templatecontext['deleteicon'] = $data_flexicon_unprohibit;
                 }
                 $forbiddenroles[$id] = $renderer->render_from_template('core/permissionmanager_role', $templatecontext);
             }
@@ -149,7 +164,7 @@ class core_role_permissions_table extends core_role_capability_table_base {
 
         $risks = $this->get_risks($capability);
 
-        $contents = html_writer::tag('td', $risks, array('class' => 'risks'));
+        $contents = html_writer::tag('td', $risks, array('class' => 'risks text-nowrap'));
         $contents .= html_writer::tag('td', $neededroles, array('class' => 'allowedroles'));
         $contents .= html_writer::tag('td', $forbiddenroles, array('class' => 'forbiddenroles'));
         return $contents;
@@ -159,17 +174,15 @@ class core_role_permissions_table extends core_role_capability_table_base {
         global $OUTPUT;
 
         $allrisks = get_all_risks();
-        $risksurl = new moodle_url(get_docs_url(s(get_string('risks', 'core_role'))));
+        $risksurl = new moodle_url(get_docs_url('Roles#Roles-Risks')); // Totara: updated to our docs.
 
         $return = '';
 
         foreach ($allrisks as $type => $risk) {
             if ($risk & (int)$capability->riskbitmask) {
-                if (!isset($this->icons[$type])) {
-                    $pixicon = new pix_icon('/i/' . str_replace('risk', 'risk_', $type), get_string($type . 'short', 'admin'));
-                    $this->icons[$type] = $OUTPUT->action_icon($risksurl, $pixicon, new popup_action('click', $risksurl));
-                }
-                $return .= $this->icons[$type];
+                $pixicon = new pix_icon('/i/' . str_replace('risk', 'risk_', $type), get_string($type . 'short', 'admin'));
+                $riskicon = $OUTPUT->action_icon($risksurl, $pixicon, new popup_action('click', $risksurl));
+                $return .= $riskicon;
             }
         }
 

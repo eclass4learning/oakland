@@ -21,54 +21,51 @@
  * @package totara_dashboard
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/my/lib.php');
 require_once($CFG->dirroot . '/totara/dashboard/lib.php');
 require_once($CFG->dirroot . '/lib/navigationlib.php');
-require_once($CFG->dirroot . '/oakland/groups/lib.php');
 
 redirect_if_major_upgrade_required();
 
 $edit   = optional_param('edit', null, PARAM_BOOL);    // Turn editing on and off.
 $reset  = optional_param('reset', null, PARAM_BOOL);
 $id =  optional_param('id', 0, PARAM_INT);
-/**
- * BEGIN OAKLAND EDIT
- */
-//require_login();    //Allow Guests to visit specially approved dashboards, regardless of audience.
-/**
- * END OAKLAND EDIT
- */
+
+require_login(null, false);
+if (isguestuser()) {
+    // No dashboards for guests!
+    redirect(new moodle_url('/'));
+}
+
+// Check Totara Dashboard is enable.
+totara_dashboard::check_feature_enabled();
+
 $userid = $USER->id;
 
 $availabledash = array_keys(totara_dashboard::get_user_dashboards($userid));
 
 // Validate dashboard id.
-if (!$id || !in_array($id, $availabledash)) {
-  $id = '357';
+if ($id) {
+    if (!in_array($id, $availabledash)) {
+        // If not available, redirect to default dashboard.
+        redirect(new moodle_url('/totara/dashboard/index.php'));
+    }
+} else if (get_user_preferences('user_home_page_preference') == HOMEPAGE_TOTARA_DASHBOARD &&
+        in_array(get_user_preferences('user_home_totara_dashboard_id'), $availabledash)) {
+    // Set home page dashboard id.
+    $id = get_user_preferences('user_home_totara_dashboard_id');
+} else if (isset($availabledash[0])) {
+    // Set first in sort order.
+    $id = $availabledash[0];
 }
-
 
 $params = array('id' => $id);
 $PAGE->set_url('/totara/dashboard/index.php', $params);
-if (get_home_page() == HOMEPAGE_TOTARA_DASHBOARD) {
-    $PAGE->set_totara_menu_selected('home');
-} else {
-    $PAGE->set_totara_menu_selected('dashboard');
-}
+
 if (!$id) {
     $header = $SITE->shortname. ': ' . get_string('dashboard', 'totara_dashboard');
-    /**
-     * BEGIN OAKLAND CUSTOMIZATIONS
-     */
-    if($userid>0){
-        $PAGE->set_context(context_user::instance($USER->id));
-    }else{
-        $PAGE->set_context(context_system::instance());
-    }
-    /**
-     * END OAKLAND CUSTOMIZATIONS
-     */
+    $PAGE->set_context(context_user::instance($USER->id));
     totara_set_notification(get_string('noavailabledashboards', 'totara_dashboard'));
 } else {
     $dashboard = new totara_dashboard($id);
@@ -88,7 +85,8 @@ if (!$id) {
     $PAGE->set_subpage($userpageid);
     $PAGE->set_blocks_editing_capability('totara/dashboard:manageblocks');
     $PAGE->set_pagelayout('dashboard');
-    $PAGE->set_pagetype('my-totara-dashboard-' . $id);
+    $PAGE->set_pagetype('totara-dashboard-' . $id);
+    $PAGE->set_subpage($userpageid);
     // Method add_region requires pagetype set first.
     $PAGE->blocks->add_region('content');
     $PAGE->navbar->add($dashboard->name);
@@ -106,24 +104,12 @@ if (!$id) {
         }
         $newhomeurl = new moodle_url('/totara/dashboard/index.php', array('setdefaulthome' => 1, 'id' => $id, 'sesskey' => sesskey()));
         $PAGE->settingsnav->add(get_string('makedashboardmyhomepage', 'totara_dashboard'), $newhomeurl, navigation_node::TYPE_SETTING);
-   } 
- // BEGIN OAKLAND CUSTOMIZATIONS
-    $groupcreator = false;
-    if ($dashboard->oaklandgroupid) {
-        $oaklandgroups = $DB->get_record('oakland_groups', array('id'=>$dashboard->oaklandgroupid));
-        if ($oaklandgroups) {
-            $groupcreator = check_group_ownership($oaklandgroups);
-
-           // if ($userid == $oaklandgroups->userid) {
-           //     $groupcreator = true;
-           // }
-        }
     }
+
     $resetbutton = '';
     $editbutton = '';
     // Toggle the editing state and switches.
-    if ($PAGE->user_allowed_editing() && !$dashboard->is_locked() && (!$dashboard->oaklandgroupid || ($dashboard->oaklandgroupid && $groupcreator))) {
-    error_log('Loooking to edit!');
+    if ($PAGE->user_allowed_editing() && !$dashboard->is_locked()) {
         if ($reset !== null) {
             if (!is_null($userid)) {
                 require_sesskey();
@@ -171,7 +157,7 @@ if (!$id) {
         }
 
         $editurl = new moodle_url("/totara/dashboard/index.php", $params);
-        // $editbutton = $OUTPUT->single_button($editurl, $editstring);
+        $editbutton = $OUTPUT->single_button($editurl, $editstring);
     } else {
         $USER->editing = $edit = 0;
     }
@@ -189,7 +175,6 @@ if (!$id) {
         $CFG->blockmanagerclass = 'my_syspage_block_manager';
     }
 }
-
 
 $PAGE->set_title($header);
 $PAGE->set_heading($header);

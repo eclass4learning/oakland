@@ -25,6 +25,8 @@
 namespace tool_langimport;
 
 defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
 require_once($CFG->libdir.'/filelib.php');
 require_once($CFG->libdir.'/componentlib.class.php');
 
@@ -142,7 +144,7 @@ class controller {
         global $CFG;
 
         if (!$availablelangs = $this->installer->get_remote_list_of_languages()) {
-            $this->errors[] = get_string('cannotdownloadlanguageupdatelist', 'error');
+            $this->errors[] = get_string('cannotdownloadtotaralanguageupdatelist', 'totara_core');
             return false;
         }
 

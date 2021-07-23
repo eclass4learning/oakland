@@ -130,6 +130,44 @@ class question_objfromplan extends review{
     }
 
     /**
+     * Can the reviewer see additional info about this item on another page?
+     *
+     * @param array $itemgroup collection of rating objects
+     * @return bool
+     */
+    public function can_view_more_info($itemgroup){
+        // The $itemgroup will relate to one item, e.g. one objective.
+        $anyitemset = reset($itemgroup);
+        $anyitem = reset($anyitemset);
+        if (!empty($anyitem->ismissing)) {
+            return false;
+        }
+        return dp_can_view_users_plans($this->subjectid);
+    }
+
+    /**
+     * URL of page where the reviewer can see additional info about this item.
+     *
+     * @param array $itemgroup collection of rating objects
+     * @return moodle_url
+     */
+    public function get_more_info_url($itemgroup){
+        global $DB;
+
+        // The $itemgroup will relate to one item, e.g. one objective.
+        $anyitemset = reset($itemgroup);
+        $anyitem = reset($anyitemset);
+        $planid = $DB->get_field('dp_plan_objective', 'planid', array('id'=>$anyitem->itemid));
+
+        return new moodle_url('/totara/plan/components/objective/view.php',
+            array(
+                'itemid' => $anyitem->itemid,
+                'id' => $planid
+            )
+        );
+    }
+
+    /**
      * Get items that have already been added to the review question, so that they can be excluded from the selection dialog.
      *
      * @param int $planid

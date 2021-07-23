@@ -65,11 +65,11 @@ M.totara_cohortlearning = M.totara_cohortlearning || {
 
         // Init courses dialog.
         var csaveurl = url + 'updatelearning.php?type=' + this.config.COHORT_ASSN_ITEMTYPE_COURSE
-            + '&cohortid=' + this.config.cohortid + '&sesskey=' + M.cfg.sesskey + '&v=' + assgnval + '&u=';
+            + '&cohortid=' + this.config.cohortid + '&v=' + assgnval + '&u=';
         var chandler = new totaraDialog_handler_cohortlearning();
         chandler.baseurl = url;
         var cbuttons = {};
-        cbuttons[M.util.get_string('save','totara_core')] = function() { chandler._save(csaveurl) }
+        cbuttons[M.util.get_string('save','totara_core')] = function() { chandler._save_with_data(csaveurl, { sesskey: M.cfg.sesskey }) }
         cbuttons[M.util.get_string('cancel','moodle')] = function() { chandler._cancel() }
 
         totaraDialogs['learningitemcourses'] = new totaraDialog(
@@ -84,12 +84,12 @@ M.totara_cohortlearning = M.totara_cohortlearning || {
         );
 
         // Init programs dialog.
-        var psaveurl = url + 'updatelearning.php?type=' + this.config.COHORT_ASSN_ITEMTYPE_PROGRAM + '&cohortid=' + this.config.cohortid + '&sesskey=' +
-            M.cfg.sesskey + '&v=' + assgnval + '&u=';
+        var psaveurl = url + 'updatelearning.php?type=' + this.config.COHORT_ASSN_ITEMTYPE_PROGRAM + '&cohortid=' + this.config.cohortid
+            + '&v=' + assgnval + '&u=';
         var phandler = new totaraDialog_handler_cohortlearning();
         phandler.baseurl = url;
         var pbuttons = {};
-        pbuttons[M.util.get_string('save','totara_core')] = function() { phandler._save(psaveurl) }
+        pbuttons[M.util.get_string('save','totara_core')] = function() { phandler._save_with_data(psaveurl, { sesskey: M.cfg.sesskey }) }
         pbuttons[M.util.get_string('cancel','moodle')] = function() { phandler._cancel() }
 
         totaraDialogs['learningitemprograms'] = new totaraDialog(
@@ -104,12 +104,12 @@ M.totara_cohortlearning = M.totara_cohortlearning || {
         );
 
         // Init certifications dialog.
-        var pcsaveurl = url + 'updatelearning.php?type=' + this.config.COHORT_ASSN_ITEMTYPE_CERTIF + '&cohortid=' + this.config.cohortid + '&sesskey=' +
-            M.cfg.sesskey + '&v=' + assgnval + '&u=';
+        var pcsaveurl = url + 'updatelearning.php?type=' + this.config.COHORT_ASSN_ITEMTYPE_CERTIF + '&cohortid=' + this.config.cohortid
+            + '&v=' + assgnval + '&u=';
         var pchandler = new totaraDialog_handler_cohortlearning();
         pchandler.baseurl = url;
         var pcbuttons = {};
-        pcbuttons[M.util.get_string('save','totara_core')] = function() { pchandler._save(pcsaveurl) }
+        pcbuttons[M.util.get_string('save','totara_core')] = function() { pchandler._save_with_data(pcsaveurl, { sesskey: M.cfg.sesskey }) }
         pcbuttons[M.util.get_string('cancel','moodle')] = function() { pchandler._cancel() }
 
         totaraDialogs['learningitemcertifications'] = new totaraDialog(
@@ -127,8 +127,9 @@ M.totara_cohortlearning = M.totara_cohortlearning || {
     },  // init
 
     init_deletelisteners: function() {
-        $('a.learning-delete').unbind('click');
-        $('a.learning-delete').bind('click', function(e, postdeletecallback) {
+
+        $('a.learning-delete').off('click');
+        $('a.learning-delete').on('click', function(e, postdeletecallback) {
             e.preventDefault();
 
             var link = $(this);

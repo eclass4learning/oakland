@@ -369,6 +369,16 @@ class job_assignment_form extends moodleform {
                 array('optional' => true));
             $mform->setDefault('tempmanagerexpirydate', 0);
             $mform->addHelpButton('tempmanagerexpirydate', 'tempmanagerexpirydate', 'totara_job');
+            $tempmanagerexpirydate = $mform->getElement('tempmanagerexpirydate');
+            // Hack but it is easy to control a dates enable/disable click/etc
+            // 'Enable' checkbox is $tempmanagerexpirydate->_elements[4].
+            $tempmanagerexpirydate->_elements[4]->_text = ''; // Remove 'Enable' label.
+            $tempmanagerexpirydate->_elements[4]->_attributes['style'] = 'display:none'; // Hide it and still use the JS.
+        }
+
+        if (get_config('totara_sync', "element_jobassignment_enabled")) {
+            $mform->addElement('advcheckbox', 'totarasync', get_string('totarasync', 'tool_totara_sync'));
+            $mform->addHelpButton('totarasync', 'totarasync', 'tool_totara_sync');
         }
 
         if ($jobassignment) {
@@ -445,7 +455,10 @@ class job_assignment_form extends moodleform {
     }
 
     function validation($data, $files) {
+        global $CFG;
+
         $mform = $this->_form;
+        $allowmultiple = !empty($CFG->totara_job_allowmultiplejobs);
 
         $result = array();
 
@@ -469,6 +482,14 @@ class job_assignment_form extends moodleform {
             }
         }
 
+        // Prevent creation of multiple jobs for the manager when multiple jobs is disabled.
+        if (!$allowmultiple && $data['managerid'] && empty($data['managerjaid'])) {
+            $managerjas = \totara_job\job_assignment::get_all($data['managerid']);
+            if (!empty($managerjas)) {
+                $result['managerselector'] = get_string('error:managerhasjobassignment', 'totara_job');
+            }
+        }
+
         // If setting a temporary manager, check that an expiry date is set.
         $canedittempmanager = $this->_customdata['canedittempmanager'];
         if ($canedittempmanager && $mform->getElement('tempmanagerid')->getValue()) {
@@ -478,6 +499,13 @@ class job_assignment_form extends moodleform {
                 if (time() >  $data['tempmanagerexpirydate'] && $data['tempmanagerexpirydate'] !== 0) {
                     $result['tempmanagerexpirydate'] = get_string('error:datenotinfuture', 'totara_job');
                 }
+            }
+        }
+
+        if (!$allowmultiple) {
+            // Prevent creation of multiple jobs for the tempmanager when multiple jobs is disabled.
+            if ($data['id'] && $data['managerid'] && empty($data['managerjaid'])) {
+
             }
         }
 

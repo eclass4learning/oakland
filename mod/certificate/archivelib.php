@@ -30,17 +30,20 @@ defined('MOODLE_INTERNAL') || die();
 /**
  * Archives user's certificates for a course
  *
+ * @internal This function should only be used by the course archiving API.
+ *           It should never invalidate grades or activity completion state as these
+ *           operations need to be performed in specific order and are done inside
+ *           the archive_course_activities() function.
+ *
  * @param int $userid
  * @param int $courseid
+ * @param int $windowopens
+ *
  * @return bool always true
  */
 function certificate_archive_completion($userid, $courseid, $windowopens = NULL) {
     global $DB, $CFG;
-    require_once($CFG->dirroot . '/lib/completionlib.php');
     require_once($CFG->dirroot . '/mod/certificate/locallib.php');
-
-    $course = $DB->get_record('course', array('id' => $courseid), '*', MUST_EXIST);
-    $completion = new completion_info($course);
 
     $sql = "SELECT ci.*
               FROM {certificate_issues} ci
@@ -48,8 +51,13 @@ function certificate_archive_completion($userid, $courseid, $windowopens = NULL)
              WHERE ci.userid = :userid";
 
     if ($certs = $DB->get_records_sql($sql, array('userid' => $userid, 'courseid' => $courseid))) {
+        $course = $DB->get_record('course', array('id' => $courseid), '*', MUST_EXIST);
+
         foreach ($certs as $cert) {
             $certificate = $DB->get_record('certificate', array('id' => $cert->certificateid), '*', MUST_EXIST);
+
+            // NOTE: grades are deleted automatically during archiving, no need to do it here.
+            //       Caches invalidation also happens automatically during archiving.
 
             $data = clone $cert;
             $data->timearchived = time();
@@ -60,18 +68,10 @@ function certificate_archive_completion($userid, $courseid, $windowopens = NULL)
 
             $newid = $DB->insert_record('certificate_issues_history', $data, true);
             if ($newid) {
-                $course_module = get_coursemodule_from_instance('certificate', $cert->certificateid, $course->id);
-
-                // Reset viewed
-                $completion->set_module_viewed_reset($course_module, $userid);
-                // And reset completion, in case viewed is not a required condition
-                $completion->update_state($course_module, COMPLETION_INCOMPLETE, $userid);
-
                 // Delete original
                 $DB->delete_records('certificate_issues', array('id' => $cert->id));
             }
         }
-        $completion->invalidatecache($courseid, $userid, true);
     }
     return true;
 }

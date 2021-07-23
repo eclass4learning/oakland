@@ -26,8 +26,7 @@
 $string['add'] = 'Add';
 $string['addanotheroption'] = 'Add another option';
 $string['aggregate'] = 'Aggregate rating questions';
-$string['aggregate_help'] = 'Aggregate rating questions allow you to select ratings questions from previous pages
-    and aggregate the scores.';
+$string['aggregate_help'] = 'Aggregate rating questions allow you to select ratings questions from previous pages and aggregate the scores.';
 $string['aggregateaverage'] = 'Display average';
 $string['aggregatedisplayavg'] = ' Average score: {$a}';
 $string['aggregatedisplaymed'] = ' Median score: {$a}';
@@ -39,7 +38,7 @@ $string['aggregatetype'] = 'Aggregation Type';
 $string['aggregateincludezeroscores'] = 'Include zero scores';
 $string['aggregateincludescoresforunanswered'] = 'Include scores for unanswered questions';
 $string['aggregateincludedvalues'] = 'Included values';
-$string['aggregateincludedvalues_help'] = 'By default, only answered questions resulting in a non-zero score are included in the average and/or median calculations.<br />The provided checkboxes can be used to also include unanswered and/or zero scored questions in the calculation.<br /><br />When you check the <strong>Include scores for unanswered questions</strong> option, unanswered questions will be given the default score specified by an administrator. If no default score exists then they will be given the minimum value (numeric scales) or 0 (custom scales).<br /><br />When you check the <strong>Include zero scores</strong> option, questions with a zero score will be used in the calculation.<br /><br />When either/both options are enabled, the overall calculated result will be lower when zero scores and/or unanswered questions are present.';
+$string['aggregateincludedvalues_help'] = 'By default, only answered questions resulting in a non-zero score are included in the average and/or median calculations. The provided checkboxes can be used to also include unanswered and/or zero scored questions in the calculation.When you check the **Include scores for unanswered questions** option, unanswered questions will be given the default score specified by an administrator. If no default score exists then they will be given the minimum value (numeric scales) or 0 (custom scales). When you check the **Include zero scores**  option, questions with a zero score will be used in the calculation. When either/both options are enabled, the overall calculated result will be lower when zero scores and/or unanswered questions are present.';
 $string['answerrange'] = 'Answer range';
 $string['atleastonerequired'] = 'You must specify at least one item';
 $string['availablechoices'] = 'Available choices';
@@ -61,13 +60,16 @@ $string['dateselection'] = 'Date selection';
 $string['datefirstyear'] = 'First year available';
 $string['datelastyear'] = 'Last year available';
 $string['dateincludetime'] = 'Include time as well as date';
+$string['dateincludetimezone'] = 'Include timezone as well as time';
 $string['dateinvalid'] = 'Invalid date selection';
 $string['defaultmake'] = 'Make selected by default';
 $string['defaultselected'] = 'Selected by default';
 $string['defaultunselect'] = 'unselect';
 $string['defaultvalueoutrange'] = 'Default value out of range';
 $string['delete'] = 'Delete';
+$string['deletethis'] = 'Delete {$a}';
 $string['deletedquestion'] = 'Question deleted';
+$string['detailsof'] = 'Details of {$a}';
 $string['displaysettings'] = 'Display settings';
 $string['error:aggregatedisplayselect'] = 'You must select one (or both) of the average / median display options';
 $string['error:aggregatequestionselect'] = 'You must select at least one (preferably more) question to aggregate';
@@ -117,6 +119,7 @@ will be provided for the users to put their answers.
 
 When multiple fields is enabled, you can create several text boxes for each review item, each with its own
 title. Enter a title (such as a question relating to the review items) for each text box that you want to provide.';
+$string['noanswer'] = '-';
 $string['nolearnercompfromplan'] = '{$a}\'s learning plan(s) don\'t contain any competencies to review';
 $string['nolearnercoursefromplan'] = '{$a}\'s learning plan(s) don\'t contain any courses to review';
 $string['nolearnerevidencefromplan'] = '{$a}\'s learning plan(s) don\'t contain any evidence to review';
@@ -124,6 +127,7 @@ $string['nolearnergoals'] = '{$a} doesn\'t have any goals to review';
 $string['nolearnerobjfromplan'] = '{$a}\'s learning plan(s) don\'t contain any objectives to review';
 $string['nolearnerprogfromplan'] = '{$a}\'s learning plan(s) don\'t contain any programs to review';
 $string['nolearnerrequiredlearning'] = '{$a}\ doesn\'t have any required learning to review';
+$string['noresponse'] = 'No response';
 $string['noselfcompfromplan'] = 'Your learning plan(s) don\'t contain any competencies to review';
 $string['noselfcoursefromplan'] = 'Your learning plan(s) don\'t contain any courses to review';
 $string['noselfevidencefromplan'] = 'Your learning plan(s) don\'t contain any evidence to review';
@@ -132,11 +136,12 @@ $string['noselfobjfromplan'] = 'Your learning plan(s) don\'t contain any objecti
 $string['noselfprogfromplan'] = 'Your learning plan(s) don\'t contain any programs to review';
 $string['noselfrequiredlearning'] = 'You don\'t have any required learning to review';
 $string['nothingselected'] = 'No items selected';
+$string['opensinnewwindow'] = 'Opens in new window';
 $string['organisations'] = 'Organisations';
 $string['pluginname'] = 'Question';
 $string['positions'] = 'Positions';
 $string['question'] = 'Question';
-$string['question_help'] = 'Here you specify what information you want the user to provide when they answer this element';
+$string['question_help'] = 'Here you specify what information you want the user to provide when they answer this element.';
 $string['questionandstage'] = '{$a->name} ({$a->stage})';
 $string['questionandtype'] = '{$a->name} ({$a->type})';
 $string['questionaddheader'] = 'Add {$a}';
@@ -179,7 +184,9 @@ Redisplaying a future question or another redisplay question is not possible (th
 Answers or information entered in the original question will be shown in the redisplayed question. Changes made
 in the redisplayed question will be saved over the original answer. If the original question is locked for a particular
 user then the redisplayed question will also be locked for that user.';
+$string['remove'] = 'Remove';
 $string['removeconfirm'] = 'Are you sure you want to remove this item?';
+$string['removethis'] = 'Remove {$a}';
 $string['reorder'] = 'Change order';
 $string['reviewcompfromplanassignmissing'] = 'This competency has been removed from the learning plan';
 $string['reviewcoursefromplanassignmissing'] = 'This course has been removed from the learning plan';
@@ -209,6 +216,7 @@ $string['uploadmaxinvalid'] = 'Number of files must be at least one';
 $string['uploadmaxnum'] = 'Maximum number of files';
 $string['userselectednothing'] = 'User selected nothing';
 $string['valueoutsiderange'] = 'Please enter a value within the valid range';
+$string['viewdetails'] = 'View details';
 $string['visibleto'] = 'Visible to: {$a}';
 $string['youranswer'] = 'Your answer';
 

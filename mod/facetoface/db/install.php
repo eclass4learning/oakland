@@ -45,6 +45,8 @@ function xmldb_facetoface_install() {
         'setting:defaultsessioncancellationsubjectdefault' => get_string('setting:defaultsessioncancellationsubjectdefault', 'facetoface'),
         'setting:defaultregistrationexpiredsubjectdefault' => get_string('setting:defaultregistrationexpiredsubjectdefault', 'facetoface'),
         'setting:defaultpendingreqclosuresubjectdefault' => get_string('setting:defaultpendingreqclosuresubjectdefault', 'facetoface'),
+        'setting:defaultwaitlistautocleansubjectdefault' => get_string('setting:defaultwaitlistautocleansubjectdefault', 'facetoface'),
+        'setting:defaultundercapacitysubjectdefault' => get_string('setting:defaultundercapacitysubjectdefault', 'facetoface'),
     );
 
     foreach ($titles as $key => $title) {
@@ -62,6 +64,7 @@ function xmldb_facetoface_install() {
     $tpl_confirmation->reference = 'confirmation';
     $tpl_confirmation->title = $titles['setting:defaultconfirmationsubjectdefault'];
     $tpl_confirmation->body = text_to_html(get_string('setting:defaultconfirmationmessagedefault_v9', 'facetoface'));
+    $tpl_confirmation->ccmanager = 1;
     $tpl_confirmation->managerprefix = text_to_html(get_string('setting:defaultconfirmationinstrmngrdefault_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_confirmation);
 
@@ -70,6 +73,7 @@ function xmldb_facetoface_install() {
     $tpl_cancellation->reference = 'cancellation';
     $tpl_cancellation->title = $titles['setting:defaultcancellationsubjectdefault'];
     $tpl_cancellation->body = text_to_html(get_string('setting:defaultcancellationmessagedefault_v9', 'facetoface'));
+    $tpl_cancellation->ccmanager = 1;
     $tpl_cancellation->managerprefix = text_to_html(get_string('setting:defaultcancellationinstrmngrdefault_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_cancellation);
 
@@ -78,6 +82,7 @@ function xmldb_facetoface_install() {
     $tpl_waitlist->reference = 'waitlist';
     $tpl_waitlist->title = $titles['setting:defaultwaitlistedsubjectdefault'];
     $tpl_waitlist->body = text_to_html(get_string('setting:defaultwaitlistedmessagedefault_v9', 'facetoface'));
+    $tpl_waitlist->ccmanager = 0;
     $DB->insert_record('facetoface_notification_tpl', $tpl_waitlist);
 
     $tpl_reminder = new stdClass();
@@ -85,6 +90,7 @@ function xmldb_facetoface_install() {
     $tpl_reminder->reference = 'reminder';
     $tpl_reminder->title = $titles['setting:defaultremindersubjectdefault'];
     $tpl_reminder->body = text_to_html(get_string('setting:defaultremindermessagedefault_v9', 'facetoface'));
+    $tpl_reminder->ccmanager = 1;
     $tpl_reminder->managerprefix = text_to_html(get_string('setting:defaultreminderinstrmngrdefault_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_reminder);
 
@@ -93,6 +99,7 @@ function xmldb_facetoface_install() {
     $tpl_request->reference = 'request';
     $tpl_request->title = $titles['setting:defaultrequestsubjectdefault'];
     $tpl_request->body = text_to_html(get_string('setting:defaultrequestmessagedefault_v9', 'facetoface'));
+    $tpl_request->ccmanager = 1;
     $tpl_request->managerprefix = text_to_html(get_string('setting:defaultrequestinstrmngrdefault_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_request);
 
@@ -101,6 +108,7 @@ function xmldb_facetoface_install() {
     $tpl_rolerequest->reference = 'rolerequest';
     $tpl_rolerequest->title = $titles['setting:defaultrolerequestsubjectdefault'];
     $tpl_rolerequest->body = text_to_html(get_string('setting:defaultrolerequestmessagedefault_v9', 'facetoface'));
+    $tpl_rolerequest->ccmanager = 0;
     $tpl_rolerequest->managerprefix = text_to_html(get_string('setting:defaultrolerequestinstrmngrdefault_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_rolerequest);
 
@@ -109,6 +117,7 @@ function xmldb_facetoface_install() {
     $tpl_adminrequest->reference = 'adminrequest';
     $tpl_adminrequest->title = $titles['setting:defaultadminrequestsubjectdefault'];
     $tpl_adminrequest->body = text_to_html(get_string('setting:defaultadminrequestmessagedefault_v9', 'facetoface'));
+    $tpl_adminrequest->ccmanager = 1;
     $tpl_adminrequest->managerprefix = text_to_html(get_string('setting:defaultadminrequestinstrmngrdefault_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_adminrequest);
 
@@ -117,6 +126,7 @@ function xmldb_facetoface_install() {
     $tpl_decline->reference = 'decline';
     $tpl_decline->title = $titles['setting:defaultdeclinesubjectdefault'];
     $tpl_decline->body = text_to_html(get_string('setting:defaultdeclinemessagedefault_v9', 'facetoface'));
+    $tpl_decline->ccmanager = 0;
     $tpl_decline->managerprefix = text_to_html(get_string('setting:defaultdeclineinstrmngrdefault_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_decline);
 
@@ -125,6 +135,7 @@ function xmldb_facetoface_install() {
     $tpl_timechange->reference = 'timechange';
     $tpl_timechange->title = $titles['setting:defaultdatetimechangesubjectdefault'];
     $tpl_timechange->body = text_to_html(get_string('setting:defaultdatetimechangemessagedefault_v9', 'facetoface'));
+    $tpl_timechange->ccmanager = 0;
     $DB->insert_record('facetoface_notification_tpl', $tpl_timechange);
 
     $tpl_trainercancel = new stdClass();
@@ -132,6 +143,7 @@ function xmldb_facetoface_install() {
     $tpl_trainercancel->reference = 'trainercancel';
     $tpl_trainercancel->title = $titles['setting:defaulttrainersessioncancellationsubjectdefault'];
     $tpl_trainercancel->body = text_to_html(get_string('setting:defaulttrainersessioncancellationmessagedefault_v9', 'facetoface'));
+    $tpl_trainercancel->ccmanager = 0;
     $DB->insert_record('facetoface_notification_tpl', $tpl_trainercancel);
 
     $tpl_trainerunassign = new stdClass();
@@ -139,6 +151,7 @@ function xmldb_facetoface_install() {
     $tpl_trainerunassign->reference = 'trainerunassign';
     $tpl_trainerunassign->title = $titles['setting:defaulttrainersessionunassignedsubjectdefault'];
     $tpl_trainerunassign->body = text_to_html(get_string('setting:defaulttrainersessionunassignedmessagedefault_v9', 'facetoface'));
+    $tpl_trainerunassign->ccmanager = 0;
     $DB->insert_record('facetoface_notification_tpl', $tpl_trainerunassign);
 
     $tpl_trainerconfirm = new stdClass();
@@ -146,6 +159,7 @@ function xmldb_facetoface_install() {
     $tpl_trainerconfirm->reference = 'trainerconfirm';
     $tpl_trainerconfirm->title = $titles['setting:defaulttrainerconfirmationsubjectdefault'];
     $tpl_trainerconfirm->body = text_to_html(get_string('setting:defaulttrainerconfirmationmessagedefault_v9', 'facetoface'));
+    $tpl_trainerconfirm->ccmanager = 0;
     $DB->insert_record('facetoface_notification_tpl', $tpl_trainerconfirm);
 
     $tpl_allreservationcancel = new stdClass();
@@ -153,6 +167,7 @@ function xmldb_facetoface_install() {
     $tpl_allreservationcancel->reference = 'allreservationcancel';
     $tpl_allreservationcancel->title = $titles['setting:defaultcancelallreservationssubjectdefault'];
     $tpl_allreservationcancel->body = text_to_html(get_string('setting:defaultcancelallreservationsmessagedefault_v9', 'facetoface'));
+    $tpl_allreservationcancel->ccmanager = 0;
     $DB->insert_record('facetoface_notification_tpl', $tpl_allreservationcancel);
 
     $tpl_reservationcancel = new stdClass();
@@ -160,6 +175,7 @@ function xmldb_facetoface_install() {
     $tpl_reservationcancel->reference = 'reservationcancel';
     $tpl_reservationcancel->title = $titles['setting:defaultcancelreservationsubjectdefault'];
     $tpl_reservationcancel->body = text_to_html(get_string('setting:defaultcancelreservationmessagedefault_v9', 'facetoface'));
+    $tpl_reservationcancel->ccmanager = 0;
     $DB->insert_record('facetoface_notification_tpl', $tpl_reservationcancel);
 
     $tpl_sessioncancel = new stdClass();
@@ -167,6 +183,7 @@ function xmldb_facetoface_install() {
     $tpl_sessioncancel->status = 1;
     $tpl_sessioncancel->title = $titles['setting:defaultsessioncancellationsubjectdefault'];
     $tpl_sessioncancel->body = text_to_html(get_string('setting:defaultsessioncancellationmessagedefault_v9', 'facetoface'));
+    $tpl_sessioncancel->ccmanager = 0;
     $tpl_sessioncancel->managerprefix = text_to_html(get_string('setting:defaultsessioncancellationinstrmngrcopybelow', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_sessioncancel);
 
@@ -175,6 +192,7 @@ function xmldb_facetoface_install() {
     $tpl_expired->status = 1;
     $tpl_expired->title = get_string('setting:defaultregistrationexpiredsubjectdefault', 'facetoface');
     $tpl_expired->body = text_to_html(get_string('setting:defaultregistrationexpiredmessagedefault_v9', 'facetoface'));
+    $tpl_expired->ccmanager = 0;
     $tpl_expired->managerprefix = text_to_html(get_string('setting:defaultregistrationexpiredinstrmngr_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_expired);
 
@@ -183,8 +201,25 @@ function xmldb_facetoface_install() {
     $tpl_regclose->status = 1;
     $tpl_regclose->title = get_string('setting:defaultpendingreqclosuresubjectdefault', 'facetoface');
     $tpl_regclose->body = text_to_html(get_string('setting:defaultpendingreqclosuremessagedefault_v9', 'facetoface'));
+    $tpl_regclose->ccmanager = 1;
     $tpl_regclose->managerprefix = text_to_html(get_string('setting:defaultpendingreqclosureinstrmngrcopybelow_v92', 'facetoface'));
     $DB->insert_record('facetoface_notification_tpl', $tpl_regclose);
+
+    $tpl_waitlistautoclean = new stdClass();
+    $tpl_waitlistautoclean->status = 1;
+    $tpl_waitlistautoclean->reference = 'waitlistautoclean';
+    $tpl_waitlistautoclean->title = $titles['setting:defaultwaitlistautocleansubjectdefault'];
+    $tpl_waitlistautoclean->body = text_to_html(get_string('setting:defaultwaitlistautocleanmessagedefault', 'facetoface'));
+    $tpl_waitlistautoclean->ccmanager = 0;
+    $DB->insert_record('facetoface_notification_tpl', $tpl_waitlistautoclean);
+
+    $tpl_undercapacity = new stdClass();
+    $tpl_undercapacity->status = 1;
+    $tpl_undercapacity->reference = 'undercapacity';
+    $tpl_undercapacity->title = $titles['setting:defaultundercapacitysubjectdefault'];
+    $tpl_undercapacity->body = text_to_html(get_string('setting:defaultundercapacitymessagedefault', 'facetoface'));
+    $tpl_undercapacity->ccmanager = 0;
+    $DB->insert_record('facetoface_notification_tpl', $tpl_undercapacity);
 
     // Setting room, building, and address as default filters.
     set_config('facetoface_calendarfilters', 'room_1');

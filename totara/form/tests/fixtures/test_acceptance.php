@@ -128,7 +128,8 @@ if (isset($form)) {
                     $postdata = 'Data present, type '.gettype($_POST[$name]);
                 }
             }
-            $table->data[] = [$name, $formclass::format_for_display($name, $value), $postdata];
+            // Wrap the value with angle quotes to make behat "contains" matching accurate in tests.
+            $table->data[] = [$name, '«' . $formclass::format_for_display($name, $value) . '»', $postdata];
         }
         echo $OUTPUT->render($table);
         echo $OUTPUT->single_button(new moodle_url($PAGE->url, ['form_select' => $formclass]), 'Reset');
@@ -170,7 +171,7 @@ require(["totara_form/form"], function(Form) {
                     value = "[ '" + value.join("' , '") + "' ]";
                  }
             }
-            lines.push('<tr><td>' + i + '</td><td>' + encodeText(value) + '</td></tr>');
+            lines.push('<tr><td>' + i + '</td><td>«' + encodeText(value) + '»</td></tr>');
         }
         lines.push('</tbody></table>');
         lines.push($buttons);
@@ -186,6 +187,9 @@ require(["totara_form/form"], function(Form) {
         alert('Initialisation failed - there have been errors.');
     }
     promise.done(function(outcome, formid) {
+        if (Form.getFormInstance(formid) === null) {
+            alert('Load returned before form initialised');
+        }
         if (outcome !== 'display') {
             alert('Failed to load the form via JS');
             return;

@@ -43,27 +43,12 @@ Feature: Seminar Signup Role Approval
     And I press "Save changes"
     And I click on "s__facetoface_approvaloptions[approval_role_3]" "checkbox"
     And I press "Save changes"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Classroom Connect Course"
-    And I turn editing mode on
+    And I am on "Classroom Connect Course" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Classroom Connect       |
       | Description       | Classroom Connect Tests |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
-    And I set the following fields to these values:
-      | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
-      | timestart[hour]    | 10   |
-      | timestart[minute]  | 0    |
-      | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
-      | timefinish[hour]   | 12   |
-      | timefinish[minute] | 0    |
-    And I press "OK"
     And I set the following fields to these values:
       | capacity              | 10   |
     And I click on "Freddy Fred" "checkbox" in the "#id_trainerroles" "css_element"
@@ -72,25 +57,24 @@ Feature: Seminar Signup Role Approval
 
   Scenario: Student signs up a with no roles assigned
     When I log in as "sally"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Classroom Connect Course"
-    And I should see "Sign-up"
-    And I follow "Sign-up"
+    And I am on "Classroom Connect Course" course homepage
+    And I should see "Request approval"
+    And I follow "Request approval"
     And I should see "Editing Trainer"
     And I press "Request approval"
-    Then I should see "Your request to attend this session has been received. You should immediately receive a confirmation email."
+    Then I should see "Your request was sent to your manager for approval."
 
   Scenario: Student gets approved through role approval
     When I log in as "jimmy"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Classroom Connect Course"
-    And I should see "Sign-up"
-    And I follow "Sign-up"
+    And I am on "Classroom Connect Course" course homepage
+    And I should see "Request approval"
+    And I follow "Request approval"
     Then I should see "Editing Trainer"
     And I should see "Freddy Fred"
 
     When I press "Request approval"
-    Then I should see "Your request to attend this session has been received. You should immediately receive a confirmation email."
+    Then I should see "Your request was sent to your manager for approval."
+    And I run all adhoc tasks
 
     And I log out
     And I log in as "manager"
@@ -102,20 +86,20 @@ Feature: Seminar Signup Role Approval
     And I click on "Dashboard" in the totara menu
     Then I should see "Seminar trainer confirmation"
 
-    When I click on "View all alerts" "link"
+    When I click on "View all tasks" "link"
     And I click on "Attendees" "link"
     Then I should see "Jimmy Jim"
 
     When I click on "requests[8]" "radio" in the ".lastrow .lastcol" "css_element"
     And I click on "Update requests" "button"
     Then I should not see "Jimmy Jim"
+    And I run all adhoc tasks
 
     When I log out
     And I log in as "jimmy"
     And I click on "Dashboard" in the totara menu
     Then I should see "Seminar booking confirmation"
 
-    When I click on "Find Learning" in the totara menu
-    And I follow "Classroom Connect Course"
+    When I am on "Classroom Connect Course" course homepage
     And I follow "View all events"
-    Then I should see "Booked" in the "1 January 2020" "table_row"
+    Then I should see "Booked" in the "More info" "table_row"

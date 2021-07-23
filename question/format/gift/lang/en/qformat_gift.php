@@ -33,4 +33,4 @@ $string['importminerror'] = 'There is an error in the question. There are not en
 $string['nohandler'] = 'No handler for question type {$a}';
 $string['pluginname'] = 'Gift format';
 $string['pluginname_help'] = 'Gift format enables multiple-choice, true-false, short answer, matching, missing word, numerical and essay questions to be imported or exported via text file.';
-$string['pluginname_link'] = 'qformat/gift';
+$string['pluginname_link'] = 'Adding quiz questions#Addingquizquestions-Importsettings';

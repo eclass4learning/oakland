@@ -101,8 +101,7 @@ M.totara_visiblecohort = M.totara_visiblecohort || {
             },
             url+'cohort.php?selected=' + this.config.visibleselected
                     + '&instancetype=' + this.config.instancetype
-                    + '&instanceid=' + this.config.instanceid
-                    + '&sesskey=' + this.config.sesskey,
+                    + '&instanceid=' + this.config.instanceid,
             ehandler
         );
     },

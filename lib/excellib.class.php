@@ -131,14 +131,12 @@ class MoodleExcelWorkbook {
                 header('Pragma: no-cache');
             }
 
-            if (core_useragent::is_ie()) {
-                $filename = rawurlencode($filename);
-            } else {
-                $filename = s($filename);
-            }
+            // Totara: Remove the browser detection hack here.
 
             header('Content-Type: '.$mimetype);
-            header('Content-Disposition: attachment;filename="'.$filename.'"');
+            // Totara: Send the content-disposition header with both filename and filename*.
+            require_once($CFG->libdir.'/filelib.php');
+            header(make_content_disposition('attachment', $filename));
 
             $objWriter->save('php://output');
         } else {
@@ -180,16 +178,9 @@ class MoodleExcelWorksheet {
         // Replace any characters in the name that Excel cannot cope with.
         $name = strtr(trim($name, "'"), '[]*/\?:', '       ');
         // Shorten the title if necessary.
-        $len = strlen($name);
-        if ($len != 0 && $len > 31) {
-            $name = core_text::substr($name, 0, 31);
-            // Function core_text::substr can return false in certain circumstances.
-            if ($name === false) {
-                $name = '';
-            }
-            // After the substr, we might now have a single quote on the end.
-            $name = trim($name, "'");
-        }
+        $name = core_text::substr($name, 0, 31);
+        // After the substr, we might now have a single quote on the end.
+        $name = trim($name, "'");
 
         if ($name === '') {
             // Name is required!
@@ -318,12 +309,7 @@ class MoodleExcelWorksheet {
         } elseif (preg_match("/^(?:in|ex)ternal:/", $token)) {
             // Match internal or external sheet link
             return $this->write_url($row, $col, $token, '', $format);
-        } elseif (preg_match("/^=/", $token)) {
-            // Match formula
-            return $this->write_formula($row, $col, $token, $format);
-        } elseif (preg_match("/^@/", $token)) {
-            // Match formula
-            return $this->write_formula($row, $col, $token, $format);
+            // Formula processing was intentionally removed in TL-10268.
         } elseif ($token == '') {
             // Match blank
             return $this->write_blank($row, $col, $format);
@@ -866,11 +852,11 @@ class MoodleExcelFormat {
         $numbers[11] = '0.00E+00';
         $numbers[12] = '# ?/?';
         $numbers[13] = '# ??/??';
-        $numbers[14] = 'mm-dd-yy';
+        $numbers[14] = 'm/d/yyyy';
         $numbers[15] = 'd-mmm-yy';
         $numbers[16] = 'd-mmm';
         $numbers[17] = 'mmm-yy';
-        $numbers[22] = 'm/d/yy h:mm';
+        $numbers[22] = 'm/d/yyyy h:mm';
         $numbers[49] = '@';
 
         if ($num_format !== 0 and in_array($num_format, $numbers)) {

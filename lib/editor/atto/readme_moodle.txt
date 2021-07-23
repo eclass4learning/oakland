@@ -18,3 +18,6 @@ Description of the import of libraries associated with the Atto editor.
     Notes:
     * We have patched 1.2.3 with a backport fix from the next release of Rangy which addresses an incompatibility
       between Rangy and HTML5Shiv which is used in the bootstrapclean theme. See MDL-44798 for further information.
+
+    * We have patched rangy-core.js and rangy-textrange.js where it creates a Selection or Range 
+      on initialisation, and manipulates the dom, causing any focused input to lose focus -> TL-19787

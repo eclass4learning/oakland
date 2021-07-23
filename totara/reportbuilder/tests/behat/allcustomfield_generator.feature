@@ -1,10 +1,10 @@
-@javascript @mod_facetoface @totara @totara_reportbuilder
+@javascript @mod_facetoface @totara @totara_reportbuilder @totara_customfield
 Feature: All customfields column generator
   In order to always have all custom fields in report
   As an admin
   I need to be able to add "All ... custom fields" column
 
- Background:
+  Background:
     Given I am on a totara site
     And the following "users" exist:
       | username | firstname | lastname | email                |
@@ -42,7 +42,7 @@ Feature: All customfields column generator
     And I set the following fields to these values:
       | Full name                   | CF Menu of choices |
       | Short name (must be unique) | cfmenuofchoices    |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       Choice 1
       Choice 2
@@ -86,24 +86,22 @@ Feature: All customfields column generator
     And I press "Save changes"
 
   Scenario: Enable all customfields column and check that report displays all customfields and their values correctly
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Test seminar name        |
       | Description | Test seminar description |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2030 |
+      | timestart[year]    | ## +2 years ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2030 |
+      | timefinish[year]   | ## +2 years ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I press "OK"
@@ -114,20 +112,21 @@ Feature: All customfields column generator
     When I click on "Attendees" "link"
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Sam1 Student1, student1@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I wait "1" seconds
     And I press "Continue"
     And I set the following fields to these values:
-      | Requests for session organiser | My note |
-      | CF Checkbox | 1 |
-      | customfield_cfdatetime[day]   | 5    |
-      | customfield_cfdatetime[month] | 6    |
-      | customfield_cfdatetime[year]  | 2031 |
-      | CF Menu of choices | Choice 2 |
-      | CF Text area | My area |
-      | customfield_cfurl[url] | http://example.com/ |
-      | customfield_cfurl[text] | Example site |
-      | Address | Molesworth St, Pipitea, Wellington 6011 |
+      | Requests for session organiser | My note                                 |
+      | CF Checkbox                    | 1                                       |
+      | customfield_cfdatetime[enabled]| 1                                       |
+      | customfield_cfdatetime[day]    | 5                                       |
+      | customfield_cfdatetime[month]  | 6                                       |
+      | customfield_cfdatetime[year]   | ## +3 years ## Y ##                     |
+      | CF Menu of choices             | Choice 2                                |
+      | CF Text area                   | My area                                 |
+      | customfield_cfurl[url]         | http://example.com/                     |
+      | customfield_cfurl[text]        | Example site                            |
+      | Address                        | Molesworth St, Pipitea, Wellington 6011 |
     And I upload "totara/reportbuilder/tests/fixtures/test.txt" file to "CF File" filemanager
     And I click on "Option 2" "text"
     And I press "Confirm"
@@ -136,7 +135,7 @@ Feature: All customfields column generator
     Then I should see "Booked" in the "Sam1 Student1" "table_row"
     And I should see "My note" in the "Sam1 Student1" "table_row"
     And I should see "Yes" in the "Sam1 Student1" "table_row"
-    And I should see "5 Jun 2031" in the "Sam1 Student1" "table_row"
+    And I should see date "5 Jun +3 years" formatted "%d %b %Y" in the "Sam1 Student1" "table_row"
     And I should see "test.txt" in the "Sam1 Student1" "table_row"
     And I should see "Choice 2" in the "Sam1 Student1" "table_row"
     And I should see "My area" in the "Sam1 Student1" "table_row"

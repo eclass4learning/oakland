@@ -33,11 +33,11 @@ class rb_facetoface_assets_embedded extends rb_base_embedded {
             array('type' => 'asset', 'value' => 'visible', 'heading' => null),
             array('type' => 'asset', 'value' => 'actions', 'heading' => null)
         );
-
         $this->filters = array(
             array('type' => 'asset', 'value' => 'name', 'advanced' => 0),
             array('type' => 'asset', 'value' => 'assetavailable', 'advanced' => 0)
         );
+        $this->defaultsortcolumn = 'asset_name';
 
         $this->contentmode = REPORT_BUILDER_CONTENT_MODE_NONE;
 

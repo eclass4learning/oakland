@@ -1,7 +1,7 @@
 @qtype @qtype_ddmarker @_switch_window
-Feature: Preview a drag-drop onto image question
+Feature: Preview a drag-drop marker question
   As a teacher
-  In order to check my drag-drop onto image questions will work for students
+  In order to check my drag-drop marker questions will work for students
   I need to preview them
 
   Background:
@@ -21,15 +21,16 @@ Feature: Preview a drag-drop onto image question
       | questioncategory | qtype    | name         | template |
       | Test questions   | ddmarker | Drag markers | mkmap    |
     Given I log in as "teacher1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I navigate to "Question bank" node in "Course administration"
 
   @javascript @_bug_phantomjs
-  Scenario: Preview a question using the mouse.
+  Scenario: Preview a question using the mouse at full size.
     When I click on "Preview" "link" in the "Drag markers" "table_row"
     And I switch to "questionpreview" window
     # Increase window size and wait 2 seconds to ensure elements are placed properly by js.
-    And I change window size to "medium"
+    # Keep window large else drag will scroll the window to find element.
+    And I change viewport size to "large"
     And I wait "2" seconds
     # Odd, but the <br>s go to nothing, not a space.
     And I drag "OU" to "342,230" in the drag and drop markers question
@@ -42,14 +43,47 @@ Feature: Preview a drag-drop onto image question
     And I switch to the main window
 
   @javascript
-  Scenario: Preview a question using the keyboard.
+  Scenario: Preview a question using the keyboard at full size.
     When I click on "Preview" "link" in the "Drag markers" "table_row"
     And I switch to "questionpreview" window
     # Increase window size and wait 2 seconds to ensure elements are placed properly by js.
-    And I change window size to "medium"
+    # Keep window large else drag will scroll the window to find element.
+    And I change viewport size to "large"
     And I wait "2" seconds
     And I type "up" "89" times on marker "Railway station" in the drag and drop markers question
     And I type "right" "21" times on marker "Railway station" in the drag and drop markers question
+    And I press "Submit and finish"
+    Then the state of "Please place the markers on the map of Milton Keynes" question is shown as "Partially correct"
+    And I should see "Mark 0.25 out of 1.00"
+    And I switch to the main window
+
+  @javascript @_bug_phantomjs
+  Scenario: Preview a question using the mouse while scaled.
+    When I click on "Preview" "link" in the "Drag markers" "table_row"
+    And I switch to "questionpreview" window
+    # Decrease window size and wait 2 seconds to ensure elements are placed properly by js.
+    # Using a slightly taller screen than a standard size so that it can move the OU marker
+    And I change viewport size to "640x800"
+    And I wait "2" seconds
+    # Odd, but the <br>s go to nothing, not a space.
+    And I drag "OU" to "295,197" in the drag and drop markers question
+    And I drag "Railway station" to "226,170" in the drag and drop markers question
+    And I drag "Railway station,1" to "284,274" in the drag and drop markers question
+    And I drag "Railway station,2" to "181,89" in the drag and drop markers question
+    And I press "Submit and finish"
+    Then the state of "Please place the markers on the map of Milton Keynes" question is shown as "Correct"
+    And I should see "Mark 1.00 out of 1.00"
+    And I switch to the main window
+
+  @javascript
+  Scenario: Preview a question using the keyboard while scaled.
+    When I click on "Preview" "link" in the "Drag markers" "table_row"
+    And I switch to "questionpreview" window
+    # Decrease window size and wait 2 seconds to ensure elements are placed properly by js.
+    And I change viewport size to "small"
+    And I wait "2" seconds
+    And I type "up" "75" times on marker "Railway station" in the drag and drop markers question
+    And I type "right" "22" times on marker "Railway station" in the drag and drop markers question
     And I press "Submit and finish"
     Then the state of "Please place the markers on the map of Milton Keynes" question is shown as "Partially correct"
     And I should see "Mark 0.25 out of 1.00"

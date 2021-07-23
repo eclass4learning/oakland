@@ -26,9 +26,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 class rb_source_courses extends rb_base_source {
-    public $base, $joinlist, $columnoptions, $filteroptions;
-    public $contentoptions, $paramoptions, $defaultcolumns;
-    public $defaultfilters, $requiredcolumns, $sourcetitle;
+    use \core_course\rb\source\report_trait;
+    use \core_tag\rb\source\report_trait;
+    use \totara_cohort\rb\source\report_trait;
+    use \totara_reportbuilder\rb\source\report_trait;
 
     function __construct() {
         $this->base = '{course}';
@@ -42,8 +43,7 @@ class rb_source_courses extends rb_base_source {
         $this->defaulttoolbarsearchcolumns = $this->define_defaultsearchcolumns();
         $this->requiredcolumns = $this->define_requiredcolumns();
         $this->sourcetitle = get_string('sourcetitle', 'rb_source_courses');
-        // Filter out non-group related courses for Oakland
-        $this->sourcewhere = 'base.oaklandgroupid is null';
+        $this->usedcomponents[] = 'totara_cohort';
 
         parent::__construct();
     }
@@ -63,25 +63,28 @@ class rb_source_courses extends rb_base_source {
     //
 
     protected function define_joinlist() {
+        global $DB;
 
+        $list = $DB->sql_group_concat_unique($DB->sql_cast_2char('m.name'), '|');
         $joinlist = array(
             new rb_join(
                 'mods',
                 'LEFT',
-                '(SELECT cm.course, ' .
-                sql_group_concat(sql_cast2char('m.name'), '|', true) .
-                " AS list FROM {course_modules} cm LEFT JOIN {modules} m ON m.id = cm.module GROUP BY cm.course)",
+                "(SELECT cm.course, {$list} AS list
+                    FROM {course_modules} cm
+               LEFT JOIN {modules} m ON m.id = cm.module
+                GROUP BY cm.course)",
                 'mods.course = base.id',
                 REPORT_BUILDER_RELATION_ONE_TO_ONE
             ),
         );
 
         // Include some standard joins.
-        $this->add_context_table_to_joinlist($joinlist, 'base', 'id', CONTEXT_COURSE, 'INNER');
-        $this->add_course_category_table_to_joinlist($joinlist,
+        $this->add_context_tables($joinlist, 'base', 'id', CONTEXT_COURSE, 'INNER');
+        $this->add_core_course_category_tables($joinlist,
             'base', 'category');
-        $this->add_tag_tables_to_joinlist('course', $joinlist, 'base', 'id');
-        $this->add_cohort_course_tables_to_joinlist($joinlist, 'base', 'id');
+        $this->add_core_tag_tables('core', 'course', $joinlist, 'base', 'id');
+        $this->add_totara_cohort_course_tables($joinlist, 'base', 'id');
 
         return $joinlist;
     }
@@ -93,15 +96,15 @@ class rb_source_courses extends rb_base_source {
                 'mods',
                 get_string('content', 'rb_source_courses'),
                 "mods.list",
-                array('joins' => 'mods', 'displayfunc' => 'modicons')
+                array('joins' => 'mods', 'displayfunc' => 'course_mod_icons')
             ),
         );
 
         // Include some standard columns.
-        $this->add_course_fields_to_columns($columnoptions, 'base');
-        $this->add_course_category_fields_to_columns($columnoptions, 'course_category', 'base');
-        $this->add_tag_fields_to_columns('course', $columnoptions);
-        $this->add_cohort_course_fields_to_columns($columnoptions);
+        $this->add_core_course_columns($columnoptions, 'base');
+        $this->add_core_course_category_columns($columnoptions, 'course_category', 'base');
+        $this->add_core_tag_columns('core', 'course', $columnoptions);
+        $this->add_totara_cohort_course_columns($columnoptions);
 
         return $columnoptions;
     }
@@ -128,10 +131,10 @@ class rb_source_courses extends rb_base_source {
         );
 
         // Include some standard filters.
-        $this->add_course_fields_to_filters($filteroptions, 'base', 'id');
-        $this->add_course_category_fields_to_filters($filteroptions, 'base', 'category');
-        $this->add_tag_fields_to_filters('course', $filteroptions);
-        $this->add_cohort_course_fields_to_filters($filteroptions);
+        $this->add_core_course_filters($filteroptions, 'base', 'id');
+        $this->add_core_course_category_filters($filteroptions, 'base', 'category');
+        $this->add_core_tag_filters('core', 'course', $filteroptions);
+        $this->add_totara_cohort_course_filters($filteroptions);
 
         return $filteroptions;
     }
@@ -248,35 +251,56 @@ class rb_source_courses extends rb_base_source {
     //
     //
 
+    /**
+     * Display course module icons
+     *
+     * @deprecated Since Totara 12.0
+     * @param $mods
+     * @param $row
+     * @param bool $isexport
+     * @return string
+     */
     function rb_display_modicons($mods, $row, $isexport = false) {
+        debugging('rb_source_courses::rb_display_modicons has been deprecated since Totara 12.0. Use course_mod_icons::display', DEBUG_DEVELOPER);
         global $OUTPUT, $CFG;
         $modules = explode('|', $mods);
+        $mods = array();
 
         // Sort module list before displaying to make
         // cells all consistent
-        sort($modules);
+        foreach ($modules as $mod) {
+            if (empty($mod)) {
+                continue;
+            }
+            $module = new stdClass();
+            $module->name = $mod;
+            if (get_string_manager()->string_exists('pluginname', $mod)) {
+                $module->localname = get_string('pluginname', $mod);
+            } else {
+                $module->localname = ucfirst($mod);
+            }
+            $mods[] = $module;
+        }
+        \core_collator::asort_objects_by_property($mods, 'localname');
 
         $out = array();
         $glue = '';
-        foreach ($modules as $module) {
-            if (empty($module)) {
-                continue;
-            }
-            $name = (get_string_manager()->string_exists('pluginname', $module)) ?
-                get_string('pluginname', $module) : ucfirst($module);
+
+        foreach ($mods as $module) {
             if ($isexport) {
-                $out[] = $name;
+                $out[] = $module->localname;
                 $glue = ', ';
             } else {
                 $glue = '';
-                if (file_exists($CFG->dirroot . '/mod/' . $module . '/pix/icon.gif') ||
-                    file_exists($CFG->dirroot . '/mod/' . $module . '/pix/icon.png')) {
-                    $out[] = $OUTPUT->pix_icon('icon', $name, $module);
+                if (file_exists($CFG->dirroot . '/mod/' . $module->name . '/pix/icon.gif') ||
+                    file_exists($CFG->dirroot . '/mod/' . $module->name . '/pix/icon.png')) {
+                    $out[] = $OUTPUT->pix_icon('icon', $module->localname, $module->name);
                 } else {
-                    $out[] = $name;
+                    $out[] = $module->name;
                 }
             }
         }
+
         return implode($glue, $out);
     }
 
@@ -287,12 +311,7 @@ class rb_source_courses extends rb_base_source {
         $categoryparams = array('sitelevelcategory' => 0);
 
         $reportfor = $report->reportfor; // ID of the user the report is for.
-        $fieldalias = 'base';
-        $fieldbaseid = $report->get_field('base', 'id', 'base.id');
-        $fieldvisible = $report->get_field('base', 'visible', 'base.visible');
-        $fieldaudvis = $report->get_field('base', 'audiencevisible', 'base.audiencevisible');
-        list($visiblesql, $visibleparams) = totara_visibility_where($reportfor,
-                $fieldbaseid, $fieldvisible, $fieldaudvis, $fieldalias, 'course', $report->is_cached());
+        list($visiblesql, $visibleparams) = $report->post_config_visibility_where('course', 'base', $reportfor);
 
         // Combine the results.
         $report->set_post_config_restrictions(array($categorysql . " AND " . $visiblesql,

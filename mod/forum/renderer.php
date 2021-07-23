@@ -46,17 +46,25 @@ class mod_forum_renderer extends plugin_renderer_base {
             $html .= html_writer::start_tag('div', array('class' => 'discussion-nav clearfix'));
             $html .= html_writer::start_tag('ul');
             if ($prev) {
+                $prevname = $prev->name;
+                if ($prev->deleted) {
+                    $prevname = get_string('forumdiscussiondeleted', 'mod_forum');
+                }
                 $url = new moodle_url('/mod/forum/discuss.php', array('d' => $prev->id));
                 $html .= html_writer::start_tag('li', array('class' => 'prev-discussion'));
-                $html .= html_writer::link($url, format_string($prev->name),
-                    array('aria-label' => get_string('prevdiscussiona', 'mod_forum', format_string($prev->name))));
+                $html .= html_writer::link($url, format_string($prevname),
+                    array('aria-label' => get_string('prevdiscussiona', 'mod_forum', format_string($prevname))));
                 $html .= html_writer::end_tag('li');
             }
             if ($next) {
+                $nextname = $next->name;
+                if ($next->deleted) {
+                    $nextname = get_string('forumdiscussiondeleted', 'mod_forum');
+                }
                 $url = new moodle_url('/mod/forum/discuss.php', array('d' => $next->id));
                 $html .= html_writer::start_tag('li', array('class' => 'next-discussion'));
-                $html .= html_writer::link($url, format_string($next->name),
-                    array('aria-label' => get_string('nextdiscussiona', 'mod_forum', format_string($next->name))));
+                $html .= html_writer::link($url, format_string($nextname),
+                    array('aria-label' => get_string('nextdiscussiona', 'mod_forum', format_string($nextname))));
                 $html .= html_writer::end_tag('li');
             }
             $html .= html_writer::end_tag('ul');
@@ -93,6 +101,7 @@ class mod_forum_renderer extends plugin_renderer_base {
         $output .= html_writer::end_tag('div');
 
         $output .= html_writer::tag('div', $potentialuc->display(true), array('class' => 'span5'));
+        $output .= html_writer::end_tag('div');
 
         $output .= html_writer::end_tag('form');
         return $output;
@@ -120,17 +129,18 @@ class mod_forum_renderer extends plugin_renderer_base {
             $strparams = new stdclass();
             $strparams->name = format_string($forum->name);
             $strparams->count = count($users);
-            $output .= $this->output->heading(get_string("subscriberstowithcount", "forum", $strparams));
-            $table = new html_table();
-            $table->data = array();
+            $output .= $this->output->heading(get_string("subscriberstowithcount", "forum", $strparams), 3);
+
+            $subscribers = array();
+
             foreach ($users as $user) {
-                $info = array($this->output->user_picture($user, array('courseid'=>$course->id)), fullname($user));
+                $subscriber = $this->output->user_picture($user, array('courseid'=>$course->id)) . fullname($user);
                 if ($canviewemail) {
-                    array_push($info, $user->email);
+                    $subscriber .= ' (' . $user->email . ')';
                 }
-                $table->data[] = $info;
+                $subscribers[] = $subscriber;
             }
-            $output .= html_writer::table($table);
+            $output .= html_writer::alist($subscribers, array('class' => 'unlist mod_forum-subscribers'));
         }
         return $output;
     }
@@ -192,5 +202,68 @@ class mod_forum_renderer extends plugin_renderer_base {
      */
     public function forum_post_template() {
         return 'forum_post';
+    }
+
+    /**
+     * Create the inplace_editable used to select forum digest options.
+     *
+     * @param   stdClass    $forum  The forum to create the editable for.
+     * @param   int         $value  The current value for this user
+     * @return  inplace_editable
+     */
+    public function render_digest_options($forum, $value) {
+        $options = forum_get_user_digest_options();
+        $editable = new \core\output\inplace_editable(
+            'mod_forum',
+            'digestoptions',
+            $forum->id,
+            true,
+            $options[$value],
+            $value,
+            null,
+            get_string('digestmailpostlink', 'mod_forum', $forum->name)
+        );
+
+        $editable->set_type_select($options);
+
+        return $editable;
+    }
+
+    /**
+     * Render quick search form.
+     *
+     * @param \mod_forum\output\quick_search_form $form The renderable.
+     * @return string
+     */
+    public function render_quick_search_form(\mod_forum\output\quick_search_form $form) {
+        return $this->render_from_template('mod_forum/quick_search_form', $form->export_for_template($this));
+    }
+
+    /**
+     * Render big search form.
+     *
+     * @param \mod_forum\output\big_search_form $form The renderable.
+     * @return string
+     */
+    public function render_big_search_form(\mod_forum\output\big_search_form $form) {
+        $this->page->requires->js_call_amd('mod_forum/big_search_form', 'init');
+        return $this->render_from_template('mod_forum/big_search_form', $form->export_for_template($this));
+    }
+
+    /**
+     * Renders Recent activity to go in the recent activity block
+     * Basically a wrapper for {@link render_recent_activity_notes()}
+     *
+     * @param array $activities array of stdClasses from {@link forum_get_recent_mod_activity()}
+     * @param bool $viewfullnames
+     * @return string
+     */
+    public function render_recent_activities(array $activities, bool $viewfullnames=true) :string {
+        if (count($activities) == 0) {
+            return '';
+        }
+        $output = html_writer::tag('h3', get_string('newforumposts', 'forum') . ':', ['class' => 'sectionname']);
+        $output .= render_recent_activity_notes($activities, $viewfullnames);
+        return $output;
     }
 }

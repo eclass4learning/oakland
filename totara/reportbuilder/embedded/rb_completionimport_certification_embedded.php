@@ -96,6 +96,11 @@ class rb_completionimport_certification_embedded extends rb_base_embedded {
                 'value' => 'duedate',
                 'heading' => get_string('columnbaseduedate', 'rb_source_completionimport_certification'),
             ),
+            array(
+                'type' => 'base',
+                'value' => 'processed',
+                'heading' => get_string('columnbaseprocessed', 'rb_source_completionimport_certification'),
+            ),
         );
 
         $this->filters = array(
@@ -138,6 +143,11 @@ class rb_completionimport_certification_embedded extends rb_base_embedded {
                 'type' => 'base',
                 'value' => 'completiondate',
                 'advanced' => 1,
+            ),
+            array(
+                'type' => 'base',
+                'value' => 'processed',
+                'advanced' => 0,
             ),
         );
 

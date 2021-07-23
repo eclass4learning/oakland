@@ -14,12 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-require_once($CFG->libdir.'/formslib.php');
-require_once($CFG->libdir.'/gradelib.php');
-
 if (!defined('MOODLE_INTERNAL')) {
     die('Direct access to this script is forbidden.');    // It must be included from a Moodle page.
 }
+
+global $CFG;
+require_once($CFG->libdir.'/formslib.php');
+require_once($CFG->libdir.'/gradelib.php');
 
 /**
  * Form for mapping columns to the fields in the table.
@@ -83,9 +84,13 @@ class gradeimport_direct_mapping_form extends moodleform {
                         '0'   => get_string('ignore', 'grades'),
                         'new' => get_string('newitem', 'grades')
                     ),
-                    get_string('gradeitems', 'grades') => $gradeitems,
-                    get_string('feedbacks', 'grades')  => $feedbacks
                 );
+                if ($gradeitems) {
+                    $headermapsto[get_string('gradeitems', 'grades')] = $gradeitems;
+                }
+                if ($feedbacks) {
+                    $headermapsto[get_string('feedbacks', 'grades')] = $feedbacks;
+                }
                 $mform->addElement('selectgroups', 'mapping_'.$i, s($h), $headermapsto);
                 $i++;
             }

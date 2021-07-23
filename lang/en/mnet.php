@@ -59,7 +59,7 @@ $string['duplicate_usernames'] = 'We failed to create an index on the columns "m
 $string['enabled_for_all'] = '(This service has been enabled for all hosts).';
 $string['enterausername'] = 'Please enter a username, or a list of usernames separated by commas.';
 $string['error7020'] = 'This error normally occurs if the remote site has created a record for you with the wrong wwwroot, for example, http://yoursite.com instead of http://www.yoursite.com. You should contact the administrator of the remote site with your wwwroot (as specified in config.php) asking her to update her record for your host.';
-$string['error7022'] = 'The message you sent to the remote site was encrypted properly, but not signed. This is very unexpected; you should probably file a bug if this occurs (giving as much information as possible about the application versions in question, etc.';
+$string['error7022'] = 'The message you sent to the remote site was encrypted properly, but not signed. This is very unexpected; you should probably file a bug if this occurs (giving as much information as possible about the application versions in question etc).';
 $string['error7023'] = 'The remote site has tried to decrypt your message with all the keys it has on record for your site. They have all failed. You might be able to fix this problem by manually re-keying with the remote site. This is unlikely to occur unless you\'ve been out of communication with the remote site for a few months.';
 $string['error7024'] = 'You send an unencrypted message to the remote site, but the remote site doesn\'t accept unencrypted communication from your site. This is very unexpected; you should probably file a bug if this occurs (giving as much information as possible about the application versions in question, etc.';
 $string['error7026'] = 'The key that your message was signed with differs from the key that the remote host has on file for your server. Further, the remote host attempted to fetch your current key and failed to do so. Please manually re-key with the remote host and try again.';
@@ -89,9 +89,9 @@ $string['hostnamehelp'] = 'The fully-qualified domain name of the remote host, e
 $string['hostnotconfiguredforsso'] = 'This server is not configured for remote login.';
 $string['hostsettings'] = 'Host settings';
 $string['http_self_signed_help'] = 'Permit connections using a self-signed DIY SSL certificate on the remote host.';
-$string['https_self_signed_help'] = 'Permit connections using a self-signed DIY SSL in PHP on the remote host over http.';
+$string['https_self_signed_help'] = 'Permit connections using a self-signed DIY SSL in PHP on the remote host over HTTP.';
 $string['https_verified_help'] = 'Permit connections using a verified SSL certificate on the remote host.';
-$string['http_verified_help'] = 'Permit connections using a verified SSL certificate in PHP on the remote host, but over http (not https).';
+$string['http_verified_help'] = 'Permit connections using a verified SSL certificate in PHP on the remote host, but over HTTP (not HTTPS).';
 $string['id'] = 'ID';
 $string['idhelp'] = 'This value is automatically assigned and cannot be changed';
 $string['importfields'] = 'Fields to import';
@@ -219,9 +219,9 @@ $string['ssl_acl_deny'] = 'SSO ACL: Deny user \'{$a->user}\' from \'{$a->host}\'
 $string['sslverification'] = 'SSL verification';
 $string['sslverification_help'] = 'This option allows you to configure the level of security when connecting to a peer using HTTPS.
 
-* None: no level of security
-* Verify host only: validates the domain of the SSL certificate
-* Verify host and peer (recommended): validates the domain and issuer of the SSL certificate';
+* **None**: No level of security.
+* **Verify host only**: Validates the domain of the SSL certificate.
+* **Verify host and peer** (recommended): Validates the domain and issuer of the SSL certificate.';
 $string['ssoaccesscontrol'] = 'SSO access control';
 $string['ssoacldescr'] = 'Use this page to grant/deny access to specific users from remote MNet hosts. This is functional when you are offering SSO services to remote users. To control your <em>local</em> users\' ability to roam to other MNet hosts, use the roles system to grant them the <em>mnetlogintoremote</em> capability.';
 $string['ssoaclneeds'] = 'For this functionality to work, you must have Networking on, plus the MNet authentication plugin enabled.';

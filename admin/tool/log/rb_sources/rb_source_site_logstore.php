@@ -24,9 +24,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 class rb_source_site_logstore extends rb_base_source {
-    public $base, $joinlist, $columnoptions, $filteroptions;
-    public $contentoptions, $paramoptions, $defaultcolumns;
-    public $defaultfilters, $requiredcolumns, $sourcetitle;
+    use \core_course\rb\source\report_trait;
+    use \core_tag\rb\source\report_trait;
+    use \totara_job\rb\source\report_trait;
+    use \totara_cohort\rb\source\report_trait;
 
     public function __construct($groupid, rb_global_restriction_set $globalrestrictionset = null) {
         if ($groupid instanceof rb_global_restriction_set) {
@@ -50,6 +51,11 @@ class rb_source_site_logstore extends rb_base_source {
         $this->sourcetitle = get_string('sourcetitle', 'rb_source_site_logstore');
         $this->sourcewhere = 'anonymous = 0';
 
+        // No caching!!! The table is way too big and there are tons of extra fields.
+        $this->cacheable = false;
+        $this->usedcomponents[] = 'tool_log';
+        $this->usedcomponents[] = 'totara_cohort';
+
         parent::__construct();
     }
 
@@ -66,18 +72,20 @@ class rb_source_site_logstore extends rb_base_source {
         $joinlist = array();
 
         // Include some standard joins.
-        $this->add_user_table_to_joinlist($joinlist, 'base', 'userid');
-        $this->add_course_table_to_joinlist($joinlist, 'base', 'courseid');
+        $this->add_core_user_tables($joinlist, 'base', 'userid');
+        $this->add_core_course_tables($joinlist, 'base', 'courseid');
         // Requires the course join.
-        $this->add_course_category_table_to_joinlist($joinlist,
+        $this->add_core_course_category_tables($joinlist,
             'course', 'category');
-        $this->add_job_assignment_tables_to_joinlist($joinlist, 'base', 'userid');
-        $this->add_tag_tables_to_joinlist('course', $joinlist, 'base', 'courseid');
-        $this->add_cohort_user_tables_to_joinlist($joinlist, 'base', 'userid');
-        $this->add_cohort_course_tables_to_joinlist($joinlist, 'base', 'courseid');
+        $this->add_totara_job_tables($joinlist, 'base', 'userid');
+        $this->add_core_tag_tables('core', 'course', $joinlist, 'base', 'courseid');
+        $this->add_totara_cohort_course_tables($joinlist, 'base', 'courseid');
 
         // Add related user support.
-        $this->add_relateduser_table_to_joinlist($joinlist, 'base', 'relateduserid');
+        $this->add_core_user_tables($joinlist, 'base', 'relateduserid', 'ruser');
+
+        // Add real user support.
+        $this->add_core_user_tables($joinlist, 'base', 'realuserid', 'realuser');
         return $joinlist;
     }
 
@@ -117,7 +125,7 @@ class rb_source_site_logstore extends rb_base_source {
                 'ip',
                 get_string('ip', 'rb_source_site_logstore'),
                 'base.ip',
-                array('displayfunc' => 'iplookup')
+                array('displayfunc' => 'ip_lookup_link')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -125,14 +133,15 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('targetaction', 'rb_source_site_logstore'),
                 $DB->sql_concat('base.target', "' '", 'base.action'),
                 array('dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'plaintext')
             ),
             new rb_column_option(
                 'logstore_standard_log',
                 'other',
                 get_string('other', 'rb_source_site_logstore'),
                 'base.other',
-                array('displayfunc' => 'serialized')
+                array('displayfunc' => 'log_serialized_preformated')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -140,23 +149,22 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('eventclass', 'rb_source_site_logstore'),
                 'base.eventname',
                 array('dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'plaintext')
             ),
             new rb_column_option(
                 'logstore_standard_log',
                 'component',
                 get_string('component', 'rb_source_site_logstore'),
                 'base.component',
-                array('displayfunc' => 'component',
-                      'extrafields' => $eventextrafields)
+                array('displayfunc' => 'log_component')
             ),
             new rb_column_option(
                 'logstore_standard_log',
                 'context',
                 get_string('context', 'rb_source_site_logstore'),
                 'base.contextid',
-                array('displayfunc' => 'context',
-                      'extrafields' => $eventextrafields)
+                array('displayfunc' => 'log_context')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -164,7 +172,8 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('action', 'rb_source_site_logstore'),
                 'base.action',
                 array('dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'plaintext')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -172,7 +181,8 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('target', 'rb_source_site_logstore'),
                 'base.target',
                 array('dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'plaintext')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -180,14 +190,16 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('objecttable', 'rb_source_site_logstore'),
                 'base.objecttable',
                 array('dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'plaintext')
             ),
             new rb_column_option(
                 'logstore_standard_log',
                 'objectid',
                 get_string('objectid', 'rb_source_site_logstore'),
                 'base.objectid',
-                array('dbdatatype' => 'integer')
+                array('dbdatatype' => 'integer',
+                      'displayfunc' => 'integer')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -195,7 +207,8 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('origin', 'rb_source_site_logstore'),
                 'base.origin',
                 array('dbdatatype' => 'char',
-                      'outputformat' => 'text')
+                      'outputformat' => 'text',
+                      'displayfunc' => 'plaintext')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -203,7 +216,7 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('crud', 'rb_source_site_logstore'),
                 'base.crud',
                 array('dbdatatype' => 'char',
-                      'displayfunc' => 'crud')
+                      'displayfunc' => 'log_crud')
             ),
             new rb_column_option(
                 'logstore_standard_log',
@@ -211,23 +224,21 @@ class rb_source_site_logstore extends rb_base_source {
                 get_string('edulevel', 'moodle'),
                 'base.edulevel',
                 array('dbdatatype' => 'char',
-                      'displayfunc' => 'edulevel')
+                      'displayfunc' => 'log_educational_level')
             ),
             new rb_column_option(
                 'logstore_standard_log',
                 'name',
                 get_string('name', 'rb_source_site_logstore'),
-                'base.id',
-                array('displayfunc' => 'name',
-                      'extrafields' => $eventextrafields
-                     )
+                'base.eventname',
+                array('displayfunc' => 'log_event_name')
             ),
             new rb_column_option(
                 'logstore_standard_log',
                 'namelink',
                 get_string('namelink', 'rb_source_site_logstore'),
                 'base.id',
-                array('displayfunc' => 'name_link',
+                array('displayfunc' => 'log_event_name_link',
                       'extrafields' => $eventextrafields
                      )
             ),
@@ -236,22 +247,51 @@ class rb_source_site_logstore extends rb_base_source {
                 'description',
                 get_string('description', 'moodle'),
                 'base.id',
-                array('displayfunc' => 'description',
+                array('displayfunc' => 'log_description',
                       'extrafields' => $eventextrafields
                 )
             ),
         );
 
+        // Add composite real + on-behalf-of fullname column option.
+        $userusednamefields = totara_get_all_user_name_fields_join('auser', null, true);
+        $userallnamefields = totara_get_all_user_name_fields(false, 'auser', null, 'auser');
+        $realallnamefields = totara_get_all_user_name_fields(false, 'realuser', null, 'realuser');
+
+        $allnamefields = array_merge($userallnamefields, $realallnamefields);
+        foreach ($allnamefields as $key => $field) {
+            $allnamefields[$key] = "COALESCE($field,'')";
+        }
+        $allnamefields['auserid'] = 'auser.id';
+        $allnamefields['realuserid'] = 'realuser.id';
+
+        $columnoptions[] = new rb_column_option(
+            'logstore_standard_log',
+            'userfullnameincludingonbehalfof',
+            get_string('userfullnameincludingonbehalfof', 'rb_source_site_logstore'),
+            $DB->sql_concat_join("' '", $userusednamefields),
+            array(
+                'dbdatatype' => 'char',
+                'outputformat' => 'text',
+                'joins' => array('auser', 'realuser'),
+                'displayfunc' => 'log_user_full_name_including_on_behalf_of',
+                'extrafields' => $allnamefields,
+                'defaultheading' => get_string('userfullname', 'totara_reportbuilder'),
+            )
+        );
+
         // Include some standard columns.
-        $this->add_user_fields_to_columns($columnoptions);
-        $this->add_course_fields_to_columns($columnoptions);
-        $this->add_course_category_fields_to_columns($columnoptions);
-        $this->add_job_assignment_fields_to_columns($columnoptions);
-        $this->add_tag_fields_to_columns('course', $columnoptions);
-        $this->add_cohort_user_fields_to_columns($columnoptions);
-        $this->add_cohort_course_fields_to_columns($columnoptions);
+        $this->add_core_user_columns($columnoptions);
+        $this->add_core_course_columns($columnoptions);
+        $this->add_core_course_category_columns($columnoptions);
+        $this->add_totara_job_columns($columnoptions);
+        $this->add_core_tag_columns('core', 'course', $columnoptions);
+        $this->add_totara_cohort_course_columns($columnoptions);
         // Add related user support.
-        $this->add_user_fields_to_columns($columnoptions, 'ruser', 'relateduser');
+        $this->add_core_user_columns($columnoptions, 'ruser', 'relateduser', true);
+
+        // Add real user support.
+        $this->add_core_user_columns($columnoptions, 'realuser', 'realuser', true);
 
         return $columnoptions;
     }
@@ -268,11 +308,9 @@ class rb_source_site_logstore extends rb_base_source {
             new rb_filter_option(
                 'logstore_standard_log',
                 'eventname',
-                get_string('name', 'rb_source_site_logstore'),
-                'select',
-                array(
-                    'selectfunc' => 'event_names_list',
-                )
+                get_string('eventclass', 'rb_source_site_logstore'),
+                'text',
+                array()
             ),
             new rb_filter_option(
                 'logstore_standard_log',
@@ -305,13 +343,14 @@ class rb_source_site_logstore extends rb_base_source {
         );
 
         // Include some standard filters.
-        $this->add_user_fields_to_filters($filteroptions);
-        $this->add_course_fields_to_filters($filteroptions);
-        $this->add_course_category_fields_to_filters($filteroptions);
-        $this->add_job_assignment_fields_to_filters($filteroptions);
-        $this->add_tag_fields_to_filters('course', $filteroptions);
-        $this->add_cohort_user_fields_to_filters($filteroptions);
-        $this->add_cohort_course_fields_to_filters($filteroptions);
+        $this->add_core_user_filters($filteroptions);
+        $this->add_core_user_filters($filteroptions, 'relateduser', true);
+        $this->add_core_user_filters($filteroptions, 'realuser', true);
+        $this->add_core_course_filters($filteroptions);
+        $this->add_core_course_category_filters($filteroptions);
+        $this->add_totara_job_filters($filteroptions, 'base', 'userid');
+        $this->add_core_tag_filters('core', 'course', $filteroptions);
+        $this->add_totara_cohort_course_filters($filteroptions);
 
         return $filteroptions;
     }
@@ -422,44 +461,28 @@ class rb_source_site_logstore extends rb_base_source {
     }
 
     /**
-     * Adds the user table to the $joinlist array with different join name
+     * Display serialized info in preformated view
      *
-     * @param array &$joinlist Array of current join options
-     *                         Passed by reference and updated to
-     *                         include new table joins
-     * @param string $join Name of the join that provides the
-     *                     'user id' field
-     * @param string $field Name of user id field to join on
-     * @return boolean True
-     */
-    protected function add_relateduser_table_to_joinlist(&$joinlist, $join, $field) {
-        $joinlist[] = new rb_join(
-            'ruser',
-            'LEFT',
-            '{user}',
-            "ruser.id = $join.$field",
-            REPORT_BUILDER_RELATION_ONE_TO_ONE,
-            'base'
-        );
-    }
-
-    /**
-     * Display serialized info in preformated view.
+     * @deprecated Since Totara 12.0
      * @param string $other
      * @param stdClass $row
      * @return string
      */
     public function rb_display_serialized($other, $row) {
+        debugging('rb_source_site_logstore::rb_display_serialized has been deprecated since Totara 12.0. Use tool_log\rb\display\log_serialized_preformated::display', DEBUG_DEVELOPER);
         return html_writer::tag('pre', print_r(unserialize($other), true));
     }
 
     /**
      * Convert IP address into a link to IP lookup page
+     *
+     * @deprecated Since Totara 12.0
      * @param string $ip
      * @param stdClass $row
      * @return string
      */
     public function rb_display_iplookup($ip, $row) {
+        debugging('rb_source_site_logstore::rb_display_iplookup has been deprecated since Totara 12.0. Use tool_log\rb\display\ip_lookup_link::display', DEBUG_DEVELOPER);
         if (!isset($ip) || $ip == '') {
             return '';
         }
@@ -473,11 +496,14 @@ class rb_source_site_logstore extends rb_base_source {
 
     /**
      * Displays related educational level.
+     *
+     * @deprecated Since Totara 12.0
      * @param string $edulevel
      * @param stdClass $row
      * @return string
      */
     public function rb_display_edulevel($edulevel, $row) {
+        debugging('rb_source_site_logstore::rb_display_edulevel has been deprecated since Totara 12.0. Use tool_log\rb\display\log_educational_level::display', DEBUG_DEVELOPER);
         switch ($edulevel) {
             case \core\event\base::LEVEL_PARTICIPATING:
                 return get_string('edulevelparticipating', 'moodle');
@@ -494,11 +520,14 @@ class rb_source_site_logstore extends rb_base_source {
 
     /**
      * Displays CRUD verbs.
+     *
+     * @deprecated Since Totara 12.0
      * @param string $edulevel
      * @param stdClass $row
      * @return string
      */
     public function rb_display_crud($crud, $row) {
+        debugging('rb_source_site_logstore::rb_display_crud has been deprecated since Totara 12.0. Use tool_log\rb\display\log_crud::display', DEBUG_DEVELOPER);
         switch ($crud) {
             case 'c':
                 return get_string('crud_c', 'rb_source_site_logstore');
@@ -518,33 +547,53 @@ class rb_source_site_logstore extends rb_base_source {
 
     /**
      * Displays event name
-     * @param string $id
+     *
+     * @deprecated Since Totara 12.0
+     * @param string $eventname
      * @param stdClass $row
      * @return string
      */
-    public function rb_display_name($id, $row) {
-        $event = \core\event\base::restore((array)$row, array());
-        return $event->get_name();
+    public function rb_display_name($eventname, $row) {
+        debugging('rb_source_site_logstore::rb_display_name has been deprecated since Totara 12.0. Use tool_log\rb\display\log_event_name::display', DEBUG_DEVELOPER);
+        if (!class_exists($eventname) or !is_subclass_of($eventname, 'core\event\base')) {
+            return s($eventname);
+        }
+        return $eventname::get_name();
     }
 
     /**
      * Displays event name as link to event
+     *
+     * @deprecated Since Totara 12.0
      * @param string $id
      * @param stdClass $row
      * @return string
      */
     public function rb_display_name_link($id, $row) {
-        $event = \core\event\base::restore((array)$row, array());
+        debugging('rb_source_site_logstore::rb_display_name_link has been deprecated since Totara 12.0. Use tool_log\rb\display\log_event_name_link::display', DEBUG_DEVELOPER);
+        $row = (array)$row;
+        $row['other'] = unserialize($row['other']);
+        if ($row['other'] === false) {
+            $row['other'] = array();
+        }
+
+        $event = \core\event\base::restore($row, array());
+        if (!$event) {
+            return '';
+        }
         return html_writer::link($event->get_url(), $event->get_name());
     }
 
     /**
      * Displays event description.
+     *
+     * @deprecated Since Totara 12.0
      * @param string $id
      * @param stdClass $row
      * @return string
      */
     public function rb_display_description($id, $row) {
+        debugging('rb_source_site_logstore::rb_display_description has been deprecated since Totara 12.0. Use tool_log\rb\display\log_description::display', DEBUG_DEVELOPER);
         $eventdata = (array)$row;
         $eventdata['other'] = unserialize($eventdata['other']);
         $event = \core\event\base::restore($eventdata, array());
@@ -553,20 +602,21 @@ class rb_source_site_logstore extends rb_base_source {
 
     /**
      * Generate the context column.
+     *
+     * @deprecated Since Totara 12.0
      * @param string $id
      * @param stdClass $row
      * @return string
      */
     public function rb_display_context($id, $row) {
-        $event = \core\event\base::restore((array)$row, array());
-        // Code used from report/log/classes/table_log.php:col_context.
+        debugging('rb_source_site_logstore::rb_display_context has been deprecated since Totara 12.0. Use tool_log\rb\display\log_context::display', DEBUG_DEVELOPER);
         // Add context name.
-        if ($event->contextid) {
+        if ($id) {
             // If context name was fetched before then return, else get one.
-            if (isset($this->contextname[$event->contextid])) {
-                return $this->contextname[$event->contextid];
+            if (isset($this->contextname[$id])) {
+                return $this->contextname[$id];
             } else {
-                $context = context::instance_by_id($event->contextid, IGNORE_MISSING);
+                $context = context::instance_by_id($id, IGNORE_MISSING);
                 if ($context) {
                     $contextname = $context->get_context_name(true);
                     if (empty($this->download) && $url = $context->get_url()) {
@@ -580,16 +630,19 @@ class rb_source_site_logstore extends rb_base_source {
             $contextname = get_string('other');
         }
 
-        $this->contextname[$event->contextid] = $contextname;
+        $this->contextname[$id] = $contextname;
         return $contextname;
     }
 
     /**
      * Generate the component localised name.
+     *
+     * @deprecated Since Totara 12.0
      * @param string $componentname
      * @return string
      */
     protected function get_component_str($componentname) {
+        debugging('rb_source_site_logstore::get_component_str has been deprecated since Totara 12.0', DEBUG_DEVELOPER);
         // Code used from report/log/classes/table_log.php:col_component.
         if (($componentname === 'core') || ($componentname === 'legacy')) {
             return  get_string('coresystem');
@@ -602,12 +655,15 @@ class rb_source_site_logstore extends rb_base_source {
 
     /**
      * Generate the component column.
-     * @param string $desc
+     *
+     * @deprecated Since Totara 12.0
+     * @param string $component
      * @param stdClass $row
      * @return string
      */
-    public function rb_display_component($desc, $row) {
-        return $this->get_component_str($row->component);
+    public function rb_display_component($component, $row) {
+        debugging('rb_source_site_logstore::rb_display_component has been deprecated since Totara 12.0. Use tool_log\rb\display\log_component::display', DEBUG_DEVELOPER);
+        return $this->get_component_str($component);
     }
 
     /**

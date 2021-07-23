@@ -18,22 +18,24 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "2016"
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
-    And "number_with_current_data" row "Value" column of "form_results" table should contain "300"
-    And "number_frozen_empty" row "Value" column of "form_results" table should contain ""
-    And "number_frozen_with_current_data" row "Value" column of "form_results" table should contain "-300"
-    And "hiddenif_primary" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_secondary_a" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_secondary_b" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_secondary_c" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_secondary_d" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_secondary_e" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_secondary_f" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_required_a" row "Value" column of "form_results" table should contain ""
-    And "hiddenif_required_b" row "Value" column of "form_results" table should contain ""
-    And "form_select" row "Value" column of "form_results" table should contain "totara_form\form\testform\element_number"
-    And "submitbutton" row "Value" column of "form_results" table should contain "1"
+    And "number_basic" row "Value" column of "form_results" table should contain "«2016»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
+    And "number_with_current_data" row "Value" column of "form_results" table should contain "«300»"
+    And "number_frozen_empty" row "Value" column of "form_results" table should contain "«--null--»"
+    And "number_frozen_with_current_data" row "Value" column of "form_results" table should contain "«-300»"
+    And "hiddenif_primary" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_a" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_b" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_c" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_d" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_e" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_f" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_g" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_secondary_h" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_required_a" row "Value" column of "form_results" table should contain "«»"
+    And "hiddenif_required_b" row "Value" column of "form_results" table should contain "«»"
+    And "form_select" row "Value" column of "form_results" table should contain "«totara_form\form\testform\element_number»"
+    And "submitbutton" row "Value" column of "form_results" table should contain "«1»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -42,8 +44,8 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "2016"
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
+    And "number_basic" row "Value" column of "form_results" table should contain "«2016»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -52,8 +54,8 @@ Feature: Totara form number element tests
       | Required basic number | -1620 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "2016"
-    And "number_required" row "Value" column of "form_results" table should contain "-1620"
+    And "number_basic" row "Value" column of "form_results" table should contain "«2016»"
+    And "number_required" row "Value" column of "form_results" table should contain "«-1620»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -62,8 +64,8 @@ Feature: Totara form number element tests
       | Required basic number | 0 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "-70"
-    And "number_required" row "Value" column of "form_results" table should contain "0"
+    And "number_basic" row "Value" column of "form_results" table should contain "«-70»"
+    And "number_required" row "Value" column of "form_results" table should contain "«0»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -71,8 +73,8 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain ""
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
+    And "number_basic" row "Value" column of "form_results" table should contain "«»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
 
   @javascript
   Scenario: Test invalid values in number elements in Totara forms
@@ -84,8 +86,8 @@ Feature: Totara form number element tests
     Then I should not see "\r"
     When I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain ""
-    And "number_required" row "Value" column of "form_results" table should contain "42"
+    And "number_basic" row "Value" column of "form_results" table should contain "«»"
+    And "number_required" row "Value" column of "form_results" table should contain "«42»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -95,8 +97,8 @@ Feature: Totara form number element tests
     Then I should not see "\r"
     When I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain ""
-    And "number_required" row "Value" column of "form_results" table should contain "42"
+    And "number_basic" row "Value" column of "form_results" table should contain "«»"
+    And "number_required" row "Value" column of "form_results" table should contain "«42»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -106,8 +108,8 @@ Feature: Totara form number element tests
     Then I should not see "\r"
     When I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain ""
-    And "number_required" row "Value" column of "form_results" table should contain "42"
+    And "number_basic" row "Value" column of "form_results" table should contain "«»"
+    And "number_required" row "Value" column of "form_results" table should contain "«42»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -143,15 +145,6 @@ Feature: Totara form number element tests
     Then a new page should not have loaded since I started watching
     And I should not see "The form has been submit"
 
-    # Now exploit a bug in Chromes HTML5 number validation.
-    When I set the following Totara form fields to these values:
-      | Basic number | -.72 |
-      | Required basic number | 42 |
-    When I press "Save changes"
-    Then a new page should have loaded since I started watching
-    And I should not see "The form has been submit"
-    And I should see "Form could not be submitted, validation failed"
-
   Scenario: Test decimals fail validation for number elements in Totara forms
     Given I select "Basic number element [totara_form\form\testform\element_number]" from the "Test form" singleselect
     Then I should see "Form: Basic number element"
@@ -186,8 +179,8 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "2016"
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
+    And "number_basic" row "Value" column of "form_results" table should contain "«2016»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -196,8 +189,8 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain ""
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
+    And "number_basic" row "Value" column of "form_results" table should contain "«»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -215,8 +208,8 @@ Feature: Totara form number element tests
       | Required basic number | 0 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "1"
-    And "number_required" row "Value" column of "form_results" table should contain "0"
+    And "number_basic" row "Value" column of "form_results" table should contain "«1»"
+    And "number_required" row "Value" column of "form_results" table should contain "«0»"
 
   Scenario: Test required number elements in Totara forms with JavaScript disabled
     When I select "Basic number element [totara_form\form\testform\element_number]" from the "Test form" singleselect
@@ -227,8 +220,8 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "2016"
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
+    And "number_basic" row "Value" column of "form_results" table should contain "«2016»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -237,8 +230,8 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain ""
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
+    And "number_basic" row "Value" column of "form_results" table should contain "«»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
 
     When I press "Reset"
     Then I should see "Form: Basic number element"
@@ -255,8 +248,8 @@ Feature: Totara form number element tests
       | Required basic number | 3141592658979323 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "2016"
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
+    And "number_basic" row "Value" column of "form_results" table should contain "«2016»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
 
   @javascript
   Scenario: Test hidden if on number elements in Totara forms
@@ -271,14 +264,43 @@ Feature: Totara form number element tests
     And I should not see "Visible when test is filled"
     And I should see "Visible when required number is empty"
     And I should not see "Visible when required number is not empty"
+    And I should see "Hidden when test is 1 or 2"
 
     When I set the following Totara form fields to these values:
       | Visible when test is empty | 73 |
       | Visible when test is not equal to '-273' | 1098 |
       | Visible when test is not filled           | 10 |
       | Visible when required number is empty | 123456789 |
+
+    When I set the following Totara form fields to these values:
+      | Hidden if reference | 1  |
+      | Basic number        | 88 |
+    # Note that we need to set something else to trigger visibility update
+    And I should not see "Visible when test is empty"
+    And I should see "Visible when test is not empty"
+    And I should not see "Visible when test is equal to '-273'"
+    And I should not see "Visible when test equals '-273'"
+    And I should not see "Visible when test not is filled"
+    And I should see "Visible when test is filled"
+    And I should not see "Hidden when test is 1 or 2"
+    And I should see "Hidden when test is neither 1 nor 2"
+
+    When I set the following Totara form fields to these values:
+      | Hidden if reference  | 2  |
+      | Basic number         | 88 |
+    # Note that we need to set something else to trigger visibility update
+    And I should not see "Visible when test is empty"
+    And I should see "Visible when test is not empty"
+    And I should not see "Visible when test is equal to '-273'"
+    And I should not see "Visible when test equals '-273'"
+    And I should not see "Visible when test not is filled"
+    And I should see "Visible when test is filled"
+    And I should not see "Hidden when test is 1 or 2"
+    And I should see "Hidden when test is neither 1 nor 2"
+
     When I set the following Totara form fields to these values:
       | Hidden if reference | 66 |
+      | Basic number        | 88 |
     Then I should see "Form: Basic number element"
     And I should not see "Visible when test is empty"
     And I should see "Visible when test is not empty"
@@ -288,10 +310,13 @@ Feature: Totara form number element tests
     And I should see "Visible when test is filled"
     And I should see "Visible when required number is empty"
     And I should not see "Visible when required number is not empty"
+    And I should see "Hidden when test is 1 or 2"
+    And I should not see "Hidden when test is neither 1 nor 2"
 
     When I set the following Totara form fields to these values:
-      | Hidden if reference | -273 |
-      | Required basic number | 88  |
+      | Hidden if reference   | -273 |
+      | Required basic number | 88   |
+      | Basic number          | 88   |
     Then I should see "Form: Basic number element"
     And I should not see "Visible when test is empty"
     And I should see "Visible when test is not empty"
@@ -299,6 +324,8 @@ Feature: Totara form number element tests
     And I should not see "Visible when test is not equal to '-273'"
     And I should not see "Visible when test not is filled"
     And I should see "Visible when test is filled"
+    And I should see "Hidden when test is 1 or 2"
+    And I should not see "Hidden when test is neither 1 nor 2"
     And I should not see "Visible when required number is empty"
     And I should see "Visible when required number is not empty"
 
@@ -312,22 +339,22 @@ Feature: Totara form number element tests
       | Visible when required number is not empty | 8 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_basic" row "Value" column of "form_results" table should contain "2016"
-    And "number_required" row "Value" column of "form_results" table should contain "3141592658979323"
-    And "number_with_current_data" row "Value" column of "form_results" table should contain "-20"
-    And "number_frozen_empty" row "Value" column of "form_results" table should contain ""
-    And "number_frozen_with_current_data" row "Value" column of "form_results" table should contain "-300"
-    And "hiddenif_primary" row "Value" column of "form_results" table should contain "-273"
-    And "hiddenif_secondary_a" row "Value" column of "form_results" table should contain "-1998"
-    And "hiddenif_secondary_b" row "Value" column of "form_results" table should contain "73"
-    And "hiddenif_secondary_c" row "Value" column of "form_results" table should contain "1098"
-    And "hiddenif_secondary_d" row "Value" column of "form_results" table should contain "987654321"
-    And "hiddenif_secondary_e" row "Value" column of "form_results" table should contain "10"
-    And "hiddenif_secondary_f" row "Value" column of "form_results" table should contain "0"
-    And "hiddenif_required_a" row "Value" column of "form_results" table should contain "8"
-    And "hiddenif_required_b" row "Value" column of "form_results" table should contain "123456789"
-    And "form_select" row "Value" column of "form_results" table should contain "totara_form\form\testform\element_number"
-    And "submitbutton" row "Value" column of "form_results" table should contain "1"
+    And "number_basic" row "Value" column of "form_results" table should contain "«2016»"
+    And "number_required" row "Value" column of "form_results" table should contain "«3141592658979323»"
+    And "number_with_current_data" row "Value" column of "form_results" table should contain "«-20»"
+    And "number_frozen_empty" row "Value" column of "form_results" table should contain "«--null--»"
+    And "number_frozen_with_current_data" row "Value" column of "form_results" table should contain "«-300»"
+    And "hiddenif_primary" row "Value" column of "form_results" table should contain "«-273»"
+    And "hiddenif_secondary_a" row "Value" column of "form_results" table should contain "«-1998»"
+    And "hiddenif_secondary_b" row "Value" column of "form_results" table should contain "«73»"
+    And "hiddenif_secondary_c" row "Value" column of "form_results" table should contain "«1098»"
+    And "hiddenif_secondary_d" row "Value" column of "form_results" table should contain "«987654321»"
+    And "hiddenif_secondary_e" row "Value" column of "form_results" table should contain "«10»"
+    And "hiddenif_secondary_f" row "Value" column of "form_results" table should contain "«0»"
+    And "hiddenif_required_a" row "Value" column of "form_results" table should contain "«8»"
+    And "hiddenif_required_b" row "Value" column of "form_results" table should contain "«123456789»"
+    And "form_select" row "Value" column of "form_results" table should contain "«totara_form\form\testform\element_number»"
+    And "submitbutton" row "Value" column of "form_results" table should contain "«1»"
 
   @javascript
   Scenario: Test min and max in number elements in Totara forms
@@ -342,10 +369,10 @@ Feature: Totara form number element tests
 
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_positive" row "Value" column of "form_results" table should contain "66"
-    And "number_positive_or_zero" row "Value" column of "form_results" table should contain "0"
-    And "number_negative" row "Value" column of "form_results" table should contain "-77"
-    And "number_negative_or_zero" row "Value" column of "form_results" table should contain "0"
+    And "number_positive" row "Value" column of "form_results" table should contain "«66»"
+    And "number_positive_or_zero" row "Value" column of "form_results" table should contain "«0»"
+    And "number_negative" row "Value" column of "form_results" table should contain "«-77»"
+    And "number_negative_or_zero" row "Value" column of "form_results" table should contain "«0»"
 
   @javascript
   Scenario: Test step in number elements in Totara forms
@@ -356,4 +383,4 @@ Feature: Totara form number element tests
       | Number with step three from minus 1 | 2 |
     And I press "Save changes"
     Then I should see "The form has been submit"
-    And "number_step_three" row "Value" column of "form_results" table should contain "2"
+    And "number_step_three" row "Value" column of "form_results" table should contain "«2»"

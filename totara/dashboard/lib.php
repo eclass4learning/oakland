@@ -82,19 +82,6 @@ class totara_dashboard {
      */
     private $cohorts = null;
 
-    /**
-     * BEGIN OAKLAND CUSTOMIZATIONS
-     * Can Guest users view this dashboard
-     *
-     * @var int 0|1
-     */
-    public $allowguest = 0;
-
-    public $oaklandgroupid = 0;
-
-    /**
-     * END OAKLAND CUSTOMIZATIONS
-     */
 
     /**
      * Get List of all dashboards
@@ -128,67 +115,31 @@ class totara_dashboard {
             return array();
         }
 
+        //Create a cache to store user dashbaords
+        $cache = cache::make_from_params(cache_store::MODE_REQUEST, 'totara_core', 'dashboard');
+        if ($cache->has('user_' . $userid)) {
+            return $cache->get('user_' . $userid);
+        }
+
         // Get user cohorts.
         $cohortsql = '1 = 0';
         $cohortsparams = array();
         $cohorts = totara_cohort_get_user_cohorts($userid);
-        /**
-         * BEGIN OAKLAND CUSTOMIZATIONS
-         * Now that the guest user can potentially have access to all dashboards, there is no need to check for an empty $cohorts array.
-         */
-        //if (empty($cohorts)) {
-        //    return array();
-        //}
-        /**
-         * END OAKLAND CUSTOMIZATIONS
-         */
-        if(!empty($cohorts)){
-            list($cohortssql, $cohortsparams) = $DB->get_in_or_equal($cohorts);
-
-        /**
-         * BEGIN OAKLAND CUSTOMIZATIONS
-         */
-        // Check relevant dashboards.
-        $sql = 'SELECT DISTINCT td.*
-                FROM {totara_dashboard} td
-                INNER JOIN {totara_dashboard_cohort} tdc ON (tdc.dashboardid = td.id)
-                WHERE tdc.cohortid ' . $cohortssql . '
-                  AND td.published = 1
-                ORDER BY td.sortorder
-               ';
-            $userdashboards = $DB->get_records_sql($sql, $cohortsparams);
-
-            if(!empty($userdashboards)){
-                $userdashboardids = 'and d.id not in (';
-                $first = true;
-                foreach($userdashboards as $dashboard){
-                    if($first){
-                        $userdashboardids .= $dashboard->id;
-                        $first = false;
-                    }else{
-                        $userdashboardids .= ', '.$dashboard->id;
-                    }
-                }
-                $userdashboardids .= ')';
-            }else{
-                $userdashboardids = '';
-            }
-
-            $excludesql = 'select * from {totara_dashboard} as d where d.allowguest = 1 '.$userdashboardids;
-
-            $guestdashboards = $DB->get_records_sql($excludesql);
-
-            foreach($guestdashboards as $guestdashboard){
-                $userdashboards[$guestdashboard->id] = $guestdashboard;
-            }
-            return $userdashboards;
-        }else{
-            return $DB->get_records('totara_dashboard',array('allowguest'=>1));
+        if (count($cohorts)) {
+            list($cohortlistsql, $cohortsparams) = $DB->get_in_or_equal($cohorts, SQL_PARAMS_NAMED);
+            $cohortsql = 'tdc.cohortid ' . $cohortlistsql;
         }
-
-        /**
-         * END OAKLAND CUSTOMIZATIONS
-         */
+        // Check relevant dashboards.
+        $sql = "SELECT DISTINCT td.*
+                FROM {totara_dashboard} td
+                LEFT JOIN {totara_dashboard_cohort} tdc ON (tdc.dashboardid = td.id)
+                WHERE ($cohortsql OR td.published = 2)
+                  AND td.published > 0
+                ORDER BY td.sortorder
+               ";
+        $results = $DB->get_records_sql($sql, $cohortsparams);
+        $cache->set('user_' . $userid, $results);
+        return $results;
     }
 
     /**
@@ -209,14 +160,6 @@ class totara_dashboard {
         $this->published = $record->published;
         $this->locked = $record->locked;
         $this->sortorder = $record->sortorder;
-        /**
-         * BEGIN OAKLAND CUSTOMIZATIONS
-         */
-        $this->allowguest = $record->allowguest;
-        $this->oaklandgroupid = $record->oaklandgroupid;
-        /**
-         * END OAKLAND CUSTOMIZATIONS
-         */
     }
 
     /**
@@ -322,14 +265,6 @@ class totara_dashboard {
         $instance->locked = (int)$this->locked;
         $instance->sortorder = (int)$this->sortorder;
         $instance->cohorts = implode(',', $this->get_cohorts());
-        /**
-         * BEGIN OAKLAND CUSTOMIZATIONS
-         */
-        $instance->allowguest = (int)$this->allowguest;
-        $instance->oaklandgroupid = (int)$this->oaklandgroupid;
-        /**
-         * END OAKLAND CUSTOMIZATIONS
-         */
 
         return $instance;
     }
@@ -371,20 +306,6 @@ class totara_dashboard {
                 $this->cohorts = $exploded;
             }
         }
-        /**
-         * BEGIN OAKLAND CUSTOMIZATIONS
-         */
-        $this->allowguest = 0;
-        if(isset($data->allowguest)){
-             $this->allowguest = $data->allowguest;
-        }
-        $this->oaklandgroupid = null;
-        if(isset($data->oaklandgroupid)){
-            $this->oaklandgroupid = $data->oaklandgroupid;
-        }
-        /**
-         * END OAKLAND CUSTOMIZATIONS
-         */
         return $this;
     }
 
@@ -511,7 +432,7 @@ class totara_dashboard {
                 ORDER BY bi.id";
         $params = array(
             'parentcontextid' => $context->id,
-            'pagetypepattern' => 'my-totara-dashboard-' . $this->id
+            'pagetypepattern' => 'totara-dashboard-' . $this->id
         );
         $blockinstances = $DB->get_records_sql($sql, $params);
         if ($blockinstances) {
@@ -519,7 +440,7 @@ class totara_dashboard {
                 // Clone block record.
                 $block = new stdClass();
                 // Amend the page type pattern to the newly cloned dashboard.
-                $block->pagetypepattern = 'my-totara-dashboard-' . $dashboard->id;
+                $block->pagetypepattern = 'totara-dashboard-' . $dashboard->id;
                 $block->blockname = $bi->blockname;
                 $block->parentcontextid = $bi->parentcontextid;
                 $block->showinsubcontexts = $bi->showinsubcontexts;
@@ -527,6 +448,7 @@ class totara_dashboard {
                 $block->defaultregion = $bi->defaultregion;
                 $block->defaultweight = $bi->defaultweight;
                 $block->configdata = $bi->configdata;
+                $block->common_config = $bi->common_config;
                 // Create the new block record.
                 $block->id = $DB->insert_record('block_instances', $block);
 
@@ -631,10 +553,14 @@ class totara_dashboard {
 
         // Copy instances.
         $blockinstances = $DB->get_records('block_instances', array('parentcontextid' => $systemcontext->id,
-                                                                    'pagetypepattern' => 'my-totara-dashboard-' . $this->id,
+                                                                    'pagetypepattern' => 'totara-dashboard-' . $this->id,
                                                                     'subpagepattern' => 'default'));
         $clonedids = array();
         foreach ($blockinstances as $instance) {
+            if (!has_capability('moodle/block:view', context_block::instance($instance->id), $userid)) {
+                continue;
+            }
+
             $originalid = $instance->id;
             unset($instance->id);
             $instance->parentcontextid = $usercontext->id;
@@ -649,7 +575,7 @@ class totara_dashboard {
         // Copy positions of system blocks.
         $blockpositions = $DB->get_records('block_positions', array(
             'contextid' => $systemcontext->id,
-            'pagetype' => 'my-totara-dashboard-' . $this->id,
+            'pagetype' => 'totara-dashboard-' . $this->id,
             'subpage' => 'default'
         ));
         if (!empty($blockpositions)) {
@@ -679,20 +605,23 @@ class totara_dashboard {
 
         $pageid = $this->get_user_pageid($userid);
         if ($pageid) {
-            $context = context_user::instance($userid);
-            if ($blocks = $DB->get_records('block_instances', array('parentcontextid' => $context->id,
-                    'pagetypepattern' => 'my-totara-dashboard-' . $this->id))) {
-                foreach ($blocks as $block) {
-                    if (is_null($block->subpagepattern) || $block->subpagepattern == $pageid) {
-                        blocks_delete_instance($block);
+            $context = context_user::instance($userid, IGNORE_MISSING);
+            if ($context) {
+                if ($blocks = $DB->get_records('block_instances', array('parentcontextid' => $context->id,
+                        'pagetypepattern' => 'totara-dashboard-' . $this->id))) {
+                    foreach ($blocks as $block) {
+                        if (is_null($block->subpagepattern) || $block->subpagepattern == $pageid) {
+                            blocks_delete_instance($block);
+                        }
                     }
                 }
+                $DB->delete_records('block_positions', array(
+                    'contextid' => $context->id,
+                    'pagetype' => 'totara-dashboard-' . $this->id,
+                    'subpage' => $pageid
+                ));
             }
-            $DB->delete_records('block_positions', array(
-                'contextid' => $context->id,
-                'pagetype' => 'my-totara-dashboard-' . $this->id,
-                'subpage' => $pageid
-            ));
+
             $DB->delete_records('totara_dashboard_user', array('id' => $pageid));
         }
     }
@@ -720,7 +649,7 @@ class totara_dashboard {
         $page = new moodle_page();
         $page->set_context(context_system::instance());
         $page->set_pagelayout('dashboard');
-        $page->set_pagetype('my-totara-dashboard-' . $this->id);
+        $page->set_pagetype('totara-dashboard-' . $this->id);
         $page->set_subpage('default');
 
         $blockman = $page->blocks;
@@ -733,7 +662,7 @@ class totara_dashboard {
     protected function delete_dashboard_blocks() {
         global $DB;
 
-        if ($blocks = $DB->get_records('block_instances', array('pagetypepattern' => 'my-totara-dashboard-' . $this->id))) {
+        if ($blocks = $DB->get_records('block_instances', array('pagetypepattern' => 'totara-dashboard-' . $this->id))) {
             foreach ($blocks as $block) {
                 blocks_delete_instance($block);
             }
@@ -748,4 +677,23 @@ class totara_dashboard {
             print_error('totaradashboarddisabled', 'totara_dashboard');
         }
     }
+}
+
+/**
+ * Return the block pagetype options for Totara dashboards.
+ * @param string $pagetype
+ * @param context $parentcontext
+ * @param context $currentcontext
+ * @return array
+ */
+function totara_dashboard_page_type_list($pagetype, $parentcontext, $currentcontext) {
+    $result = [];
+    if (strpos($pagetype, 'totara-dashboard-') === 0) {
+        $result[$pagetype] = get_string('pagetype-this-dashboard', 'totara_dashboard');
+    }
+
+    // Allow block to be changed back to 'Any page'
+    $result['*'] = get_string('page-x', 'pagetype');
+
+    return $result;
 }

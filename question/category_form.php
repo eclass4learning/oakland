@@ -130,7 +130,7 @@ class question_category_edit_form extends moodleform {
             return false;
         }
 
-        if ($childid == $parentid) {
+        if ($childid == $parentid && !question_is_only_toplevel_category_in_context($parentid)) {
             // Simple instance of a loop.
             return get_string('movecategoryparentconflict', 'error', $name);
         }

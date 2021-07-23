@@ -230,7 +230,7 @@ class question_ratingnumeric extends question_base{
             case self::DISPLAY_INPUT:
                 $form->addElement('text', $prefixform, $this->label);
                 $form->setType($prefixform, PARAM_INT);
-                $form->addRule($prefixform, get_string('err_numeric', 'form'), 'numeric', null, 'client');
+                $form->addRule($prefixform, get_string('err_integer', 'form'), 'integer', null, 'client');
                 $form->addElement('static', $prefixform . '_range', null,
                         get_string('ratingrequiredrange', 'totara_question', array('from' => $from, 'to' => $to)));
                 break;

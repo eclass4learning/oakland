@@ -25,23 +25,21 @@
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
-require_once(dirname(__FILE__) . '/rb_source_appraisal.php');
+require_once($CFG->dirroot . '/totara/appraisal/rb_sources/rb_source_appraisal.php');
 require_once($CFG->dirroot . '/totara/appraisal/lib.php');
 
 class rb_source_appraisal_detail extends rb_source_appraisal {
-    public $base, $joinlist, $columnoptions, $filteroptions, $paramoptions;
-    public $contentoptions, $defaultcolumns, $defaultfilters, $embeddedparams;
-    public $sourcetitle, $shortname, $cacheable;
+    public $shortname;
 
     /**
      * Stored during post_params() so that it can be used later when generating columns.
      *
      * @var int
      */
-    private $appraisalid;
+    public $appraisalid;
 
     // Cache for multi choice value names. The report gets the ids of the choices and the display functions convert them to names.
-    private static $appraisalmultichoicenamecache = array();
+    public static $appraisalmultichoicenamecache = array();
 
     public function __construct($groupid, rb_global_restriction_set $globalrestrictionset = null) {
         parent::__construct($groupid, $globalrestrictionset);
@@ -55,7 +53,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
      * Hide this source if feature disabled or hidden.
      * @return bool
      */
-    public function is_ignored() {
+    public static function is_source_ignored() {
         return !totara_feature_visible('appraisals');
     }
 
@@ -67,6 +65,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('answersfromlearner', 'rb_source_appraisal_detail'),
                 'rolelearner.data_',
                 array('joins' => 'rolelearner',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'answers')
             ),
             new rb_column_option(
@@ -75,6 +74,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('numericanswersfromlearner', 'rb_source_appraisal_detail'),
                 'rolelearner.data_',
                 array('joins' => 'rolelearner',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'numericanswers')
             ),
             new rb_column_option(
@@ -83,6 +83,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('totalsfromlearner', 'rb_source_appraisal_detail'),
                 'rolelearner.data_',
                 array('joins' => 'rolelearner',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'totals')
             ),
             new rb_column_option(
@@ -91,6 +92,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('answersfrommanager', 'rb_source_appraisal_detail'),
                 'rolemanager.data_',
                 array('joins' => 'rolemanager',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'answers')
             ),
             new rb_column_option(
@@ -99,6 +101,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('numericanswersfrommanager', 'rb_source_appraisal_detail'),
                 'rolemanager.data_',
                 array('joins' => 'rolemanager',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'numericanswers')
             ),
             new rb_column_option(
@@ -107,6 +110,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('totalsfrommanager', 'rb_source_appraisal_detail'),
                 'rolemanager.data_',
                 array('joins' => 'rolemanager',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'totals')
             ),
             new rb_column_option(
@@ -115,6 +119,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('answersfromteamlead', 'rb_source_appraisal_detail'),
                 'roleteamlead.data_',
                 array('joins' => 'roleteamlead',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'answers')
             ),
             new rb_column_option(
@@ -123,6 +128,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('numericanswersfromteamlead', 'rb_source_appraisal_detail'),
                 'roleteamlead.data_',
                 array('joins' => 'roleteamlead',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'numericanswers')
             ),
             new rb_column_option(
@@ -131,6 +137,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('totalsfromteamlead', 'rb_source_appraisal_detail'),
                 'roleteamlead.data_',
                 array('joins' => 'roleteamlead',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'totals')
             ),
             new rb_column_option(
@@ -139,6 +146,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('answersfromappraiser', 'rb_source_appraisal_detail'),
                 'roleappraiser.data_',
                 array('joins' => 'roleappraiser',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'answers')
             ),
             new rb_column_option(
@@ -147,6 +155,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('numericanswersfromappraiser', 'rb_source_appraisal_detail'),
                 'roleappraiser.data_',
                 array('joins' => 'roleappraiser',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'numericanswers')
             ),
             new rb_column_option(
@@ -155,6 +164,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('totalsfromappraiser', 'rb_source_appraisal_detail'),
                 'roleappraiser.data_',
                 array('joins' => 'roleappraiser',
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'totals')
             ),
             new rb_column_option(
@@ -163,6 +173,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('answersfromall', 'rb_source_appraisal_detail'),
                 'roleall.data_',
                 array('joins' => array('rolelearner', 'rolemanager', 'roleteamlead', 'roleappraiser'),
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'allroleanswers')
             ),
             new rb_column_option(
@@ -171,6 +182,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('numericanswersfromall', 'rb_source_appraisal_detail'),
                 'roleall.data_',
                 array('joins' => array('rolelearner', 'rolemanager', 'roleteamlead', 'roleappraiser'),
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'allrolenumericanswers')
             ),
             new rb_column_option(
@@ -179,6 +191,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 get_string('totalsfromall', 'rb_source_appraisal_detail'),
                 'roleall.data_',
                 array('joins' => array('rolelearner', 'rolemanager', 'roleteamlead', 'roleappraiser'),
+                      'capability' => 'totara/appraisal:viewallappraisals',
                       'columngenerator' => 'allroletotals')
             )
         );
@@ -515,7 +528,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                         $columnoption,
                         $hidden
                     );
-                $newcolumn->displayfunc = 'longtext';
+                $newcolumn->displayfunc = 'appraisal_longtext';
                 $results[] = $newcolumn;
                 break;
 
@@ -584,7 +597,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                         $columnoption,
                         $hidden
                     );
-                $newcolumn->displayfunc = 'multichoicesingle';
+                $newcolumn->displayfunc = 'appraisal_multichoice_single';
                 $results[] = $newcolumn;
                 break;
 
@@ -615,7 +628,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                         $hidden
                     );
                 $newcolumn->joins = array($joinname);
-                $newcolumn->displayfunc = 'multichoicemulti';
+                $newcolumn->displayfunc = 'appraisal_multichoice_multi';
                 $results[] = $newcolumn;
                 break;
 
@@ -640,11 +653,12 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                 $joinname = 'file' . $columnoption->type . $question->id;
                 $file = $DB->sql_concat('f.contextid', "'/'", 'f.component', "'/'", 'f.filearea', 'f.filepath', 'f.itemid',
                         "'/'", 'f.filename');
+                $file = $DB->sql_group_concat($file, ', ');
                 $this->joinlist[] =
                     new rb_join(
                         $joinname,
                         'LEFT',
-                        "(SELECT f.itemid AS appraisalroleassignmentid, " . sql_group_concat($file) . " AS files " .
+                        "(SELECT f.itemid AS appraisalroleassignmentid, {$file} AS files " .
                            "FROM {files} f " .
                           "WHERE f.contextid = {$FILEPICKER_OPTIONS['context']->id} " .
                             "AND f.component = 'totara_appraisal' " .
@@ -667,7 +681,7 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
                         $hidden
                     );
                 $newcolumn->joins = array($joinname);
-                $newcolumn->displayfunc = 'fileupload';
+                $newcolumn->displayfunc = 'appraisal_fileupload';
                 $results[] = $newcolumn;
                 break;
 
@@ -688,8 +702,17 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
         return $results;
     }
 
-
+    /**
+     * Display response to the longtext question type
+     *
+     * @deprecated Since Totara 12.0
+     * @param $value
+     * @param $unused
+     * @param bool $isexport
+     * @return mixed|string
+     */
     public function rb_display_longtext($value, $unused, $isexport = false) {
+        debugging('rb_source_appraisal_detail::rb_display_longtext has been deprecated since Totara 12.0. Use totara_appraisal\rb\display\appraisal_longtext::display', DEBUG_DEVELOPER);
         $cleanvalue = clean_param($value, PARAM_TEXT);
         if ($isexport) {
             return $cleanvalue;
@@ -700,8 +723,15 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
         }
     }
 
-
+    /**
+     * Display response to the fileupload question type
+     *
+     * @deprecated Since Totara 12.0
+     * @param $value
+     * @return string
+     */
     public function rb_display_fileupload($value) {
+        debugging('rb_source_appraisal_detail::rb_display_fileupload has been deprecated since Totara 12.0. Use totara_appraisal\rb\display\appraisal_fileupload::display', DEBUG_DEVELOPER);
         global $OUTPUT;
 
         if (empty($value)) {
@@ -727,10 +757,10 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
      *
      * Just using a static variable as a cache because it's quick and easy and only costs one query to populate.
      */
-    private function populate_multichoice_name_cache() {
+    public function populate_multichoice_name_cache() {
         global $DB;
 
-        $sql = "SELECT asv.id, asv.name
+        $sql = "SELECT DISTINCT asv.id, asv.name
                   FROM {appraisal_scale_value} asv
                   JOIN {appraisal_quest_field} aqf
                     ON " . $DB->sql_cast_char2int('aqf.param1') . " = asv.appraisalscaleid
@@ -751,7 +781,15 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
         self::$appraisalmultichoicenamecache = array();
     }
 
+    /**
+     * Display response to the multichoicesingle question type
+     *
+     * @deprecated Since Totara 12.0
+     * @param $id
+     * @return string
+     */
     public function rb_display_multichoicesingle($id) {
+        debugging('rb_source_appraisal_detail::rb_display_multichoicesingle has been deprecated since Totara 12.0. Use totara_appraisal\rb\display\appraisal_multichoice_single::display', DEBUG_DEVELOPER);
         if (empty($id)) {
             return '';
         }
@@ -764,7 +802,15 @@ class rb_source_appraisal_detail extends rb_source_appraisal {
         return self::$appraisalmultichoicenamecache[$this->appraisalid][$id];
     }
 
+    /**
+     * Display response to the multichoicemulti question type
+     *
+     * @deprecated Since Totara 12.0
+     * @param $idscommalist
+     * @return string
+     */
     public function rb_display_multichoicemulti($idscommalist) {
+        debugging('rb_source_appraisal_detail::rb_display_multichoicemulti has been deprecated since Totara 12.0. Use totara_appraisal\rb\display\appraisal_multichoice_multi::display', DEBUG_DEVELOPER);
         if (empty($idscommalist)) {
             return '';
         }

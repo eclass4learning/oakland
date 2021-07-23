@@ -30,6 +30,7 @@ $string['status'] = 'Status';
 $string['certfullnamelink'] = 'Certification Name and Linked Icon';
 $string['certifpath'] = 'Certification path';
 $string['certificationid'] = 'Certification ID';
+$string['progress'] = 'Progress';
 $string['renewalstatus'] = 'Renewal status';
 $string['timewindowopens'] = 'Window opens';
 $string['timeexpires'] = 'Expiration date';
@@ -45,3 +46,5 @@ $string['type_certif_completion_history'] = 'Certification completion history';
 
 $string['datenotset'] = '(not set)';
 $string['unassigned'] = '(prior to unassigned from certification)';
+
+$string['viewpreviouscompletions'] = 'View previous completions for certification {$a}';

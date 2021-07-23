@@ -37,11 +37,12 @@ class rb_filter_select extends rb_filter_type {
      *                          when advanced options are shown (1)
      * @param integer $region Which region this filter appears in.
      * @param reportbuilder object $report The report this filter is for
+     * @param array $defaultvalue Default value for the filter
      *
      * @return rb_filter_select object
      */
-    public function __construct($type, $value, $advanced, $region, $report) {
-        parent::__construct($type, $value, $advanced, $region, $report);
+    public function __construct($type, $value, $advanced, $region, $report, $defaultvalue) {
+        parent::__construct($type, $value, $advanced, $region, $report, $defaultvalue);
 
         // set defaults for optional rb_filter_select options
         if (!isset($this->options['simplemode'])) {
@@ -79,24 +80,13 @@ class rb_filter_select extends rb_filter_type {
         global $SESSION;
         $label = format_string($this->label);
         $advanced = $this->advanced;
+        $defaultvalue = $this->defaultvalue;
         $simplemode = $this->options['simplemode'];
         $attr = $this->options['attributes'];
 
         $options = array();
         foreach ($this->options['selectchoices'] as $key => $option) {
-            $formattedoption = format_string($option);
-            if (!is_numeric($key)) {
-                if ($key === $option) {
-                    $formattedkey = $formattedoption;
-                } else {
-                    $formattedkey = format_string($key);
-                }
-            } else {
-                // If the key is numeric just use it as is.
-                $formattedkey = $key;
-            }
-
-            $options[$formattedkey] = $formattedoption;
+            $options[$key] = format_string($option);
         }
 
         if ($simplemode) {
@@ -104,7 +94,8 @@ class rb_filter_select extends rb_filter_type {
             $choices = array('' => get_string('anyvalue', 'filters')) + $options;
             $mform->addElement('select', $this->name, $label, $choices, $attr);
             $mform->setType($this->name, PARAM_TEXT);
-            $mform->addHelpButton($this->name, 'filtersimpleselect', 'filters');
+
+            $this->add_help_button($mform, $this->name, 'filtersimpleselect', 'filters');
             if ($advanced) {
                 $mform->setAdvanced($this->name);
             }
@@ -118,18 +109,20 @@ class rb_filter_select extends rb_filter_type {
             $mform->setType($this->name . '_op', PARAM_INT);
             $mform->setType($this->name, PARAM_TEXT);
             $grp =& $mform->addElement('group', $this->name . '_grp', $label, $objs, '', false);
-            $mform->addHelpButton($grp->_name, 'filterselect', 'filters');
+            $this->add_help_button($mform, $grp->_name, 'filterselect', 'filters');
             $mform->disabledIf($this->name, $this->name . '_op', 'eq', 0);
             if ($advanced) {
                 $mform->setAdvanced($this->name . '_grp');
             }
         }
 
-
         // set default values
         if (isset($SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name])) {
             $defaults = $SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name];
+        } else if (!empty($defaultvalue)) {
+            $this->set_data($defaultvalue);
         }
+
         if (!$simplemode && isset($defaults['operator'])) {
             $mform->setDefault($this->name . '_op', $defaults['operator']);
         }
@@ -154,7 +147,7 @@ class rb_filter_select extends rb_filter_type {
         }
 
         if ($simplemode) {
-            if (isset($formdata->$field) && $formdata->$field !== '') {
+            if (isset($formdata->$field)) {
                 return array('value'    => (string)$formdata->$field);
             }
         } else {
@@ -216,21 +209,26 @@ class rb_filter_select extends rb_filter_type {
      * @return string active filter label
      */
     function get_label($data) {
-        $value     = $data['value'];
-        $label = format_string($this->label);
-        $options = $this->options['selectchoices'][$value];
+        $value = $data['value'];
         $simplemode = $this->options['simplemode'];
+        $label = format_string($this->label);
+
+        if ($simplemode && $value === '') {
+            $a = new stdClass();
+            $a->label    = $label;
+            $a->value    = get_string('anyvalue', 'filters');
+            $a->operator = get_string('isequalto', 'filters');
+
+            return get_string('selectlabel', 'filters', $a);
+        }
+
+        $options = $this->options['selectchoices'][$value];
 
         if ($simplemode) {
-            if ($value == '') {
-                return '';
-            }
-
             $a = new stdClass();
             $a->label    = $label;
             $a->value    = '"' . s($options) . '"';
             $a->operator = get_string('isequalto', 'filters');
-
         } else {
             $operators = $this->get_operators();
             $operator  = $data['operator'];

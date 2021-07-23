@@ -44,35 +44,19 @@ Feature: Seminar Signup Self Approval
     And I set the following fields to these values:
       | Terms and conditions | Blah Blah Blah, agree? |
     And I press "Save changes"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Classroom Connect Course"
-    And I turn editing mode on
+    And I am on "Classroom Connect Course" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Classroom Connect       |
       | Description       | Classroom Connect Tests |
       | approvaloptions   | approval_admin          |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
-    And I set the following fields to these values:
-      | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
-      | timestart[hour]    | 10   |
-      | timestart[minute]  | 0    |
-      | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
-      | timefinish[hour]   | 12   |
-      | timefinish[minute] | 0    |
-    And I press "OK"
     And I set the following fields to these values:
       | capacity              | 10   |
     And I press "Save changes"
 
   Scenario: Student signs up and self approves
-    When I click on "Find Learning" in the totara menu
-    And I follow "Classroom Connect Course"
+    When I am on "Classroom Connect Course" course homepage
     And I follow "View all events"
     And I follow "Edit settings"
     And I expand all fieldsets
@@ -83,13 +67,12 @@ Feature: Seminar Signup Self Approval
     And I press "Save and display"
     And I log out
     And I log in as "jimmy"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Classroom Connect Course"
+    And I am on "Classroom Connect Course" course homepage
     And I should see "Sign-up"
     And I follow "Sign-up"
     Then I should see "Self authorisation"
 
-    When I press "Agree and submit"
+    When I press "Sign-up"
     Then I should see "Required"
 
     When I follow "Terms and conditions"
@@ -97,5 +80,5 @@ Feature: Seminar Signup Self Approval
 
     When I press "Close"
     And I click on "authorisation" "checkbox"
-    When I press "Agree and submit"
-    Then I should see "Your booking has been completed."
+    When I press "Sign-up"
+    Then I should see "Your request was accepted"

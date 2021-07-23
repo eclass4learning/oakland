@@ -39,14 +39,14 @@ $row = array();
 $inactive = array();
 $activated = array();
 
-if (has_capability('mod/scorm:savetrack', $contextmodule)) {
-    $row[] = new tabobject('info', "$CFG->wwwroot/mod/scorm/view.php?id=$cm->id", get_string('info', 'scorm'));
-}
+// TOTARA: everybody that gets here has the view permission.
+$row[] = new tabobject('info', "$CFG->wwwroot/mod/scorm/view.php?id=$cm->id", get_string('info', 'scorm'));
+
 if (has_capability('mod/scorm:viewreport', $contextmodule)) {
     $row[] = new tabobject('reports', "$CFG->wwwroot/mod/scorm/report.php?id=$cm->id", get_string('reports', 'scorm'));
 }
 
-if (!($currenttab == 'info' && count($row) == 1)) {
+if (!empty($row)) {
     $tabs[] = $row;
 }
 
@@ -61,4 +61,7 @@ if ($currenttab == 'reports' && !empty($reportlist) && count($reportlist) > 1) {
     $currenttab = 'scorm_' . $mode;
 }
 
-print_tabs($tabs, $currenttab, $inactive, $activated);
+// Totara: show tabs only if there is more than 'info'.
+if (count($row) > 1) {
+    print_tabs($tabs, $currenttab, $inactive, $activated);
+}

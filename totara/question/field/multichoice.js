@@ -76,8 +76,8 @@ M.totara_question_multichoice = M.totara_question_multichoice || {
     $allOptions.each(function(){
         var $this = $(this);
         if ($($this.find('span')).length > 0) {
-            $this.find('span').hide();
-            var $makeDefault = $('<span class="makedefaultlink">');
+            $this.find('span:not(.error)').hide();
+            var $makeDefault = $('<span class="makedefaultlink fitemtitle">');
             var $makeDefaultLink = $('<a href="#">' + M.util.get_string('defaultmake', 'totara_question') + '</a>');
             var $unselect = $('<span class="unselectlink">' + M.util.get_string('defaultselected', 'totara_question') + ' </span>').hide();
             var $unselectLink = $('<a href="#">' + M.util.get_string('defaultunselect', 'totara_question') + '</a>');
@@ -85,6 +85,7 @@ M.totara_question_multichoice = M.totara_question_multichoice || {
             $makeDefault.append($makeDefaultLink);
             $makeDefaultLink.on('click', function(){
                 if (M.totara_question_multichoice.config.oneAnswer == 1) {
+                    $allOptions.find('.unselectlink a').click();
                     $allOptions.find('.unselectlink').hide();
                     $allOptions.find('.makedefaultlink').show();
                 }
@@ -159,7 +160,6 @@ M.totara_question_multichoice = M.totara_question_multichoice || {
 
     function clearChoices() {
         $allOptions.find("input[type='text']").val('');
-        $allOptions.find('.unselectlink').show();
     }
 
     // Disable "Save options as" fields.

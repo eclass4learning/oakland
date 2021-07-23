@@ -61,7 +61,7 @@ abstract class prog_message {
 
     public $id, $programid, $messagetype, $sortorder;
     public $messagesubject, $mainmessage;
-    public $notifymanager, $managermessage;
+    public $notifymanager, $managersubject, $managermessage;
     public $triggertime, $triggerperiod, $triggernum;
     public $isfirstmessage, $islastmessage;
     public $studentrole, $managerrole;
@@ -73,6 +73,19 @@ abstract class prog_message {
 
     protected $replacementvars = array();
     protected $helppage = '';
+
+    /**
+     * Since it is hard to re-use the value of completion time
+     * and passing it arround for the child class using it to
+     * send the message to the manager.
+     *
+     * Therefore, this private variable is being used,
+     * and it can only access via get method
+     *
+     * @see prog_message::get_completion_time
+     * @var int
+     */
+    private $completiontime = COMPLETION_TIME_NOT_SET;
 
     const messageprefixstr = 'message_';
 
@@ -86,6 +99,7 @@ abstract class prog_message {
             $this->messagesubject = $messageob->messagesubject;
             $this->mainmessage = $messageob->mainmessage;
             $this->notifymanager = $messageob->notifymanager;
+            $this->managersubject = $messageob->managersubject;
             $this->managermessage = $messageob->managermessage;
             $this->triggertime = $messageob->triggertime;
         } else {
@@ -95,6 +109,7 @@ abstract class prog_message {
             $this->messagesubject = '';
             $this->mainmessage = '';
             $this->notifymanager = false;
+            $this->managersubject = '';
             $this->managermessage = '';
             $this->triggertime = 0;
         }
@@ -132,6 +147,7 @@ abstract class prog_message {
         $this->mainmessage = $formdata->{$formnameprefix.'mainmessage'};
 
         $this->notifymanager = isset($formdata->{$formnameprefix.'notifymanager'}) ? $formdata->{$formnameprefix.'notifymanager'} : false;;
+        $this->managersubject = isset($formdata->{$formnameprefix.'managersubject'}) ? $formdata->{$formnameprefix.'managersubject'} : '';
         $this->managermessage = isset($formdata->{$formnameprefix.'managermessage'}) ? $formdata->{$formnameprefix.'managermessage'} : '';
         $this->triggerperiod = isset($formdata->{$formnameprefix.'triggerperiod'}) ? $formdata->{$formnameprefix.'triggerperiod'} : 0;
         $this->triggernum = isset($formdata->{$formnameprefix.'triggernum'}) ? $formdata->{$formnameprefix.'triggernum'} : 0;
@@ -148,6 +164,15 @@ abstract class prog_message {
 
     public function get_manager_message_data() {
         return $this->managermessagedata;
+    }
+
+    /**
+     * The only interface that other child class
+     * can access to attribute completiontime
+     * @return int
+     */
+    protected final function get_completion_time() {
+        return $this->completiontime;
     }
 
     public function check_message_action($action, $formdata) {
@@ -168,12 +193,14 @@ abstract class prog_message {
             $message_todb->id = $this->id;
             $message_todb->messagesubject = $this->messagesubject;
             $message_todb->mainmessage = $this->mainmessage;
+            $message_todb->managersubject = $this->managersubject;
             $message_todb->managermessage = $this->managermessage;
             $DB->update_record('prog_message', $message_todb);
             return true;
         } else {
             $message_todb->messagesubject = $this->messagesubject;
             $message_todb->mainmessage = $this->mainmessage;
+            $message_todb->managersubject = $this->managersubject;
             $message_todb->managermessage = $this->managermessage;
             $id = $DB->insert_record('prog_message', $message_todb);
             $this->id = $id;
@@ -192,11 +219,18 @@ abstract class prog_message {
         global $DB;
 
         $userid = $recipient->id;
+        $lang = isset($recipient->lang) ? $recipient->lang : null;
         $programid = $this->programid;
         $coursesetid = isset($options['coursesetid']) ? $options['coursesetid'] : 0;
 
         // Get text to scan for placeholders.
         $messagedata = $this->studentmessagedata->subject . $this->studentmessagedata->fullmessage;
+        if (!empty($this->managersubject)) {
+            $messagedata .= $this->managersubject;
+        }
+        if (!empty($this->managermessage)) {
+            $messagedata .= $this->managermessage;
+        }
         if (!empty($this->managermessagedata->subject)) {
             $messagedata .= $this->managermessagedata->subject;
         }
@@ -212,29 +246,6 @@ abstract class prog_message {
         foreach ($placeholders as $key => $value) {
             if (strpos($messagedata, "%{$value}%") === false) {
                 unset($placeholders[$key]);
-            }
-        }
-
-        // Initialise data needed to calculate completion fields.
-        if (in_array('duedate', $placeholders) || in_array('completioncriteria', $placeholders)) {
-            $formatdate = get_string('strftimedatefulllong', 'langconfig');
-            $deletecompletionfield = false;
-            if ($assignment = $DB->get_record('prog_user_assignment', array('programid' => $programid, 'userid' => $userid))) {
-                if (!$progassignment = $DB->get_record('prog_assignment', array('id' => $assignment->assignmentid))) {
-                    $deletecompletionfield = true;
-                }
-            } else {
-                $deletecompletionfield = true;
-            }
-
-            // If program assignment record not found, delete completion date and completion criteria from placeholders.
-            if ($deletecompletionfield) {
-                if ($pos = array_search('duedate', $placeholders)) {
-                    unset($placeholders[$pos]);
-                }
-                if ($pos = array_search('completioncriteria', $placeholders)) {
-                    unset($placeholders[$pos]);
-                }
             }
         }
 
@@ -268,28 +279,47 @@ abstract class prog_message {
                     // Get completion date.
                     $completiontime = $DB->get_field('prog_completion', 'timedue',
                         array('programid' => $programid, 'userid' => $userid, 'coursesetid' => 0));
+                    $this->completiontime = $completiontime;
                     $duedate = get_string('duedatenotset', 'totara_program');
                     if ($completiontime && $completiontime != COMPLETION_TIME_NOT_SET) {
-                        $duedate = userdate($completiontime, $formatdate, core_date::get_user_timezone($recipient), false);
+                        $datetimeformat = get_string_manager()->get_string("strftimedatefulllong", "langconfig", null, $lang);
+                        $duedate = userdate($completiontime, $datetimeformat, core_date::get_user_timezone($recipient), false);
                     }
                     $this->replacementvars['duedate']   = $duedate;
                     break;
                 case 'completioncriteria':
-                    $time = $progassignment->completiontime;
-                    $event = $progassignment->completionevent;
-                    $instance = $progassignment->completioninstance;
+                    $progassignment = false;
+                    // We can't guarantee which assignment is responsible for the user's current due date. In this case,
+                    // we've chosen to use the most recently assigned. The order by id is added so that if a user was
+                    // assigned to two at the same time, the criteria won't randomly change.
+                    if ($userassignments = $DB->get_records('prog_user_assignment', array('programid' => $programid, 'userid' => $userid), 'timeassigned DESC, id ASC')) {
+                        foreach ($userassignments as $userassignment) {
+                            if ($progassignment = $DB->get_record('prog_assignment', array('id' => $userassignment->assignmentid))) {
+                                break;
+                            }
+                        }
+                    }
 
-                    // Get completion criteria.
-                    if ($progassignment->completionevent == COMPLETION_EVENT_NONE) {
-                        $ccriteria = get_string('completioncriterianotdefined', 'totara_program');
-                        if ($time != COMPLETION_TIME_NOT_SET) {
-                            $formatedtime = trim(userdate($time, $formatdate, core_date::get_user_timezone($recipient), false));
+                    if ($progassignment) {
+                        $time = $progassignment->completiontime;
+                        $event = $progassignment->completionevent;
+                        $instance = $progassignment->completioninstance;
+
+                        // Get completion criteria.
+                        if ($progassignment->completionevent == COMPLETION_EVENT_NONE) {
+                            $ccriteria = get_string('completioncriterianotdefined', 'totara_program');
+                            if ($time != COMPLETION_TIME_NOT_SET) {
+                                $formatedtime = trim(userdate($time, get_string('strftimedatefulllong', 'langconfig'), core_date::get_user_timezone($recipient), false));
+                                $ccriteria = prog_assignment_category::build_completion_string($formatedtime, $event, $instance);
+                            }
+                        } else {
+                            $parts = program_utilities::duration_explode($time);
+                            $formatedtime = $parts->num . ' ' . $parts->period;
                             $ccriteria = prog_assignment_category::build_completion_string($formatedtime, $event, $instance);
                         }
+
                     } else {
-                        $parts = program_utilities::duration_explode($time);
-                        $formatedtime = $parts->num . ' ' . $parts->period;
-                        $ccriteria = prog_assignment_category::build_completion_string($formatedtime, $event, $instance);
+                        $ccriteria = get_string('completioncriterianotdefined', 'totara_program');
                     }
                     $this->replacementvars['completioncriteria'] =  $ccriteria;
                     break;
@@ -429,7 +459,7 @@ abstract class prog_message {
         $templatehtml = '';
 
         // Add the message subject
-        $safe_messagesubject = format_string($this->messagesubject);
+        $safe_messagesubject = clean_param($this->messagesubject, PARAM_TEXT);
         if ($updateform) {
             $mform->addElement('text', $prefix.'messagesubject', '', array('size'=>'50', 'maxlength'=>'255', 'id'=>$prefix.'messagesubject'));
             $mform->setType($prefix.'messagesubject', PARAM_TEXT);
@@ -443,7 +473,7 @@ abstract class prog_message {
         $formdataobject->{$prefix.'messagesubject'} = $safe_messagesubject;
 
         // Add the main message
-        $safe_mainmessage = format_string($this->mainmessage);
+        $safe_mainmessage = clean_param($this->mainmessage, PARAM_TEXT);
         if ($updateform) {
             $mform->addElement('textarea', $prefix.'mainmessage', '', array('cols'=>'40', 'rows'=>'5', 'id'=>$prefix.'mainmessage'));
             $mform->setType($prefix.'mainmessage', PARAM_TEXT);
@@ -492,8 +522,22 @@ abstract class prog_message {
         $templatehtml .= html_writer::end_tag('div');
         $formdataobject->{$prefix.'notifymanager'} = (bool)$this->notifymanager;
 
+        // Add the manager subject
+        $safe_managersubject = clean_param($this->managersubject, PARAM_TEXT);
+        if ($updateform) {
+            $mform->addElement('text', $prefix.'managersubject', '', array('size'=>'50', 'maxlength'=>'255', 'id'=>$prefix.'managersubject'));
+            $mform->setType($prefix.'managersubject', PARAM_TEXT);
+            $template_values['%'.$prefix.'managersubject%'] = array('name'=>$prefix.'managersubject', 'value'=>null);
+        }
+        $helpbutton = $OUTPUT->help_icon('managersubject', 'totara_program');
+        $templatehtml .= html_writer::start_tag('div', array('class' => 'fitem'));
+        $templatehtml .= html_writer::tag('div', html_writer::tag('label', get_string('label:managersubject', 'totara_program') . ' ' . $helpbutton, array('for' => $prefix.'managersubject')), array('class' => 'fitemtitle'));
+        $templatehtml .= html_writer::tag('div', '%'.$prefix.'managersubject%', array('class' => 'felement'));
+        $templatehtml .= html_writer::end_tag('div');
+        $formdataobject->{$prefix.'managersubject'} = $safe_managersubject;
+
         // Add the manager message
-        $safe_managermessage = format_string($this->managermessage);
+        $safe_managermessage = clean_param($this->managermessage, PARAM_TEXT);
         if ($updateform) {
             $mform->addElement('textarea', $prefix.'managermessage', $safe_managermessage, array('cols'=>'40', 'rows'=>'5', 'id' => $prefix . 'managermessage'));
             //$mform->disabledIf($prefix.'managermessage', $prefix.'notifymanager', 'notchecked');
@@ -678,18 +722,32 @@ abstract class prog_noneventbased_message extends prog_message {
         }
 
         // Don't send to the manager if the recipient is suspended.
-        if (!$recipient->suspended) {
+        if (!$recipient->suspended && $this->notifymanager) {
             // Send the message to all of the recipients managers.
             $managers = \totara_job\job_assignment::get_all_manager_userids($recipient->id);
-            if ($result && $this->notifymanager && !empty($managers)) {
+            $managersubject = empty($this->managersubject) ? $this->managermessagedata->subject : $this->managersubject;
+            if ($result && !empty($managers)) {
                 foreach ($managers as $managerid) {
                     $manager = core_user::get_user($managerid, '*', MUST_EXIST);
+
+                    //Set the completion time for the manager
+                    //using the attribute $completiontime from a super class
+                    //to modify the attribute $replacementvars so that it can
+                    //convert the time for specific manager language configuration
+                    $completiontime = $this->get_completion_time();
+                    if ($completiontime && $completiontime != COMPLETION_TIME_NOT_SET) {
+                        $lang = isset($manager->lang) ? $manager->lang : null;
+                        $datetimeformat = get_string_manager()->get_string("strftimedatefulllong", "langconfig", null, $lang);
+                        $timezone = core_date::get_user_timezone($manager);
+
+                        $this->replacementvars['duedate'] = userdate($completiontime, $datetimeformat, $timezone, false);
+                    }
 
                     $managerdata = new stdClass();
                     $managerdata->userto = $manager;
                     //ensure the message is actually coming from $user, default to support
                     $managerdata->userfrom = ($USER->id == $recipient->id) ? $recipient : core_user::get_support_user();
-                    $managerdata->subject = $this->replacevars($this->managermessagedata->subject);
+                    $managerdata->subject = $this->replacevars($managersubject);
                     $managerdata->fullmessage = $this->replacevars($this->managermessagedata->fullmessage);
                     $managerdata->contexturl = $CFG->wwwroot.'/totara/program/view.php?id='.$this->programid.'&amp;userid='.$recipient->id;
                     $managerdata->icon = 'program-regular';
@@ -821,6 +879,7 @@ abstract class prog_eventbased_message extends prog_message {
             // Send the message to all of the recipients managers.
             $managers = \totara_job\job_assignment::get_all_manager_userids($recipient->id);
             if ($result && $this->notifymanager && !empty($managers)) {
+                $managersubject = empty($this->managersubject) ? $this->managermessagedata->subject : $this->managersubject;
                 foreach ($managers as $managerid) {
                     $manager = core_user::get_user($managerid, '*', MUST_EXIST);
 
@@ -828,7 +887,7 @@ abstract class prog_eventbased_message extends prog_message {
                     $managerdata->userto = $manager;
                     //ensure the message is actually coming from $user, default to support
                     $managerdata->userfrom = ($USER->id == $recipient->id) ? $recipient : core_user::get_support_user();
-                    $managerdata->subject = $this->replacevars($this->managermessagedata->subject);
+                    $managerdata->subject = $this->replacevars($managersubject);
                     $managerdata->fullmessage = $this->replacevars($this->managermessagedata->fullmessage);
                     $managerdata->contexturl = $CFG->wwwroot.'/totara/program/view.php?id='.$this->programid.'&amp;userid='.$recipient->id;
                     $managerdata->icon = 'program-regular';

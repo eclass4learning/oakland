@@ -45,6 +45,8 @@ define('CERT_PER_PAGE', 30);
 
 define('CERT_MAX_PER_PAGE', 200);
 
+define('CERT_LEGACY_LOG', 1);
+define('CERT_STANDARD_LOG', 2);
 
 /**
  * Returns a list of teachers by group
@@ -243,7 +245,7 @@ function certificate_email_student($course, $certificate, $certrecord, $context,
     $info->certificate = format_string($certificate->name, true);
     $info->course = format_string($course->fullname, true);
     $from = fullname($teacher);
-    $subject = $info->course . ': ' . $info->certificate;
+    $subject = format_string($course->fullname . ': ' . $certificate->name, true, array('escape' => false));
     $message = get_string('emailstudenttext', 'certificate', $info) . "\n";
 
     // Make the HTML version more XHTML happy  (&amp;)
@@ -274,9 +276,10 @@ function certificate_email_student($course, $certificate, $certrecord, $context,
  * @param int $certrecordid the certificate issue record id
  * @param string $filename pdf filename
  * @param int $contextid context id
+ * @param object $user Use to create the PDF for (introduced for testing).
  * @return bool return true if successful, false otherwise
  */
-function certificate_save_pdf($pdf, $certrecordid, $filename, $contextid) {
+function certificate_save_pdf($pdf, $certrecordid, $filename, $contextid, $user = null) {
     global $USER;
 
     if (empty($certrecordid)) {
@@ -301,7 +304,8 @@ function certificate_save_pdf($pdf, $certrecordid, $filename, $contextid) {
         'filepath'  => $filepath,     // any path beginning and ending in /
         'filename'  => $filename,    // any filename
         'mimetype'  => 'application/pdf',    // any filename
-        'userid'    => $USER->id);
+        'userid'    => ($user ? $user->id : $USER->id)
+    );
 
     // We do not know the previous file name, better delete everything here,
     // luckily there is supposed to be always only one certificate here.
@@ -330,13 +334,13 @@ function certificate_print_user_files($certificate, $userid, $contextid) {
 
     $component = 'mod_certificate';
     $filearea = 'issue';
-    $files = $fs->get_area_files($contextid, $component, $filearea, $certrecord->id);
+    $files = $fs->get_area_files($contextid, $component, $filearea, $certrecord->id, "itemid, filepath, filename", false);
     foreach ($files as $file) {
         $filename = $file->get_filename();
         $link = file_encode_url($CFG->wwwroot.'/pluginfile.php', '/'.$contextid.'/mod_certificate/issue/'.$certrecord->id.'/'.$filename);
         $mimetype = $file->get_mimetype();
         $fileicon = file_mimetype_flex_icon($mimetype);
-        $output = $fileicon . '&nbsp;' . '<a href="'.$link.'" >'.s($filename).'</a>';
+        $output .= $fileicon . '&nbsp;' . '<a href="'.$link.'" >'.s($filename).'</a>';
 
     }
     $output .= '<br />';
@@ -492,6 +496,9 @@ function certificate_print_attempts($course, $certificate, $attempts) {
 
     echo $OUTPUT->heading(get_string('summaryofattempts', 'certificate'));
 
+    $cm = get_coursemodule_from_instance('certificate', $certificate->id, $course->id);
+    echo self_completion_form($cm, $course);
+
     // Prepare table header
     $table = new html_table();
     $table->class = 'generaltable';
@@ -530,13 +537,12 @@ function certificate_print_attempts($course, $certificate, $attempts) {
  * @return int the total time spent in seconds
  */
 function certificate_get_course_time($courseid) {
-    global $CFG, $USER;
+    global $CFG;
 
     core_php_time_limit::raise(0);
 
     $totaltime = 0;
-    $sql = "l.course = :courseid AND l.userid = :userid";
-    if ($logs = get_logs($sql, array('courseid' => $courseid, 'userid' => $USER->id), 'l.time ASC', '', '', $totalcount)) {
+    if ($logs = certificate_get_log_stores_data($courseid)) {
         foreach ($logs as $log) {
             if (!isset($login)) {
                 // For the first time $login is not set so the first log is also the first login
@@ -992,16 +998,22 @@ function certificate_get_grade($certificate, $course, $userid = null, $valueonly
  *
  * @param stdClass $certificate
  * @param stdClass $course
+ * @param null     $userid
+ *
  * @return string the outcome
  */
-function certificate_get_outcome($certificate, $course) {
+function certificate_get_outcome($certificate, $course, $userid = null) {
     global $USER;
+
+    if (empty($userid)) {
+        $userid = $USER->id;
+    }
 
     if ($certificate->printoutcome > 0) {
         if ($grade_item = new grade_item(array('id' => $certificate->printoutcome))) {
             $outcomeinfo = new stdClass;
             $outcomeinfo->name = $grade_item->get_name();
-            $outcome = new grade_grade(array('itemid' => $grade_item->id, 'userid' => $USER->id));
+            $outcome = new grade_grade(array('itemid' => $grade_item->id, 'userid' => $userid));
             $outcomeinfo->grade = grade_format_gradevalue($outcome->finalgrade, $grade_item, true, GRADE_DISPLAY_TYPE_REAL);
 
             return $outcomeinfo->name . ': ' . $outcomeinfo->grade;
@@ -1047,8 +1059,10 @@ function certificate_print_text($pdf, $x, $y, $align, $font='freeserif', $style,
         $pdf->setRTL(true);
     }
 
-    if (in_array($language, array('zh_cn', 'ja'))) {
+    if (in_array($language, array('zh_cn', 'zh_tw', 'ja'))) {
         $pdf->setFont('droidsansfallback', $style, $size);
+    } else if (in_array($language, array('ar', 'he', 'fa'))) {
+        $pdf->setFont('freeserif', $style, $size);
     } else if ($language == 'th') {
         $pdf->setFont('cordiaupc', $style, $size);
     } else {
@@ -1300,4 +1314,57 @@ function certificate_get_certificate_filename($certificate, $cm, $course) {
     }
 
     return $filename;
+}
+
+/**
+ * Check if Leagacy log or Standard log plugin is enabled and if its enabled then return 1 for Legacy log
+ * or 2 for Standard log otherwise false.
+ *
+ * @return bool|int false if all disabled and 1|2 if enabled.
+ */
+function certificate_log_stores_enabled() {
+    static $log = null;
+    if ($log !== null) {
+        return $log;
+    }
+    $config = get_config('tool_log', 'enabled_stores');
+    $logstores = array_flip(explode(',', $config));
+    if (isset($logstores['logstore_legacy'])) {
+        $log = CERT_LEGACY_LOG;
+    } else if (isset($logstores['logstore_standard'])) {
+        $log = CERT_STANDARD_LOG;
+    } else {
+        $log = false;
+    }
+    return $log;
+}
+
+/**
+ * Get data records of Legacy or Standard log store.
+
+ * @param $courseid course id
+ * @return array
+ */
+function certificate_get_log_stores_data($courseid) {
+    global $USER, $DB;
+
+    $logs = array();
+    $logstore = certificate_log_stores_enabled();
+    $params = array('courseid' => $courseid, 'userid' => $USER->id);
+
+    if ((int)$logstore === CERT_LEGACY_LOG) {
+        $sql = "l.course = :courseid AND l.userid = :userid";
+        $logs = get_logs($sql, $params, 'l.time ASC', '', '', $totalcount);
+    }
+
+    if ((int)$logstore === CERT_STANDARD_LOG) {
+        $sql = "SELECT l.id, l.timecreated AS time
+                  FROM {logstore_standard_log} l
+             LEFT JOIN {user} u ON l.userid = u.id
+                 WHERE l.courseid = :courseid AND l.userid = :userid
+              ORDER BY l.id, l.timecreated ASC";
+
+        $logs = $DB->get_records_sql($sql, $params) ;
+    }
+    return $logs;
 }

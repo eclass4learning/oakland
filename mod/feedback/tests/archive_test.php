@@ -45,13 +45,8 @@ class mod_feedback_archive_testcase extends advanced_testcase {
         $this->assertTrue(feedback_supports(FEATURE_ARCHIVE_COMPLETION));
     }
 
-    /**
-     * @depends test_module_supports_archive_completion
-     */
     public function test_archive() {
         global $DB;
-
-        $this->resetAfterTest(true);
 
         set_config('enablecompletion', 1);
 
@@ -141,14 +136,6 @@ class mod_feedback_archive_testcase extends advanced_testcase {
         $DB->insert_record('feedback_value', $value);
         $this->assertEquals(1, $DB->count_records('feedback_value'));
 
-        $this->assertEquals(0, $DB->count_records('feedback_tracking'));
-        $tracking = new stdClass();
-        $tracking->userid = $user->id;
-        $tracking->feedback = $feedback->id;
-        $tracking->completed = $completedid;
-        $DB->insert_record('feedback_tracking', $tracking);
-        $this->assertEquals(1, $DB->count_records('feedback_tracking'));
-
         // Update completion state
         $completioninfo = new completion_info($course);
         if ($completioninfo->is_enabled($course_module) && $feedback->completionsubmit) {
@@ -159,20 +146,18 @@ class mod_feedback_archive_testcase extends advanced_testcase {
         $completionstate = $DB->get_field('course_modules_completion', 'completionstate', $params, MUST_EXIST);
         $this->assertEquals(COMPLETION_COMPLETE, $completionstate);
 
-        // Archive it
+        // Archive course activities.
         $this->assertEquals(0, $DB->count_records('feedback_completed_history'));
         $this->assertEquals(0, $DB->count_records('feedback_value_history'));
-        feedback_archive_completion($user->id, $course->id);
+        archive_course_activities($user->id, $course->id);
         // Check there is no feedback
         $this->assertEquals(0, $DB->count_records('feedback_completed'));
         $this->assertEquals(0, $DB->count_records('feedback_value'));
         // Check there is a history record
         $this->assertEquals(1, $DB->count_records('feedback_completed_history'));
         $this->assertEquals(1, $DB->count_records('feedback_value_history'));
-
-        // Check its incomplete
-        $completionstate = $DB->get_field('course_modules_completion', 'completionstate', $params, MUST_EXIST);
-        $this->assertEquals(COMPLETION_INCOMPLETE, $completionstate);
+        // Verify module completion record is gone.
+        $this->assertEquals(0, $DB->count_records('course_modules_completion', $params));
 
         // Check we can report on it
         $totalcount = 0;

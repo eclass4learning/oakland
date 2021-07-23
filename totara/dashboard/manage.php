@@ -21,13 +21,13 @@
  * @package totara_dashboard
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/totara/dashboard/lib.php');
 require_once($CFG->libdir.'/adminlib.php');
 
 $action = optional_param('action', null, PARAM_ALPHANUMEXT);
 
-admin_externalpage_setup('totaradashboard', '', array('action' => $action), new moodle_url('/totara/dashboard/manage.php'));
+admin_externalpage_setup('totaradashboard', '', array('action' => $action));
 
 // Check Totara Dashboard is enable.
 totara_dashboard::check_feature_enabled();
@@ -70,16 +70,6 @@ switch ($action) {
                     array('class' => 'notifysuccess'));
         }
         break;
-    case 'publish':
-        require_sesskey();
-        $dashboard->publish()->save();
-        redirect($returnurl);
-        break;
-    case 'unpublish':
-        require_sesskey();
-        $dashboard->unpublish()->save();
-        redirect($returnurl);
-        break;
     case 'up':
         require_sesskey();
         $dashboard->move_up();
@@ -101,34 +91,31 @@ switch ($action) {
         break;
 }
 
-echo $output->header();
-switch ($action) {
-    case 'delete':
-    case 'reset':
-        $confirmtext = get_string('deletedashboardconfirm', 'totara_dashboard', $dashboard->name);
-        if ($action == 'reset') {
+$requiresconfirmation = array('delete', 'reset', 'clone');
+if (in_array($action, $requiresconfirmation)) {
+    switch ($action) {
+        case 'delete':
+            $confirmtext = get_string('deletedashboardconfirm', 'totara_dashboard', $dashboard->name);
+            break;
+        case 'reset':
             $confirmtext = get_string('resetdashboardconfirm', 'totara_dashboard', $dashboard->name);
-        }
-        echo $OUTPUT->box_start('notifynotice');
-        echo html_writer::tag('p', $confirmtext);
-        echo $OUTPUT->box_end();
+            break;
+        case 'clone':
+            $confirmtext = get_string('clonedashboardconfirm', 'totara_dashboard', $dashboard->name);
+            break;
+        default:
+            throw new coding_exception('Invalid action passed to confirmation.');
+            break;
+    }
 
-        $url = new moodle_url('/totara/dashboard/manage.php', array('action'=> $action, 'id' => $id, 'confirm' => 1));
-        $continue = new single_button($url, get_string('continue'), 'post');
-        $cancel = new single_button($returnurl, get_string('cancel'), 'get');
-        echo html_writer::tag('div', $OUTPUT->render($continue) . $OUTPUT->render($cancel), array('class' => 'buttons'));
-        break;
-    default:
-        /* OAKLAND CUSTOMIZATION - Only allow SITE_ADMINs to access the main page */
-        if(is_siteadmin($USER->id)){
-            echo $output->heading(get_string('managedashboards', 'totara_dashboard'));
-            echo $output->create_dashboard_button();
-            echo $output->dashboard_manage_table($dashboards);
-        }
-        else{
-            redirect(new moodle_url('/oakland/groups/index.php'));
-        }
-        /* END OAKLAND CUSTOM */
+    $url = new moodle_url('/totara/dashboard/manage.php', array('action'=> $action, 'id' => $id, 'confirm' => 1));
+    $continue = new single_button($url, get_string('continue'), 'post');
+    $cancel = new single_button($returnurl, get_string('cancel'), 'get');
+
+    echo $output->header();
+    echo $output->confirm(format_text($confirmtext), $continue, $cancel);
+    echo $output->footer();
+    exit;
 }
 
 echo $output->header();

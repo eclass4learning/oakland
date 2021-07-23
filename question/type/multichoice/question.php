@@ -114,7 +114,7 @@ abstract class qtype_multichoice_base extends question_graded_automatically {
     public function check_file_access($qa, $options, $component, $filearea, $args, $forcedownload) {
         if ($component == 'question' && in_array($filearea,
                 array('correctfeedback', 'partiallycorrectfeedback', 'incorrectfeedback'))) {
-            return $this->check_combined_feedback_file_access($qa, $options, $filearea);
+            return $this->check_combined_feedback_file_access($qa, $options, $filearea, $args);
 
         } else if ($component == 'question' && $filearea == 'answer') {
             $answerid = reset($args); // Itemid is answer id.
@@ -370,8 +370,10 @@ class qtype_multichoice_multi_question extends qtype_multichoice_base {
         $choices = array();
         foreach ($this->answers as $ansid => $ans) {
             if (isset($selectedchoices[$ansid])) {
-                $choices[$ansid] = new question_classified_response($ansid,
+                if (!(isset($ans->isdeletedchoice) && $ans->isdeletedchoice === true)) {
+                    $choices[$ansid] = new question_classified_response($ansid,
                         $this->html_to_text($ans->answer, $ans->answerformat), $ans->fraction);
+                }
             }
         }
         return $choices;

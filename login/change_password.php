@@ -28,48 +28,50 @@ require('../config.php');
 require_once($CFG->dirroot.'/user/lib.php');
 require_once('change_password_form.php');
 require_once($CFG->libdir.'/authlib.php');
+require_once($CFG->dirroot.'/webservice/lib.php');
+require_once($CFG->dirroot.'/user/editlib.php');
 
 $id     = optional_param('id', SITEID, PARAM_INT); // current course
 $return = optional_param('return', 0, PARAM_BOOL); // redirect after password change
+$returnto = optional_param('returnto', '', PARAM_ALPHANUMEXT);  // Code determining where to return to after save/cancel.
 
 $systemcontext = context_system::instance();
 
-//HTTPS is required in this page when $CFG->loginhttps enabled
-$PAGE->https_required();
-
-$PAGE->set_url('/login/change_password.php', array('id'=>$id));
+$PAGE->set_url('/login/change_password.php', array('id'=>$id, 'returnto'=>$returnto));
 
 $PAGE->set_context($systemcontext);
-
-if ($return) {
-    // this redirect prevents security warning because https can not POST to http pages
-    if (empty($SESSION->wantsurl)
-            or stripos(str_replace('https://', 'http://', $SESSION->wantsurl), str_replace('https://', 'http://', $CFG->wwwroot.'/login/change_password.php')) === 0) {
-        $returnto = "$CFG->wwwroot/user/preferences.php?userid=$USER->id&course=$id";
-    } else {
-        $returnto = $SESSION->wantsurl;
-    }
-    unset($SESSION->wantsurl);
-
-    redirect($returnto);
-}
-
-$strparticipants = get_string('participants');
 
 if (!$course = $DB->get_record('course', array('id'=>$id))) {
     print_error('invalidcourseid');
 }
 
+if ($return) {
+    // this redirect prevents security warning because https can not POST to http pages
+    if ($returnto) {
+        $returntourl = useredit_get_return_url($USER, $returnto, $course);
+    } else if (empty($SESSION->wantsurl)
+            or stripos(str_replace('https://', 'http://', $SESSION->wantsurl), str_replace('https://', 'http://', $CFG->wwwroot.'/login/change_password.php')) === 0) {
+        $returntourl = "$CFG->wwwroot/user/preferences.php?userid=$USER->id&course=$id";
+    } else {
+        $returntourl = $SESSION->wantsurl;
+    }
+    unset($SESSION->wantsurl);
+
+    redirect($returntourl);
+}
+
+$strparticipants = get_string('participants');
+
 // require proper login; guest user can not change password
 if (!isloggedin() or isguestuser()) {
     if (empty($SESSION->wantsurl)) {
-        $SESSION->wantsurl = $CFG->httpswwwroot.'/login/change_password.php';
+        $SESSION->wantsurl = $CFG->wwwroot.'/login/change_password.php';
     }
     redirect(get_login_url());
 }
 
 $PAGE->set_context(context_user::instance($USER->id));
-$PAGE->set_pagelayout('login');
+$PAGE->set_pagelayout('standard');
 $PAGE->set_course($course);
 
 // do not require change own password cap if change forced
@@ -103,12 +105,15 @@ if ($changeurl = $userauth->change_password_url()) {
 }
 
 $mform = new login_change_password_form();
-$mform->set_data(array('id'=>$course->id));
+$mform->set_data(array('id'=>$course->id, 'returnto'=>$returnto));
 
 $navlinks = array();
 $navlinks[] = array('name' => $strparticipants, 'link' => "$CFG->wwwroot/user/index.php?id=$course->id", 'type' => 'misc');
 
 if ($mform->is_cancelled()) {
+    if ($returnto) {
+        redirect(useredit_get_return_url($USER, $returnto, $course));
+    }
     redirect($CFG->wwwroot.'/user/preferences.php?userid='.$USER->id.'&amp;course='.$course->id);
 } else if ($data = $mform->get_data()) {
 
@@ -121,6 +126,13 @@ if ($mform->is_cancelled()) {
     if (!empty($CFG->passwordchangelogout)) {
         \core\session\manager::kill_user_sessions($USER->id, session_id());
     }
+
+    if (!empty($data->signoutofotherservices)) {
+        webservice::delete_user_ws_tokens($USER->id);
+    }
+
+    // Totara: always force users to login again after closing browser or normal session timeout.
+    \totara_core\persistent_login::kill_user($USER->id);
 
     // Reset login lockout - we want to prevent any accidental confusion here.
     login_unlock_account($USER);
@@ -143,9 +155,6 @@ if ($mform->is_cancelled()) {
     exit;
 }
 
-// make sure we really are on the https page when https login required
-$PAGE->verify_https_required();
-
 $strchangepassword = get_string('changepassword');
 
 $fullname = fullname($USER, true);
@@ -153,6 +162,7 @@ $fullname = fullname($USER, true);
 $PAGE->set_title($strchangepassword);
 $PAGE->set_heading($fullname);
 echo $OUTPUT->header();
+echo $OUTPUT->heading($strchangepassword);
 
 if (get_user_preferences('auth_forcepasswordchange')) {
     echo $OUTPUT->notification(get_string('forcepasswordchangenotice'));

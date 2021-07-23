@@ -29,7 +29,9 @@
 define(['jquery', 'totara_form/form'], function($, Form) {
 
     var ERROR_CONTAINER_CLASS = 'totara_form-error-container',
-        ERROR_CONTAINER_SELECTOR = '.'+ERROR_CONTAINER_CLASS;
+        ERROR_CONTAINER_SELECTOR = '.'+ERROR_CONTAINER_CLASS,
+        ELEMENT_PARENT = '.tf_element',
+        ELEMENT_LOADING = '.tf_loading';
 
     /**
      * Checkbox element
@@ -69,29 +71,13 @@ define(['jquery', 'totara_form/form'], function($, Form) {
      * @param {Function} done
      */
     CheckboxElement.prototype.init = function(done) {
-        var input = $('#' + this.id),
-            self = this,
-            deferred = $.Deferred(),
-            submitselector = 'input[type="submit"]:not([formnovalidate])';
+        var input = $('#' + this.id);
 
         this.input = input;
         // Call the changed method when this element is changed.
         this.input.change($.proxy(this.changed, this));
 
-        // Only do this if we need to.
-        if (input.attr('required')) {
-            require(['totara_form/modernizr'], function (Mod) {
-                if (!Mod.input.required) {
-                    input.change($.proxy(self.polyFillValidate, self));
-                    input.closest('form').find(submitselector).click($.proxy(self.polyFillValidate, self));
-                }
-                deferred.resolve();
-            });
-        } else {
-            deferred.resolve();
-        }
-
-        deferred.done(done);
+        done();
     };
 
     /**
@@ -113,7 +99,7 @@ define(['jquery', 'totara_form/form'], function($, Form) {
         var input = this.input;
         if (!input.prop('checked')) {
             e.preventDefault();
-            if (input.closest('.tf_element').find(ERROR_CONTAINER_SELECTOR).length === 0) {
+            if (input.closest(ELEMENT_PARENT).find(ERROR_CONTAINER_SELECTOR).length === 0) {
                 require(['core/templates', 'core/str', 'core/config'], function (templates, mdlstrings, mdlconfig) {
                     mdlstrings.get_string('required', 'core').done(function (requiredstring) {
                         var context = {
@@ -127,8 +113,26 @@ define(['jquery', 'totara_form/form'], function($, Form) {
                 });
             }
         } else if (input.val().trim() !== '') {
-            input.closest('.tf_element').find(ERROR_CONTAINER_SELECTOR).remove();
+            input.closest(ELEMENT_PARENT).find(ERROR_CONTAINER_SELECTOR).remove();
         }
+    };
+
+    /**
+     * Shows a loading icon
+     *
+     * @since Totara 9.10, 10
+     */
+    CheckboxElement.prototype.showLoading = function() {
+        this.input.siblings(ELEMENT_LOADING).show();
+    };
+
+    /**
+     * Hides a loading icon
+     *
+     * @since Totara 9.10, 10
+     */
+    CheckboxElement.prototype.hideLoading = function () {
+        this.siblings(ELEMENT_LOADING).hide();
     };
 
     return CheckboxElement;

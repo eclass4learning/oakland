@@ -30,7 +30,7 @@
 
 define('AJAX_SCRIPT', true);
 
-require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
 
 // Send the correct headers.
@@ -50,7 +50,8 @@ $reportrecord = $DB->get_record('report_builder', array('id' => $id), '*', MUST_
 $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($reportrecord);
 
 // Create the report object. Includes embedded report capability checks.
-$report = new reportbuilder($id, null, false, $sid, null, false, array(), $globalrestrictionset);
+$config = (new rb_config())->set_sid($sid)->set_global_restriction_set($globalrestrictionset);
+$report = reportbuilder::create($id, $config);
 
 // Decide if require_login should be executed.
 if ($report->needs_require_login()) {
@@ -67,38 +68,28 @@ if (!empty($report->embeddedurl)) {
 } else {
     $PAGE->set_url('/totara/reportbuilder/report.php', array('id' => $id));
 }
-$PAGE->set_totara_menu_selected('myreports');
+
 $PAGE->set_pagelayout('noblocks');
 
 \totara_reportbuilder\event\report_viewed::create_from_report($report)->trigger();
 
-$override_initial = isset($searched['addfilter']);
-$hide_initial_display = ($report->initialdisplay == RB_INITIAL_DISPLAY_HIDE && !$override_initial);
-$countfiltered = 0;
-$countall = 0;
-
-if (!$hide_initial_display || $report->is_report_filtered()) {
-    $countfiltered = $report->get_filtered_count(true);
-    $countall = $report->get_full_count();
-}
-
 /** @var totara_reportbuilder_renderer $output */
 $output = $PAGE->get_renderer('totara_reportbuilder');
 
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $output->report_html($report, $debug);
+echo $debughtml;
 
 // Construct the output which consists of a report, header and (eventually) sidebar filter counts.
 // We put the data in a container so that jquery can search inside it.
 echo html_writer::start_div('instantreportcontainer');
 
 // Show report results.
-$report->display_table();
+echo $reporthtml;
 $report->display_sidebar_search();
 
 // Display heading including filtering stats.
-echo $output->print_result_count_string($countfiltered, $countall);
+echo $output->result_count_info($report);
 
 // Close the container.
 echo html_writer::end_div();

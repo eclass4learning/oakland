@@ -33,6 +33,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+define('NO_HTTP_REFERER', true);
+
 require('../config.php');
 require_once($CFG->libdir.'/authlib.php');
 require_once(__DIR__ . '/lib.php');
@@ -40,9 +42,6 @@ require_once('forgot_password_form.php');
 require_once('set_password_form.php');
 
 $token = optional_param('token', false, PARAM_ALPHANUM);
-
-//HTTPS is required in this page when $CFG->loginhttps enabled
-$PAGE->https_required();
 
 $PAGE->set_url('/login/forgot_password.php');
 $systemcontext = context_system::instance();
@@ -86,7 +85,7 @@ if (empty($token)) {
     // The session var is intentionally used only during the lifespan of one request (the redirect) and is unset above.
     if (!$tokeninsession && $_SERVER['REQUEST_METHOD'] === 'GET') {
         $SESSION->password_reset_token = $token;
-        redirect($CFG->httpswwwroot . '/login/forgot_password.php');
+        redirect($CFG->wwwroot . '/login/forgot_password.php');
     } else {
         // Continue with the password reset process.
         core_login_process_password_set($token);

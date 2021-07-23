@@ -87,9 +87,39 @@ class upload_form extends moodleform {
         $mform->setType('evidencetype', PARAM_INT);
         $mform->addHelpButton('evidencetype', 'evidencetype', 'totara_completionimport');
 
+        // Evidence custom field for completion date.
+        $selectoptions = array(get_string('selectanevidencedatefield', 'totara_completionimport'));
+        $options = $DB->get_records('dp_plan_evidence_info_field', array('datatype' => 'datetime', 'hidden' => 0), 'sortorder');
+        foreach ($options as $option) {
+            $selectoptions[$option->shortname] = format_string($option->fullname);
+        }
+        $mform->addElement('select', 'evidencedatefield', get_string('evidencedatefield', 'totara_completionimport'), $selectoptions);
+        $mform->setType('evidencedatefield', PARAM_TEXT);
+        $mform->addHelpButton('evidencedatefield', 'evidencedatefield', 'totara_completionimport');
+
+        // Evidence custom field for the import description.
+        $selectoptions = array(get_string('selectanevidencedescriptionfield', 'totara_completionimport'));
+        $options = $DB->get_records('dp_plan_evidence_info_field', array('datatype' => 'textarea', 'hidden' => 0), 'sortorder');
+        foreach ($options as $option) {
+            $selectoptions[$option->shortname] = format_string($option->fullname);
+        }
+        $mform->addElement('select', 'evidencedescriptionfield', get_string('evidencedescriptionfield', 'totara_completionimport'), $selectoptions);
+        $mform->setType('evidencedescriptionfield', PARAM_TEXT);
+        $mform->addHelpButton('evidencedescriptionfield', 'evidencedescriptionfield', 'totara_completionimport');
+
         $dateformats = get_dateformats();
         $mform->addElement('select', 'csvdateformat', get_string('csvdateformat', 'totara_completionimport'), $dateformats);
         $mform->setType('csvdateformat', PARAM_TEXT);
+
+        if (in_array($data->importname, ['course'])) {
+            $selectoptions = [
+                TCI_CSV_GRADE_POINT => get_string('csvgradeunit_point', 'totara_completionimport'),
+                TCI_CSV_GRADE_PERCENT => get_string('csvgradeunit_percent', 'totara_completionimport'),
+            ];
+            $gradeunitstr = get_string('csvgradeunit', 'totara_completionimport');
+            $mform->addElement('select', 'csvgradeunit', $gradeunitstr, $selectoptions);
+            $mform->setDefault('csvgradeunit', TCI_CSV_GRADE_POINT);
+        }
 
         // Function get_delimiter_list() actually returns the list of separators as in "comma *separated* values".
         $separators = csv_import_reader::get_delimiter_list();

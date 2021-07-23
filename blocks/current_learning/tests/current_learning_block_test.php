@@ -109,7 +109,7 @@ class block_current_learning_testcase extends block_current_learning_testcase_ba
      */
     function test_ensure_user_learning_items_unique_with_multiple_plans() {
         global $CFG;
-
+        require_once($CFG->dirroot . '/blocks/moodleblock.class.php');
         require_once($CFG->dirroot . '/blocks/current_learning/block_current_learning.php');
 
         $course1 = $this->generator->create_course();

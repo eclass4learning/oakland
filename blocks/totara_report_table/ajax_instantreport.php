@@ -37,20 +37,22 @@ $blockid = required_param('blockid', PARAM_INT);
 $blockcontext = context_block::instance($blockid, MUST_EXIST);
 list($context, $course, $cm) = get_context_info_array($blockcontext->id);
 
+$PAGE->set_context($blockcontext);
+$PAGE->set_pagelayout('noblocks');
+
 if ($CFG->forcelogin) {
     require_login($course, false, $cm, false, true);
 } else {
     require_course_login($course, false, $cm, false, true);
 }
 
-require_capability('moodle/block:view', $blockcontext);
-
 // Send the correct headers.
 send_headers('text/html; charset=utf-8', false);
 
 $block = $DB->get_record('block_instances', array('id' => $blockid, 'blockname' => 'totara_report_table'), '*', MUST_EXIST);
 
-if (empty($block->configdata)) {
+$totara_report_table = block_instance('totara_report_table', $block);
+if (empty($block->configdata) || !$totara_report_table || !$totara_report_table->user_can_view()) {
     die;
 }
 
@@ -67,35 +69,10 @@ $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($
 // Create the report object. Includes embedded report capability checks.
 $uniqueid = 'block_totara_report_table_' . $blockid;
 reportbuilder::overrideuniqueid($uniqueid);
-$report = new reportbuilder($id, null, false, null, null, false, array(), $globalrestrictionset);
-
-// Decide if require_login should be executed.
-if ($report->needs_require_login() and !isloggedin()) {
-    require_login();
-}
-
-// Checks that the report is one that is returned by get_permitted_reports.
-if (!reportbuilder::is_capable($id)) {
-    print_error('nopermission', 'totara_reportbuilder');
-}
-
-$PAGE->set_context($blockcontext);
-if (!empty($report->embeddedurl)) {
-    $PAGE->set_url($report->embeddedurl);
-} else {
-    $PAGE->set_url('/totara/reportbuilder/report.php', array('id' => $id));
-}
-$PAGE->set_totara_menu_selected('myreports');
-$PAGE->set_pagelayout('noblocks');
+$config = (new rb_config())->set_global_restriction_set($globalrestrictionset);
+$report = reportbuilder::create($id, $config, true);
 
 \totara_reportbuilder\event\report_viewed::create_from_report($report)->trigger();
-
-$countfiltered = 0;
-$countall = 0;
-if ($report->is_report_filtered()) {
-    $countfiltered = $report->get_filtered_count(true);
-    $countall = $report->get_full_count();
-}
 
 /** @var totara_reportbuilder_renderer $output */
 $output = $PAGE->get_renderer('totara_reportbuilder');
@@ -109,7 +86,7 @@ $report->display_table();
 $report->display_sidebar_search();
 
 // Display heading including filtering stats.
-echo $output->print_result_count_string($countfiltered, $countall);
+echo $output->result_count_info($report);
 
 // Close the container.
 echo html_writer::end_div();

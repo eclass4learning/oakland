@@ -45,13 +45,8 @@ class mod_certificate_archive_testcase extends advanced_testcase {
         $this->assertTrue(certificate_supports(FEATURE_ARCHIVE_COMPLETION));
     }
 
-    /**
-     * @depends test_module_supports_archive_completion
-     */
     public function test_archive() {
         global $DB;
-
-        $this->resetAfterTest(true);
 
         set_config('enablecompletion', 1);
 
@@ -107,17 +102,15 @@ class mod_certificate_archive_testcase extends advanced_testcase {
         $completionstate = $DB->get_field('course_modules_completion', 'completionstate', $params, MUST_EXIST);
         $this->assertEquals(COMPLETION_COMPLETE, $completionstate);
 
-        // Archive it
+        // Archive course activities.
         $this->assertEquals(0, $DB->count_records('certificate_issues_history'));
-        certificate_archive_completion($user->id, $course->id);
+        archive_course_activities($user->id, $course->id);
         // Check there is no certificate issue
         $this->assertEquals(0, $DB->count_records('certificate_issues'));
         // Check there is a history record
         $this->assertEquals(1, $DB->count_records('certificate_issues_history'));
-
-        // Check its incomplete
-        $completionstate = $DB->get_field('course_modules_completion', 'completionstate', $params, MUST_EXIST);
-        $this->assertEquals(COMPLETION_INCOMPLETE, $completionstate);
+        // Verify module completion record is gone.
+        $this->assertEquals(0, $DB->count_records('course_modules_completion', $params));
 
         // Check we can report on it
         $totalcount = 0;

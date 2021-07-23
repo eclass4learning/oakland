@@ -22,7 +22,7 @@
  * @subpackage totara_hierarchy
  */
 
-require_once dirname(dirname(dirname(dirname(dirname(dirname(__FILE__)))))) . '/config.php';
+require_once(__DIR__ . '/../../../../../config.php');
 require_once $CFG->libdir.'/adminlib.php';
 require_once($CFG->dirroot.'/totara/hierarchy/lib.php');
 require_once($CFG->dirroot.'/totara/hierarchy/prefix/competency/lib.php');
@@ -149,7 +149,7 @@ if ($mform->is_cancelled()) {
         $notification->url = "$CFG->wwwroot/totara/hierarchy/prefix/competency/scale/view.php?id={$scalenew->id}&amp;prefix=competency";
         $notification->params = array('class' => 'notifysuccess');
     }
-    totara_set_notification(get_string($notification->text, 'totara_hierarchy', $scalenew->name),
+    totara_set_notification(get_string($notification->text, 'totara_hierarchy', format_string($scalenew->name)),
                     $notification->url, $notification->params);
 
 }

@@ -24,7 +24,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot . '/totara/plan/lib.php');
 require_once($CFG->dirroot . '/totara/core/js/lib/setup.php');
 require_once($CFG->dirroot . '/totara/plan/components/evidence/evidence.class.php');
@@ -45,11 +45,7 @@ $plan = new development_plan($id);
 $plancompleted = $plan->status == DP_PLAN_STATUS_COMPLETE;
 
 // Permissions check.
-$can_access = dp_can_view_users_plans($plan->userid);
-$can_view = dp_role_is_allowed_action($plan->role, 'view');
-$can_manage = dp_can_manage_users_plans($plan->userid);
-
-if (!$can_access || !$can_view) {
+if (!$plan->can_view()) {
     print_error('error:nopermissions', 'totara_plan');
 }
 
@@ -62,7 +58,7 @@ $systemcontext = context_system::instance();
 $PAGE->set_context($systemcontext);
 $PAGE->set_url('/totara/plan/components/program/view.php', array('id' => $id, 'itemid' => $progassid));
 $PAGE->set_pagelayout('report');
-$PAGE->set_totara_menu_selected('learningplans');
+$PAGE->set_totara_menu_selected('\totara_plan\totara\menu\learningplans');
 
 //Javascript include
 local_js(array(
@@ -72,22 +68,31 @@ local_js(array(
 
 // Get extension dialog content
 if ($programid = $DB->get_field('dp_plan_program_assign', 'programid', array('id' => $progassid))) {
+
     $PAGE->requires->strings_for_js(array('pleaseentervaliddate', 'pleaseentervalidreason', 'extensionrequest', 'cancel', 'ok'), 'totara_program');
     $PAGE->requires->strings_for_js(array('datepickerlongyeardisplayformat', 'datepickerlongyearplaceholder', 'datepickerlongyearregexjs'), 'totara_core');
-    $notify_html = addslashes_js(trim($OUTPUT->notification(get_string("extensionrequestsent", "totara_program"), "notifysuccess")));
-    $notify_html_fail = addslashes_js(trim($OUTPUT->notification(get_string("extensionrequestnotsent", "totara_program"), null)));
-    $args = array('args'=>'{"id":'.$programid.', "userid":'.$USER->id.', "user_fullname":'.json_encode(fullname($USER)).', "notify_html_fail":"'.$notify_html_fail.'", "notify_html":"'.$notify_html.'"}');
+
+    $args = array(
+        'args' => json_encode((object)[
+            'id' => $programid,
+            'userid' => $USER->id,
+            'user_fullname' => fullname($USER),
+            'notify_html_fail' => trim($OUTPUT->notification(get_string("extensionrequestnotsent", "totara_program"), null)),
+            'notify_html' => trim($OUTPUT->notification(get_string("extensionrequestsent", "totara_program"), "notifysuccess"))
+        ]
+    ));
+
     $jsmodule = array(
-                 'name' => 'totara_programview',
-                 'fullpath' => '/totara/program/view/program_view.js',
-                 'requires' => array('json', 'totara_core')
-              );
-    $PAGE->requires->js_init_call('M.totara_programview.init',$args, false, $jsmodule);
+        'name' => 'totara_programview',
+        'fullpath' => '/totara/program/view/program_view.js',
+        'requires' => array('json', 'totara_core')
+    );
+    $PAGE->requires->js_init_call('M.totara_programview.init', $args, false, $jsmodule);
 }
 
 $componentname = 'program';
 $component = $plan->get_component($componentname);
-$canupdate = $component->can_update_items() && $can_manage;
+$canupdate = $component->can_update_items() && $plan->can_manage();
 
 $evidence = new dp_evidence_relation($id, $componentname, $progassid);
 
@@ -109,9 +114,14 @@ if ($canupdate) {
         'name' => 'totara_plan_find_evidence',
         'fullpath' => '/totara/plan/components/evidence/find-evidence.js',
         'requires' => array('json'));
-    $PAGE->requires->js_init_call('M.totara_plan_find_evidence.init',
-            array('args' => '{"plan_id":'.$id.', "component_name":"'.$componentname.'", "item_id":'.$progassid.'}'),
-            false, $jsmodule_evidence);
+    $args = array(
+        'args' => json_encode((object)[
+            'plan_id' => $id,
+            'component_name' => $componentname,
+            'item_id' => $progassid
+        ]
+    ));
+    $PAGE->requires->js_init_call('M.totara_plan_find_evidence.init', $args,false, $jsmodule_evidence);
 }
 
 // Check if we are performing an action
@@ -130,27 +140,29 @@ $PAGE->navbar->add(get_string("{$component->component}plural", 'totara_plan'), $
 $PAGE->navbar->add(get_string('viewitem', 'totara_plan'));
 
 
-$plan->print_header($componentname);
+$plan->print_header($componentname, array(), false);
 
 print $component->display_program_detail($progassid);
 
 // Display linked evidence
 echo $evidence->display_linked_evidence($currenturl, $canupdate, $plancompleted);
 
-// Comments
-echo $OUTPUT->heading(get_string('comments', 'totara_plan'), 3, null, 'comments');
-require_once($CFG->dirroot.'/comment/lib.php');
-comment::init();
-$options = new stdClass;
-$options->area    = 'plan_program_item';
-$options->context = $systemcontext;
-$options->itemid  = $progassid;
-$options->showcount = true;
-$options->component = 'totara_plan';
-$options->autostart = true;
-$options->notoggle = true;
-$comment = new comment($options);
-echo $comment->output(true);
+if (!empty($CFG->usecomments)) {
+    // Comments
+    echo $OUTPUT->heading(get_string('comments', 'totara_plan'), 3, null, 'comments');
+    require_once($CFG->dirroot.'/comment/lib.php');
+    comment::init();
+    $options = new stdClass();
+    $options->area    = 'plan_program_item';
+    $options->context = $systemcontext;
+    $options->itemid  = $progassid;
+    $options->showcount = true;
+    $options->component = 'totara_plan';
+    $options->autostart = true;
+    $options->notoggle = true;
+    $comment = new comment($options);
+    echo $comment->output(true);
+}
 
 echo $OUTPUT->container_end();
 

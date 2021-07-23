@@ -96,7 +96,7 @@ class dp_competency_component extends dp_base_component {
         global $DB;
 
         // Generate where clause
-        $where = "c.visible = 1 AND a.planid = :planid";
+        $where = "a.planid = :planid";
         $params = array('planid' => $this->plan->id);
         if ($approved !== null) {
             list($approvedsql, $approvedparams) = $DB->get_in_or_equal($approved, SQL_PARAMS_NAMED, 'approved');
@@ -180,7 +180,10 @@ class dp_competency_component extends dp_base_component {
                 {dp_plan_competency_assign} a
             INNER JOIN
                 {comp} c
-                ON c.id = a.competencyid
+                ON c.id = a.competencyid AND c.visible = 1
+            INNER JOIN
+                {comp_framework} cf
+                ON cf.id = c.frameworkid AND cf.visible = 1
             $countjoin
             $status
             WHERE
@@ -426,7 +429,7 @@ class dp_competency_component extends dp_base_component {
                 if ($USER->id == $this->plan->userid) {
                     echo html_writer::tag('p', get_string('deletelinkedcoursesinstructionslearner', 'totara_plan'));
                 } else {
-                    if ($planowner = $DB->get_record('user', array('id' => $this->plan->userid), 'firstname, lastname')) {
+                    if ($planowner = $DB->get_record('user', array('id' => $this->plan->userid), get_all_user_name_fields(true))) {
                         $planowner_name = fullname($planowner);
                     }
 
@@ -621,9 +624,10 @@ class dp_competency_component extends dp_base_component {
         $params[] = $priorityscaleid;
         list($insql, $inparams) = $DB->get_in_or_equal($list);
         $where = "WHERE ca.id $insql
-                    AND ca.approved = ? ";
+                    AND ca.approved >= ? ";
         $params = array_merge($params, $inparams);
-        $params[] = DP_APPROVAL_APPROVED;
+        // We are looking for competencies that were added to an approved plan by a user with "Request" permission.
+        $params[] = DP_APPROVAL_UNAPPROVED;
         $sort = "ORDER BY c.fullname";
 
         $tableheaders = array(
@@ -681,12 +685,15 @@ class dp_competency_component extends dp_base_component {
                 }
 
                 if (!$this->plan->is_complete() && $this->can_update_items()) {
+                    $id = 'delete_linked_course_assign_' . $ca->id;
+                    $a = array('name' => $ca->fullname, 'component' => get_string('competency', 'totara_plan'));
+                    $label = html_writer::label(get_string('selectlinked','totara_plan', $a), $id, '', array('class' => 'sr-only'));
                     if (!empty($mandatory_list) && in_array($ca->id, $mandatory_list)) {
                         // If this course has a mandatory link to the competency disable checkbox
-                        $row[] = html_writer::checkbox('delete_linked_comp_assign['.$ca->id.']', '1', false,
-                            get_string('mandatory', 'totara_plan'), array('disabled' => 'true'));
+                        $row[] = $label . html_writer::checkbox('delete_linked_comp_assign['.$ca->id.']', '1', false,
+                            get_string('mandatory', 'totara_plan'), array('disabled' => 'true', 'id' => $id));
                     } else {
-                        $row[] = html_writer::checkbox('delete_linked_comp_assign['.$ca->id.']', '1', false);
+                        $row[] = $label . html_writer::checkbox('delete_linked_comp_assign['.$ca->id.']', '1', false, '', array('id' => $id));
                     }
                 }
 
@@ -919,7 +926,7 @@ class dp_competency_component extends dp_base_component {
 
         $currenturl = qualified_me();
 
-        $oldrecords = $DB->get_records_list('dp_plan_competency_assign', 'planid', array($this->plan->id), null, 'id, planid, competencyid, approved, priority');
+        $oldrecords = $DB->get_records_list('dp_plan_competency_assign', 'planid', array($this->plan->id), null, 'id, planid, competencyid, approved, priority, duedate');
         $status = true;
         $stored_records = array();
         if (!empty($evidences)) {
@@ -941,6 +948,7 @@ class dp_competency_component extends dp_base_component {
                         $details->organisationid = $jobassignment->organisationid;
                     }
 
+                    $details->timeproficient = time();
                     $details->assessorname = fullname($USER);
                     $details->assessorid = $USER->id;
                     $result = hierarchy_add_competency_evidence($competencyid, $this->plan->userid, $evidence, $this, $details);
@@ -1071,7 +1079,7 @@ class dp_competency_component extends dp_base_component {
                     if (!empty($record->duedate) && $oldrecords[$itemid]->duedate != $record->duedate) {
                         $updates .= $compprinted ? '' : $compheader;
                         $compprinted = true;
-                        $dateformat = get_string('strftimedateshortmonth', 'langconfig');
+                        $dateformat = get_string('strfdateshortmonth', 'langconfig');
                         $updates .= get_string('duedate', 'totara_plan').' - '.
                             get_string('changedfromxtoy', 'totara_plan', (object)array('before' => empty($oldrecords[$itemid]->duedate) ? '' :
                                     userdate($oldrecords[$itemid]->duedate, $dateformat, 99, false),
@@ -1291,6 +1299,8 @@ class dp_competency_component extends dp_base_component {
             $assigned = $DB->get_records('dp_plan_competency_assign', array('planid' => $this->plan->id), '', 'competencyid');
             $assigned = array_keys($assigned);
             foreach ($competencies as $c) {
+                $assignment = null;
+
                 // Don't assign duplicate competencies
                 if (!in_array($c->id, $assigned)) {
                     // Assign competency item (false = assigned automatically)
@@ -1298,8 +1308,9 @@ class dp_competency_component extends dp_base_component {
                         return false;
                     }
                 }
-                // Add relation
-                if ($relation) {
+
+                // Add relation providing we've got an assignment.
+                if ($relation && $assignment) {
                     $mandatory = $c->linktype == PLAN_LINKTYPE_MANDATORY ? 'competency' : '';
                     $this->plan->add_component_relation($relation['component'], $relation['id'], 'competency', $assignment->id, $mandatory);
                 }
@@ -1417,32 +1428,38 @@ class dp_competency_component extends dp_base_component {
         $includecompleted = $this->get_setting('includecompleted');
 
         require_once($CFG->dirroot.'/totara/hierarchy/prefix/position/lib.php');
-        // Get primary position
-        $jobassignment = \totara_job\job_assignment::get_first($this->plan->userid);
-        $organisationid = $jobassignment->organisationid;
-        if (empty($organisationid)) {
-            // No organisation assigned to the primary position, so just go away
+        require_once($CFG->dirroot.'/totara/hierarchy/prefix/organisation/lib.php');
+
+        // Get job assignments.
+        $jobassignments = \totara_job\job_assignment::get_all($this->plan->userid);
+        if (empty($jobassignments)) {
             return true;
         }
 
-        require_once($CFG->dirroot.'/totara/hierarchy/prefix/organisation/lib.php');
         $org = new organisation();
-        if ($includecompleted) {
-            $competencies = $org->get_assigned_competencies($organisationid);
-        } else {
-            $completed_competency_ids = competency::get_user_completed_competencies($this->plan->userid);
-            $competencies = $org->get_assigned_competencies($organisationid, 0, $completed_competency_ids);
-        }
+        foreach ($jobassignments as $jobassignment) {
+            $organisationid = $jobassignment->organisationid;
+            if (empty($organisationid)) {
+                continue;
+            }
 
-        if ($competencies) {
-            $relation = array('component' => 'organisation', 'id' => $organisationid);
-            if ($this->auto_assign_competencies($competencies, false, $relation)) {
-                // assign courses
-                if ($includecourses) {
-                    $this->assign_linked_courses($competencies, false);
-                }
+            if ($includecompleted) {
+                $competencies = $org->get_assigned_competencies($organisationid);
             } else {
-                return false;
+                $completed_competency_ids = competency::get_user_completed_competencies($this->plan->userid);
+                $competencies = $org->get_assigned_competencies($organisationid, 0, $completed_competency_ids);
+            }
+
+            if ($competencies) {
+                $relation = array('component' => 'organisation', 'id' => $organisationid);
+                if ($this->auto_assign_competencies($competencies, false, $relation)) {
+                    // assign courses
+                    if ($includecourses) {
+                        $this->assign_linked_courses($competencies, false);
+                    }
+                } else {
+                    return false;
+                }
             }
         }
 
@@ -1458,7 +1475,7 @@ class dp_competency_component extends dp_base_component {
      * @return string the items status
      */
     protected function display_list_item_progress($item) {
-        if ($this->can_update_competency_evidence($item) && dp_can_manage_users_plans($this->plan->userid)) {
+        if ($this->can_update_competency_evidence($item) && $this->plan->can_manage()) {
             return $this->get_competency_menu($item);
         } else {
             return $this->is_item_approved($item->approved) ? $this->display_status($item) : '';
@@ -1494,7 +1511,8 @@ class dp_competency_component extends dp_base_component {
         }
 
         $attributes = array(); //in this case no attributes are set
-        $output = html_writer::select($formatscale,
+        $output = html_writer::label(get_string('statusof', 'totara_plan', format_string($item->fullname)), "menucompprof_{$this->component}{$item->id}", true, array('class' => 'sr-only'));
+        $output .= html_writer::select($formatscale,
                                     "compprof_{$this->component}[{$item->id}]",
                                     $item->profscalevalueid,
                                     array(($item->profscalevalueid ? '' : 0) => ($item->profscalevalueid ? '' : get_string('notset', 'totara_hierarchy'))),
@@ -1513,7 +1531,7 @@ class dp_competency_component extends dp_base_component {
     protected function display_list_item_actions($item) {
 
         $markup = '';
-        if (dp_can_manage_users_plans($this->plan->userid)) {
+        if ($this->plan->can_manage()) {
             $markup .= $this->display_comp_delete_icon($item);
             $markup .= $this->display_comp_add_evidence_icon($item);
         }

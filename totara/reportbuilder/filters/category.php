@@ -45,6 +45,7 @@ class rb_filter_category extends rb_filter_type {
         global $SESSION;
         $label = format_string($this->label);
         $advanced = $this->advanced;
+        $defaultvalue = $this->defaultvalue;
 
         $objs = array();
         $objs[] =& $mform->createElement('select', $this->name.'_op', $label, $this->get_operators());
@@ -68,7 +69,7 @@ class rb_filter_category extends rb_filter_type {
 
         // Create a group for the elements.
         $grp =& $mform->addElement('group', $this->name.'_grp', $label, $objs, '', false);
-        $mform->addHelpButton($grp->_name, 'reportbuilderdialogfilter', 'totara_reportbuilder');
+        $this->add_help_button($mform, $grp->_name, 'reportbuilderdialogfilter', 'totara_reportbuilder');
 
         if ($advanced) {
             $mform->setAdvanced($this->name.'_grp');
@@ -81,7 +82,10 @@ class rb_filter_category extends rb_filter_type {
         // Set default values.
         if (isset($SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name])) {
             $defaults = $SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name];
+        } else if (!empty($defaultvalue)) {
+            $this->set_data($defaultvalue);
         }
+
         if (isset($defaults['operator'])) {
             $mform->setDefault($this->name . '_op', $defaults['operator']);
         }
@@ -158,9 +162,13 @@ class rb_filter_category extends rb_filter_type {
         switch($operator) {
             case 1:
                 $notlike = false;
+                $equal = '=';
+                $logicaloperator = 'OR';
                 break;
             case 2:
                 $notlike = true;
+                $equal = '<>';
+                $logicaloperator = 'AND';
                 break;
             default:
                 // Return 1=1 instead of TRUE for MSSQL support.
@@ -183,17 +191,13 @@ class rb_filter_category extends rb_filter_type {
             $path = $DB->get_field('course_categories', 'path', array('id' => $itemid));
             $uniqueparam  = rb_unique_param("ccp_{$count}");
             $uniqueparam2 = rb_unique_param("ccp2_{$count}");
-            if ($operator == 2) {
-                $sql .= '((' . $DB->sql_like($query, ":{$uniqueparam}", true, true, $notlike) .
-                                                ") AND ( {$query} <> :{$uniqueparam2} ))";
-                $params[$uniqueparam] = $DB->sql_like_escape($path) . $recursive;
-                $params[$uniqueparam2] = $path;
-            } else {
-                $sql .= '((' . $DB->sql_like($query, ":{$uniqueparam}", true, true, $notlike) .
-                                                ") OR ( {$query} = :{$uniqueparam2} ))";
-                $params[$uniqueparam] = $DB->sql_like_escape($path) . $recursive;
-                $params[$uniqueparam2] = $path;
+            $sqlquery = "({$query} {$equal} :{$uniqueparam})";
+            $params[$uniqueparam] = $path;
+            if (!empty($recursive)) {
+                $sqlquery = "({$sqlquery} {$logicaloperator} (" . $DB->sql_like($query, ":{$uniqueparam2}", true, true, $notlike) . '))';
+                $params[$uniqueparam2] = $DB->sql_like_escape($path) . $recursive;
             }
+            $sql .= $sqlquery;
             $count++;
         }
 
@@ -255,7 +259,7 @@ class rb_filter_category extends rb_filter_type {
         $jsdetails->strings = array(
             'totara_reportbuilder' => array('choosecatplural'),
         );
-        $jsdetails->args = array('filter_to_load' => 'category');
+        $jsdetails->args = array('filter_to_load' => 'category', null, null, $this->name, 'reportid' => $this->report->_id);
 
         foreach ($jsdetails->strings as $scomponent => $sstrings) {
             $PAGE->requires->strings_for_js($sstrings, $scomponent);

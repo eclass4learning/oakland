@@ -28,6 +28,9 @@
  */
 
 define(['jquery', 'core/config', 'core/str'], function ($, mdlcfg, mdlstrings) {
+
+    /* global totaraSingleSelectDialog totaraMultiSelectDialogRbFilter */
+
     var disable_filter_controls = function(event) {
         var name = $(this).attr('name');
 
@@ -53,7 +56,7 @@ define(['jquery', 'core/config', 'core/str'], function ($, mdlcfg, mdlstrings) {
             $('*[data-filtername="' + name + '"] a').prop('disabled', false);
             $('*[data-filtername="' + name + '"] a').attr('href', '#');
         }
-    }
+    };
 
     var handler = {
 
@@ -110,7 +113,7 @@ define(['jquery', 'core/config', 'core/str'], function ($, mdlcfg, mdlstrings) {
                         break;
                     case "jobassign_multi":
                         handler.rb_load_jobassign_multi_filters();
-                        // Note: no break here since we also want to load hierarchy.
+                        // Note falls through: no break here since we also want to load hierarchy.
                     case "hierarchy_multi":
                         handler.rb_load_hierarchy_multi_filters();
                         break;
@@ -301,6 +304,7 @@ define(['jquery', 'core/config', 'core/str'], function ($, mdlcfg, mdlstrings) {
         },
 
         rb_load_hierarchy_multi_filters: function() {
+            var self = this;
             // Bind multi-organisation report filter.
             $('div.rb-org-add-link a').each(function() {
                 var id = $(this).attr('id');
@@ -317,7 +321,7 @@ define(['jquery', 'core/config', 'core/str'], function ($, mdlcfg, mdlstrings) {
                     totaraMultiSelectDialogRbFilter(
                         id,
                         chooseorgplural,
-                        url + 'find.php?',
+                        url + 'find.php?reportid=' + self.reportid,
                         url + 'save.php?filtername=' + id + '&ids='
                     );
                 });
@@ -339,7 +343,7 @@ define(['jquery', 'core/config', 'core/str'], function ($, mdlcfg, mdlstrings) {
                     totaraMultiSelectDialogRbFilter(
                         id,
                         chooseposplural,
-                        url + 'find.php?',
+                        url + 'find.php?reportid=' + self.reportid,
                         url + 'save.php?filtername=' + id + '&ids='
                     );
                 });

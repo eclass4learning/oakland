@@ -28,7 +28,8 @@ Feature: Use the multi-item appraiser filter
       | user4   | manager3 | appraiser2 |
       | user5   |          | appraiser3 |
     And I log in as "admin"
-    And I navigate to "Manage reports" node in "Site administration > Reports > Report builder"
+    And I navigate to "Manage user reports" node in "Site administration > Reports"
+    And I press "Create report"
     Given I set the field "Report Name" to "Users Report"
     And I set the field "Source" to "user"
     And I press "Create report"
@@ -50,8 +51,9 @@ Feature: Use the multi-item appraiser filter
     And I should see "user3" in the ".reportbuilder-table" "css_element"
     And I should see "user4" in the ".reportbuilder-table" "css_element"
     And I should see "user5" in the ".reportbuilder-table" "css_element"
+    # Select
     When I select "Any of the selected" from the "User's Appraiser(s) field limiter" singleselect
-    When I click on "Choose Appraisers" "link" in the "Search by" "fieldset"
+    And I click on "Choose Appraisers" "link" in the "Search by" "fieldset"
     And I click on "Appraiser1 One1" "link" in the "Choose Appraisers" "totaradialogue"
     And I click on "Save" "button" in the "Choose Appraisers" "totaradialogue"
     And I wait "1" seconds
@@ -60,4 +62,20 @@ Feature: Use the multi-item appraiser filter
     And I should see "user2" in the ".reportbuilder-table" "css_element"
     And I should see "user3" in the ".reportbuilder-table" "css_element"
     And I should not see "user4" in the ".reportbuilder-table" "css_element"
+    And I should not see "user5" in the ".reportbuilder-table" "css_element"
+    # Search
+    When I select "Any of the selected" from the "User's Appraiser(s) field limiter" singleselect
+    And I click on "Choose Appraisers" "link" in the "Search by" "fieldset"
+    And I switch to "Search" tab
+    And I set the following fields to these values:
+      | query | Appr |
+    And I press "dialogsearchsubmitbutton"
+    And I click on "Appraiser2 Two2" "link" in the "#search-tab" "css_element"
+    And I click on "Save" "button" in the "Choose Appraisers" "totaradialogue"
+    And I wait "1" seconds
+    And I click on "Search" "button" in the "#fgroup_id_submitgroupstandard" "css_element"
+    Then I should not see "user1" in the ".reportbuilder-table" "css_element"
+    And I should see "user2" in the ".reportbuilder-table" "css_element"
+    And I should see "user3" in the ".reportbuilder-table" "css_element"
+    And I should see "user4" in the ".reportbuilder-table" "css_element"
     And I should not see "user5" in the ".reportbuilder-table" "css_element"

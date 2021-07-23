@@ -23,5 +23,4 @@
  */
 
 $string['activity_modules:addinstance'] = 'Add a new activities block';
-$string['activity_modules:myaddinstance'] = 'Add a new activities block';
-$string['pluginname'] = 'Dashboard Activities';
+$string['pluginname'] = 'Activities';

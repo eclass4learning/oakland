@@ -1,4 +1,4 @@
-@mod @mod_facetoface @totara @javascript
+@mod @mod_facetoface @totara @javascript @totara_customfield
 Feature: Manage pre-defined rooms
   In order to test seminar rooms
   As a site manager
@@ -34,7 +34,7 @@ Feature: Manage pre-defined rooms
       | Name              | Room 1          |
       | Building          | That house      |
       | Address           | 123 here street |
-      | Maximum bookings  | 5               |
+      | Room capacity     | 5               |
     And I click on "#id_customfield_locationsize_medium" "css_element"
     And I click on "#id_customfield_locationview_satellite" "css_element"
     And I click on "#id_customfield_locationdisplay_map" "css_element"
@@ -45,7 +45,7 @@ Feature: Manage pre-defined rooms
       | Name              | Room 2          |
       | Building          | Your house      |
       | Address           | 123 near street |
-      | Maximum bookings  | 6               |
+      | Room capacity     | 6               |
     And I click on "#id_customfield_locationsize_medium" "css_element"
     And I click on "#id_customfield_locationview_satellite" "css_element"
     And I click on "#id_customfield_locationdisplay_map" "css_element"
@@ -61,9 +61,7 @@ Feature: Manage pre-defined rooms
     And I should see "123 near street" in the "Room 2" "table_row"
     And I should see "6" in the "Room 2" "table_row"
 
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Test seminar name        |
       | Description | Test seminar description |
@@ -74,27 +72,13 @@ Feature: Manage pre-defined rooms
     And I should see "Room 2, Your house, 123 near street (Capacity: 6)" in the "Choose a room" "totaradialogue"
 
   Scenario: Fill a room
-    Given I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    Given I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Test seminar name        |
       | Description | Test seminar description |
+    And I turn editing mode off
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
-    And I set the following fields to these values:
-      | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
-      | timestart[hour]    | 11   |
-      | timestart[minute]  | 00   |
-      | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
-      | timefinish[hour]   | 12   |
-      | timefinish[minute] | 00   |
-    And I press "OK"
     And I set the following fields to these values:
       | capacity           | 7   |
     When I click on "Select room" "link"
@@ -108,14 +92,8 @@ Feature: Manage pre-defined rooms
 
     When I click on "Attendees" "link"
     And I set the field "menuf2f-actions" to "Add users"
-    And I wait "1" seconds
-    And I click on "User One, user1@example.invalid" "option"
-    And I click on "User Two, user2@example.invalid" "option"
-    And I click on "User Three, user3@example.invalid" "option"
-    And I click on "User Four, user4@example.invalid" "option"
-    And I click on "User Five, user5@example.invalid" "option"
+    And I set the field "potential users" to "User One, user1@example.invalid, User Two, user2@example.invalid, User Three, user3@example.invalid,User Four, user4@example.invalid,User Five, user5@example.invalid"
     And I press "Add"
-    And I wait "1" seconds
     And I press "Continue"
     And I press "Confirm"
     Then I should see "User One"
@@ -129,7 +107,7 @@ Feature: Manage pre-defined rooms
     And I set the field "menuf2f-actions" to "Add users"
     And I wait "1" seconds
     And I click on "User Six, user6@example.invalid" "option"
-    And I press "Add"
+    And I press exact "add"
     And I wait "1" seconds
     And I press "Continue"
     And I press "Confirm"
@@ -137,24 +115,22 @@ Feature: Manage pre-defined rooms
     And I should see "This event is overbooked"
 
   Scenario: Try and clash a room
-    Given I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    Given I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Test seminar name        |
       | Description | Test seminar description |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 0    |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I press "OK"
@@ -168,16 +144,16 @@ Feature: Manage pre-defined rooms
     And I press "Save changes"
 
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 0    |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I press "OK"
@@ -186,16 +162,16 @@ Feature: Manage pre-defined rooms
     Then I should see "(Room unavailable)" in the "Choose a room" "totaradialogue"
     And I click on "Cancel" "button" in the "Choose a room" "totaradialogue"
     And I wait "1" seconds
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 14   |
       | timestart[minute]  | 0    |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 15   |
       | timefinish[minute] | 0    |
     And I press "OK"
@@ -203,44 +179,42 @@ Feature: Manage pre-defined rooms
     And I click on "Room 1, That house, 123 here street (Capacity: 5)" "text" in the "Choose a room" "totaradialogue"
     And I click on "OK" "button" in the "Choose a room" "totaradialogue"
     And I wait "1" seconds
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 0    |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 0    |
     And I press "OK"
     And I should see "The new dates you have selected are unavailable due to a scheduling conflict"
     And I click on "Cancel" "button" in the "Select date" "totaradialogue"
     And I press "Save changes"
-    Then I should see "Room 1" in the "1 January 2020" "table_row"
+    Then I should see date "1 January next year" formatted "%d %B %Y" in the "Room 1" "table_row"
 
   Scenario: Clash a room with different timezones
-    Given I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    Given I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Test seminar name        |
       | Description | Test seminar description |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]       | 1                |
       | timestart[month]     | 1                |
-      | timestart[year]      | 2020             |
+      | timestart[year]      | ## next year ## Y ## |
       | timestart[hour]      | 19               |
       | timestart[minute]    | 0                |
       | timestart[timezone]  | Pacific/Auckland |
       | timefinish[day]      | 1                |
       | timefinish[month]    | 1                |
-      | timefinish[year]     | 2020             |
+      | timefinish[year]     | ## next year ## Y ## |
       | timefinish[hour]     | 20               |
       | timefinish[minute]   | 0                |
       | timefinish[timezone] | Pacific/Auckland |
@@ -255,17 +229,17 @@ Feature: Manage pre-defined rooms
     And I press "Save changes"
 
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]       | 1             |
       | timestart[month]     | 1             |
-      | timestart[year]      | 2020          |
+      | timestart[year]      | ## next year ## Y ## |
       | timestart[hour]      | 6             |
       | timestart[minute]    | 0             |
       | timestart[timezone]  | Europe/London |
       | timefinish[day]      | 1             |
       | timefinish[month]    | 1             |
-      | timefinish[year]     | 2020          |
+      | timefinish[year]     | ## next year ## Y ## |
       | timefinish[hour]     | 7             |
       | timefinish[minute]   | 0             |
       | timefinish[timezone] | Europe/London |
@@ -276,17 +250,17 @@ Feature: Manage pre-defined rooms
     And I wait "1" seconds
     Then I should see "(Room unavailable)" in the "Choose a room" "totaradialogue"
     And I click on "Cancel" "button" in the "Choose a room" "totaradialogue"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]       | 1             |
       | timestart[month]     | 1             |
-      | timestart[year]      | 2020          |
+      | timestart[year]      | ## next year ## Y ## |
       | timestart[hour]      | 14            |
       | timestart[minute]    | 0             |
       | timestart[timezone]  | Europe/London |
       | timefinish[day]      | 1             |
       | timefinish[month]    | 1             |
-      | timefinish[year]     | 2020          |
+      | timefinish[year]     | ## next year ## Y ## |
       | timefinish[hour]     | 15            |
       | timefinish[minute]   | 0             |
       | timefinish[timezone] | Europe/London |
@@ -296,17 +270,17 @@ Feature: Manage pre-defined rooms
     And I click on "Room 1, That house, 123 here street (Capacity: 5)" "text" in the "Choose a room" "totaradialogue"
     And I click on "OK" "button" in the "Choose a room" "totaradialogue"
     And I wait "1" seconds
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]       | 1             |
       | timestart[month]     | 1             |
-      | timestart[year]      | 2020          |
+      | timestart[year]      | ## next year ## Y ## |
       | timestart[hour]      | 6             |
       | timestart[minute]    | 0             |
       | timestart[timezone]  | Europe/London |
       | timefinish[day]      | 1             |
       | timefinish[month]    | 1             |
-      | timefinish[year]     | 2020          |
+      | timefinish[year]     | ## next year ## Y ## |
       | timefinish[hour]     | 7             |
       | timefinish[minute]   | 0             |
       | timefinish[timezone] | Europe/London |
@@ -315,4 +289,4 @@ Feature: Manage pre-defined rooms
     And I click on "Cancel" "button" in the "Select date" "totaradialogue"
     And I click on "Delete" "link" in the ".f2fmanagedates" "css_element"
     And I press "Save changes"
-    Then I should see "Room 1" in the "1 January 2020" "table_row"
+    Then I should see date "1 January next year" formatted "%d %B %Y" in the "Room 1" "table_row"

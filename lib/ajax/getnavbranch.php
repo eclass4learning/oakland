@@ -28,7 +28,7 @@
 define('AJAX_SCRIPT', true);
 
 /** Include config */
-require_once(dirname(__FILE__) . '/../../config.php');
+require_once(__DIR__ . '/../../config.php');
 /** Include course lib for its functions */
 require_once($CFG->dirroot.'/course/lib.php');
 
@@ -39,14 +39,24 @@ if (!empty($CFG->forcelogin)) {
 try {
     // Start buffer capture so that we can `remove` any errors
     ob_start();
-    // Require id This is the key for whatever branch we want to get.
-    // This accepts alphanum because the courses and my courses branches don't have numerical keys.
-    // For those branches we return the alphanum key, courses and mycourses.
-    $branchid = required_param('id', PARAM_ALPHANUM);
     // This identifies the type of the branch we want to get
     $branchtype = required_param('type', PARAM_INT);
+    // Require id This is the key for whatever branch we want to get.
+    // Totara: require it to be an integer unless branch type is root node.
+    if ($branchtype == navigation_node::TYPE_ROOTNODE) {
+        // This accepts alphanum because the root node branches don't have numerical keys.
+        $branchid = required_param('id', PARAM_ALPHANUM);
+        // Only two values are allowed: courses and mycourses
+        if ($branchid !== 'mycourses' && $branchid !== 'courses') {
+            throw new coding_exception('Invalid branch type/id passed to AJAX call to load branches.');
+        }
+    } else {
+        $branchid = required_param('id', PARAM_INT);
+    }
     // This identifies the block instance requesting AJAX extension
     $instanceid = optional_param('instance', null, PARAM_INT);
+    // Totara: This identifies the block type requesting AJAX extension
+    $blockname = optional_param('blocktype', null, PARAM_PLUGIN);
 
     $PAGE->set_context(context_system::instance());
 
@@ -57,13 +67,14 @@ try {
 
     if ($instanceid!==null) {
         // Get the db record for the block instance
-        $blockrecord = $DB->get_record('block_instances', array('id'=>$instanceid,'blockname'=>'navigation'));
+        $blockrecord = $DB->get_record('block_instances', array('id'=>$instanceid,'blockname'=>$blockname));
         if ($blockrecord!=false) {
 
             // Instantiate a block_instance object so we can access config
-            $block = block_instance('navigation', $blockrecord);
+            $block = block_instance($blockname, $blockrecord);
 
-            $trimmode = block_navigation::TRIM_RIGHT;
+            $blockclass = 'block_' . $blockname;
+            $trimmode = $blockclass::TRIM_RIGHT;
             $trimlength = 50;
 
             // Set the trim mode
@@ -94,13 +105,7 @@ try {
     $converter = new navigation_json();
 
     // Find the actual branch we are looking for
-    if ($branchtype != 0) {
-        $branch = $navigation->find($branchid, $branchtype);
-    } else if ($branchid === 'mycourses' || $branchid === 'courses') {
-        $branch = $navigation->find($branchid, navigation_node::TYPE_ROOTNODE);
-    } else {
-        throw new coding_exception('Invalid branch type/id passed to AJAX call to load branches.');
-    }
+    $branch = $navigation->find($branchid, $branchtype);
 
     // Remove links to categories if required.
     if (!$linkcategories) {
@@ -116,7 +121,7 @@ try {
     $html = ob_get_contents();
     ob_end_clean();
 } catch (Exception $e) {
-    throw new coding_exception('Error: '.$e->getMessage());
+    throw $e;
 }
 
 // Check if the buffer contianed anything if it did ERROR!
@@ -124,19 +129,16 @@ if (trim($html) !== '') {
     throw new coding_exception('Errors were encountered while producing the navigation branch'."\n\n\n".$html);
 }
 // Check that branch isn't empty... if it is ERROR!
+// TOTARA: it is now acceptable to expand an empty node.
 if (empty($branch) || ($branch->nodetype !== navigation_node::NODETYPE_BRANCH && !$branch->isexpandable)) {
-    throw new coding_exception('No further information available for this branch');
+    // TOTARA: Hack to prevent repeating if caused by course visibility change.
+    unset($USER->enrol);
+//     throw new coding_exception('No further information available for this branch');
 }
 
-// Prepare an XML converter for the branch
+// Prepare a JSON converter for the branch
 $converter->set_expandable($navigation->get_expandable());
-// Skip elements to support Oakland navigation requirements
-foreach ($branch->children as $item) {
-    if ($item->text == "Oakland Group Courses") {
-        $item->remove();
-    }
-}
-// Set XML headers
-header('Content-type: text/plain; charset=utf-8');
-// Convert and output the branch as XML
+// Set headers
+echo $OUTPUT->header();
+// Convert and output the branch as JSON
 echo $converter->convert($branch);

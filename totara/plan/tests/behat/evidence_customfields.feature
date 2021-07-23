@@ -48,7 +48,7 @@ Feature: Evidence custom fields.
     And I set the following fields to these values:
       | Full name                   | Menu test |
       | Short name (must be unique) | menutest  |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       optionone
       optiontwo
@@ -288,6 +288,7 @@ Feature: Evidence custom fields.
     And I press "Add evidence"
     And I set the following fields to these values:
       | Evidence name                     | Date test |
+      | customfield_datetimetest[enabled] | 1         |
       | customfield_datetimetest[day]     | 15        |
       | customfield_datetimetest[month]   | 3         |
       | customfield_datetimetest[year]    | 1982      |
@@ -332,7 +333,7 @@ Feature: Evidence custom fields.
     And I set the following fields to these values:
       | Full name                   | Menu test |
       | Short name (must be unique) | menutest   |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       optionone
       optiontwo
@@ -424,14 +425,33 @@ Feature: Evidence custom fields.
     And I should see "Text area test"
     When I log out
     And I log in as "learner1"
-    And I click on "Record of Learning" in the totara menu
+
+        # Add images to the private files block to use later
+    And I click on "Dashboard" in the totara menu
+    And I press "Customise this page"
+    And I add the "Private files" block
+    And I follow "Manage private files..."
+    And I upload "totara/plan/tests/fixtures/pic1.png" file to "Files" filemanager
+    Then I should see "pic1.png"
+
+    When I click on "Record of Learning" in the totara menu
     And I press "Add evidence"
     And I set the following fields to these values:
       | Evidence name | Text area evidence |
     And I set the field "Text area test" to "This is a text area!"
+    # Image in the custom field
+    And I click on "//button[@class='atto_image_button']" "xpath_element" in the "//div[@id='fitem_id_customfield_textareatest_editor']" "xpath_element"
+    And I click on "Browse repositories..." "button"
+    And I click on "pic1.png" "link"
+    And I click on "Select this file" "button"
+    And I set the field "Describe this image for someone who cannot see it" to "My image"
+    And I click on "Save image" "button"
+
     And I press "Add evidence"
     And I follow "Text area evidence"
     Then I should see "Text area test : This is a text area!"
+    And I should see the "My image" image in the "//*[@id='dp-plan-content']" "xpath_element"
+    And I should see image with alt text "My image"
 
   Scenario: As a learner I need to provide a URL when creating an evidence record so that I can link to online documents and pages within Totara
 
@@ -509,6 +529,16 @@ Feature: Evidence custom fields.
     Given I log in as "admin"
     And I navigate to "Evidence custom fields" node in "Site administration > Learning Plans"
 
+    # Create a text area custom field.
+    When I set the field "Create a new custom field" to "Text area"
+    And I set the following fields to these values:
+      | Full name                   | Unique textarea test |
+      | Short name (must be unique) | textareatest         |
+      | Should the data be unique?  | Yes                  |
+    And I press "Save changes"
+    Then I should see "Available Evidence Custom Fields"
+    And I should see "Unique textarea test"
+
     # Create a text input custom field.
     When I set the field "Create a new custom field" to "Text input"
     And I set the following fields to these values:
@@ -545,7 +575,7 @@ Feature: Evidence custom fields.
       | Full name                   | Unique menu of choices test |
       | Short name (must be unique) | menutest                    |
       | Should the data be unique?  | Yes                         |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       optionone
       optiontwo
@@ -568,52 +598,70 @@ Feature: Evidence custom fields.
     Then I should see "Available Evidence Custom Fields"
     And I should see "Unique multi-select test"
 
+    # Create a location custom field.
+    When I set the field "Create a new custom field" to "Location"
+    And I set the following fields to these values:
+      | Full name                   | Unique location test  |
+      | Short name (must be unique) | locationtest          |
+      | Should the data be unique?  | Yes                   |
+    And I press "Save changes"
+    Then I should see "Available Evidence Custom Fields"
+    And I should see "Unique location test"
+
     # Create a piece of evidence using the custom fields.
     When I click on "Record of Learning" in the totara menu
     And I press "Add evidence"
     And I set the following fields to these values:
-      | Evidence name                   | Unique input test 1 |
-      | Unique input test               | Test 1              |
-      | Unique checkbox test            | Yes                 |
-      | customfield_datetimetest[day]   | 19                  |
-      | customfield_datetimetest[month] | 7                   |
-      | customfield_datetimetest[year]  | 2027                |
-      | Unique menu of choices test     | optiontwo           |
-      | customfield_multiselecttest[1]  | 1                   |
+      | Evidence name                     | Unique input test 1 |
+      | Unique textarea test              | Hello               |
+      | Unique input test                 | Test 1              |
+      | Unique checkbox test              | Yes                 |
+      | customfield_datetimetest[enabled] | 1                   |
+      | customfield_datetimetest[day]     | 19                  |
+      | customfield_datetimetest[month]   | 7                   |
+      | customfield_datetimetest[year]    | 2027                |
+      | Unique menu of choices test       | optiontwo           |
+      | customfield_multiselecttest[1]    | 1                   |
+      | id_customfield_locationtestaddress| SW1                 |
     And I press "Add evidence"
     Then I should see "Unique input test 1"
 
     # Create another piece of evidence using the same custom field values, setting it as not unique.
     When I press "Add evidence"
     And I set the following fields to these values:
-      | Evidence name                   | Unique input test 2 |
-      | Unique input test               | Test 1              |
-      | Unique checkbox test            | Yes                 |
-      | customfield_datetimetest[day]   | 19                  |
-      | customfield_datetimetest[month] | 7                   |
-      | customfield_datetimetest[year]  | 2027                |
-      | Unique menu of choices test     | optiontwo           |
-      | customfield_multiselecttest[1]  | 1                   |
+      | Evidence name                     | Unique input test 2 |
+      | Unique textarea test              | Hello               |
+      | Unique input test                 | Test 1              |
+      | Unique checkbox test              | Yes                 |
+      | customfield_datetimetest[enabled] | 1                   |
+      | customfield_datetimetest[day]     | 19                  |
+      | customfield_datetimetest[month]   | 7                   |
+      | customfield_datetimetest[year]    | 2027                |
+      | Unique menu of choices test       | optiontwo           |
+      | customfield_multiselecttest[1]    | 1                   |
+      | id_customfield_locationtestaddress| SW1                 |
     And I press "Add evidence"
-
-
+    And I should see the form validation error "This value has already been used." for the "textareatest" custom field
     Then I should see the form validation error "This value has already been used." for the "textinputtest" custom field
     And I should see the form validation error "This value has already been used." for the "checkboxtest" custom field
     And I should see the form validation error "The 'datetimetest' date/time custom field contains a non-unique date" for the "datetimetest" custom field
     And I should see the form validation error "This value has already been used." for the "menutest" custom field
-    # TODO: Add support for multiselect custom fields.
+    # TODO: Add support for multiselect and location custom fields.
     # And I should see the form .phpvalidation error "This value has already been used." for the "multiselecttest" custom field
+    # And I should see the form .phpvalidation error "This value has already been used." for the "locationtest" custom field
 
     # Update the custom field values to be unique.
     When I set the following fields to these values:
-      | Unique input test               | Test 2    |
-      | Unique checkbox test            | 0         |
-      | customfield_datetimetest[day]   | 20        |
-      | customfield_datetimetest[month] | 8         |
-      | customfield_datetimetest[year]  | 2028      |
-      | Unique menu of choices test     | optionone |
-      | customfield_multiselecttest[1]  | 0         |
-      | customfield_multiselecttest[2]  | 1         |
+      | Unique textarea test              | Goodbye   |
+      | Unique input test                 | Test 2    |
+      | Unique checkbox test              | 0         |
+      | customfield_datetimetest[day]     | 20        |
+      | customfield_datetimetest[month]   | 8         |
+      | customfield_datetimetest[year]    | 2028      |
+      | Unique menu of choices test       | optionone |
+      | customfield_multiselecttest[1]    | 0         |
+      | customfield_multiselecttest[2]    | 1         |
+      | id_customfield_locationtestaddress| SW2       |
     And I press "Add evidence"
     Then I should not see "This value has already been used."
     And I should not see "The 'datetimetest' date/time custom field contains a non-unique date"
@@ -656,18 +704,34 @@ Feature: Evidence custom fields.
     # Create a menu of choices custom field.
     When I set the field "Create a new custom field" to "Menu of choices"
     And I set the following fields to these values:
-      | Full name                   | Locked menu of choices test |
-      | Short name (must be unique) | menutest                    |
-      | Is this field locked?       | Yes                         |
-    And I set the field "Menu options (one per line)" to multiline
+      | Full name                   | Locked menu 1 |
+      | Short name (must be unique) | menutest1     |
+      | Is this field locked?       | Yes           |
+    And I set the field "Menu options (one per line)" to multiline:
       """
-      menuoptionone
-      menuoptiontwo
-      menuoptionthree
+      Option 1
+      Option 2
+      Option 3
       """
     And I press "Save changes"
     Then I should see "Available Evidence Custom Fields"
-    And I should see "Locked menu of choices test"
+    And I should see "Locked menu 1"
+
+    # Create a menu of choices custom field.
+    When I set the field "Create a new custom field" to "Menu of choices"
+    And I set the following fields to these values:
+      | Full name                   | Locked menu 2 |
+      | Short name (must be unique) | menutest2     |
+      | Is this field locked?       | Yes           |
+    And I set the field "Menu options (one per line)" to multiline:
+      """
+      Option 1
+      Option 2
+      Option 3
+      """
+    And I press "Save changes"
+    Then I should see "Available Evidence Custom Fields"
+    And I should see "Locked menu 2"
 
     # Create a multi-select custom field.
     When I set the field "Create a new custom field" to "Multi-select"
@@ -682,27 +746,54 @@ Feature: Evidence custom fields.
     Then I should see "Available Evidence Custom Fields"
     And I should see "Locked multi-select test"
 
+    # Create a textarea custom field.
+    When I set the field "Create a new custom field" to "Text area"
+    And I set the following fields to these values:
+      | Full name                   | Locked Textarea 1 |
+      | Short name (must be unique) | textarea1         |
+      | Is this field locked?       | Yes               |
+    And I press "Save changes"
+    Then I should see "Available Evidence Custom Fields"
+    And I should see "Locked Textarea 1"
+
+    # Create a textarea custom field.
+    When I set the field "Create a new custom field" to "Text area"
+    And I set the following fields to these values:
+      | Full name                   | Locked Textarea 2 |
+      | Short name (must be unique) | textarea2         |
+      | Is this field locked?       | Yes               |
+    And I press "Save changes"
+    Then I should see "Available Evidence Custom Fields"
+    And I should see "Locked Textarea 2"
+
     # Create a piece of evidence to check the fields are locked after first input.
     When I click on "Record of Learning" in the totara menu
     And I press "Add evidence"
     And I set the following fields to these values:
-      | Evidence name                   | Locked input test 1 |
-      | Locked input test               | Test 1              |
-      | Locked checkbox test            | Yes                 |
-      | customfield_datetimetest[day]   | 19                  |
-      | customfield_datetimetest[month] | 7                   |
-      | customfield_datetimetest[year]  | 2027                |
-      | Locked menu of choices test     | menuoptiontwo       |
-      | customfield_multiselecttest[1]  | 1                   |
+      | Evidence name                     | Locked input test 1 |
+      | Locked input test                 | Test 1              |
+      | Locked checkbox test              | Yes                 |
+      | customfield_datetimetest[enabled] | 1                   |
+      | customfield_datetimetest[day]     | 19                  |
+      | customfield_datetimetest[month]   | 7                   |
+      | customfield_datetimetest[year]    | 2027                |
+      | Locked menu 1                     | Option 2            |
+      | Locked menu 2                     |                     |
+      | customfield_multiselecttest[1]    | 1                   |
+      | Locked Textarea 1                 | Locked text area!   |
+      | Locked Textarea 2                 |                     |
     And I press "Add evidence"
     Then I should see "Locked input test 1"
     When I follow "Locked input test 1"
     And I click on "Edit details" "button"
+
     Then the "Locked input test" "field" should be readonly
     And the "Locked checkbox test" "checkbox" should be disabled
-    And I should see "menuoptiontwo"
+    And I should see the "menutest1" custom field is locked and contains "Option 2"
+    And I should see the "menutest2" custom field is locked and empty
     And "customfield_datetimetest[day]" "select" should not exist
     And the "id_customfield_multiselecttest_0" "checkbox" should be disabled
-    # TODO: All the inputs in the multiselect custom field should be locked. See TL-12769.
-    # And the "id_customfield_multiselecttest_1" "checkbox" should be disabled
-    # And the "id_customfield_multiselecttest_2" "checkbox" should be disabled
+    And the "id_customfield_multiselecttest_1" "checkbox" should be disabled
+    And the "id_customfield_multiselecttest_2" "checkbox" should be disabled
+    And I should see the "textarea1" custom field is locked and contains "Locked text area!"
+    And I should see the "textarea2" custom field is locked and empty

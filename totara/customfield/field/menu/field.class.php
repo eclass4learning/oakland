@@ -23,8 +23,21 @@
  */
 
 class customfield_menu extends customfield_base {
-    var $options;
-    var $datakey;
+
+    /**
+     * Options as they defined in database
+     * @var string[] $options
+     */
+    public $options;
+
+    /**
+     * Options to be used in form select element (formatted)
+     * @var string[] $formoptions
+     */
+    public $formoptions;
+
+    /** @var int $datakey */
+    public $datakey;
 
     /**
      * Get the choose option for the menu of choices.
@@ -40,17 +53,22 @@ class customfield_menu extends customfield_base {
      * Pulls out the options for the menu from the database and sets the
      * the corresponding key for the data if it exists
      */
-    function __construct($fieldid=0, $itemid=0, $prefix, $tableprefix, $addsuffix = false) {
+    function __construct($fieldid=0, $itemid=0, $prefix, $tableprefix, $addsuffix = false, $suffix = '') {
         // First call parent constructor.
-        parent::__construct($fieldid, $itemid, $prefix, $tableprefix, $addsuffix);
+        parent::__construct($fieldid, $itemid, $prefix, $tableprefix, $addsuffix, $suffix);
 
-        /// Param 1 for menu type is the options.
-        $options = explode("\n", $this->field->param1);
-        $this->options = array();
+        // Param 1 for menu type is the options.
+        if (isset($this->field->param1)) {
+            $this->options = explode("\n", $this->field->param1);
+        } else {
+            $this->options = array();
+        }
+
         // Include the choose option at the beginning.
-        $this->options[''] = $this->get_choose_option();
-        foreach($options as $key => $option) {
-            $this->options[$key] = format_string($option);// Multilang formatting.
+        $this->formoptions[''] = $this->get_choose_option();
+        foreach($this->options as $key => $option) {
+            $this->formoptions[$key] = format_string($option, true, ['context' => context_system::instance()]);// Multilang formatting.
+            $this->options[$key] = $option;
         }
 
         // Set the data key.
@@ -67,8 +85,23 @@ class customfield_menu extends customfield_base {
      * Overwrites the base class method
      * @param   object   moodleform instance
      */
-    function edit_field_add(&$mform) {
-        $mform->addElement('select', $this->inputname, format_string($this->field->fullname), $this->options);
+    public function edit_field_add(&$mform) {
+
+        if ($this->itemid != 0 && $this->is_locked()) {
+            // Display the field using a hyphen if there's no content.
+            $mform->addElement(
+                'static',
+                'freezedisplay',
+                format_string($this->field->fullname),
+                html_writer::div(
+                    !empty($this->data) ? format_text($this->data) : get_string('readonlyemptyfield', 'totara_customfield'),
+                    null,
+                    ['id' => 'id_customfield_' . $this->field->shortname]
+                )
+            );
+        } else {
+            $mform->addElement('select', $this->inputname, format_string($this->field->fullname), $this->formoptions);
+        }
     }
 
     /**
@@ -168,7 +201,7 @@ class customfield_menu extends customfield_base {
 
         $value = core_text::strtolower($value);
         $options = explode("\n", core_text::strtolower($this->field->param1));
-        foreach($options as $key => $option) {
+        foreach ($options as $key => $option) {
             if ($option == $value) {
                 $value = (string)$key;
                 break;
@@ -177,5 +210,26 @@ class customfield_menu extends customfield_base {
         $syncitem->{$this->inputname} = $value;
 
         return $syncitem;
+    }
+
+    /**
+     * Display the data for the menu custom field.
+     *
+     * @param $data mixed The data to display.
+     * @param $extradata array Data that identifies the source of the data.
+     * @return string The formatted text for display.
+     */
+    public static function display_item_data($data, $extradata=array()) {
+
+        // Export - return raw value
+        if (!empty($extradata['isexport'])) {
+            return $data;
+        }
+
+        if (empty($data)) {
+            return get_string('readonlyemptyfield', 'totara_customfield');
+        } else {
+            return format_string($data);
+        }
     }
 }

@@ -25,15 +25,13 @@ Feature: Download a seminar signin sheet
   @javascript
   Scenario: An editing trainer can download the signin sheet when one session date present
     And I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Test seminar name        |
       | Description       | Test seminar description |
     And I follow "Test seminar name"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 10   |
       | timestart[month]   | 2    |
@@ -51,12 +49,12 @@ Feature: Download a seminar signin sheet
     And I should not see "Download sign-in sheet"
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Learner One, learner1@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I click on "Learner Two, learner2@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I press "Continue"
     And I press "Confirm"
-    When I press "Download sign-in sheet"
+    When I press "Download"
     Then I should see "Learner One"
     And I should see "Learner Two"
     And I should not see "Learner Three"
@@ -66,15 +64,13 @@ Feature: Download a seminar signin sheet
   @javascript
   Scenario: An editing trainer can download the signin sheet after selecting first date
     And I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Test seminar name        |
       | Description       | Test seminar description |
     And I follow "Test seminar name"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 10   |
       | timestart[month]   | 2    |
@@ -87,10 +83,10 @@ Feature: Download a seminar signin sheet
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 0    |
     And I press "OK"
-    And I press "Add a new date"
+    And I press "Add a new session"
     And I press "Save changes"
     And I click on "Edit event" "link" in the "0 / 10" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 9    |
       | timestart[month]   | 2    |
@@ -108,13 +104,13 @@ Feature: Download a seminar signin sheet
     And I should not see "Download sign-in sheet"
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Learner One, learner1@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I click on "Learner Two, learner2@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I press "Continue"
     And I press "Confirm"
     And I set the field "sessiondateid" to "9 February 2030, 11:00 AM Australia/Perth"
-    When I press "Download sign-in sheet"
+    When I press "Download"
     Then I should see "Learner One"
     And I should see "Learner Two"
     And I should not see "Learner Three"
@@ -124,15 +120,13 @@ Feature: Download a seminar signin sheet
   @javascript
   Scenario: An editing trainer can download the signin sheet after selecting second date
     And I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Test seminar name        |
       | Description       | Test seminar description |
     And I follow "Test seminar name"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 10   |
       | timestart[month]   | 2    |
@@ -145,10 +139,10 @@ Feature: Download a seminar signin sheet
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 0    |
     And I press "OK"
-    And I press "Add a new date"
+    And I press "Add a new session"
     And I press "Save changes"
     And I click on "Edit event" "link" in the "0 / 10" "table_row"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 9    |
       | timestart[month]   | 2    |
@@ -166,13 +160,13 @@ Feature: Download a seminar signin sheet
     And I should not see "Download sign-in sheet"
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Learner One, learner1@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I click on "Learner Two, learner2@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I press "Continue"
     And I press "Confirm"
     And I set the field "sessiondateid" to "10 February 2030, 11:00 AM Australia/Perth"
-    When I press "Download sign-in sheet"
+    When I press "Download"
     Then I should see "Learner One"
     And I should see "Learner Two"
     And I should not see "Learner Three"
@@ -182,9 +176,7 @@ Feature: Download a seminar signin sheet
   @javascript
   Scenario: An editing trainer cannot download the signin sheet without sesion dates
     And I log in as "teacher1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Test seminar name        |
       | Description       | Test seminar description |
@@ -196,9 +188,9 @@ Feature: Download a seminar signin sheet
     And I should not see "Download sign-in sheet"
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Learner One, learner1@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I click on "Learner Two, learner2@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I press "Continue"
     When I press "Confirm"
     Then I should not see "Download sign-in sheet"

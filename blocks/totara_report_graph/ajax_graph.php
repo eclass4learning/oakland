@@ -36,13 +36,14 @@ $type = required_param('type', PARAM_ALPHA);
 $blockcontext = context_block::instance($blockid, MUST_EXIST);
 list($context, $course, $cm) = get_context_info_array($blockcontext->id);
 
+$PAGE->set_context($blockcontext);
+$PAGE->set_url('/blocks/totara_report_graph/ajax_graph.php', array('blockid' => $blockid, 'type' => $type));
+
 if ($CFG->forcelogin) {
     require_login($course, false, $cm, false, true);
 } else {
     require_course_login($course, false, $cm, false, true);
 }
-
-require_capability('moodle/block:view', $blockcontext);
 
 // NOTE: no need to require sesskey here, this is not JSON.
 
@@ -51,6 +52,12 @@ require_capability('moodle/block:view', $blockcontext);
 \core\session\manager::write_close();
 
 $block = $DB->get_record('block_instances', array('id' => $blockid, 'blockname' => 'totara_report_graph'), '*', MUST_EXIST);
+
+$totara_report_graph = block_instance('totara_report_graph', $block);
+if (!$totara_report_graph || !$totara_report_graph->user_can_view()) {
+    error_log($blockid . ': no access');
+    die;
+}
 
 if (empty($block->configdata)) {
     error_log($blockid . ': no config yet');

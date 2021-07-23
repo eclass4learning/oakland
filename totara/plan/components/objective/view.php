@@ -24,7 +24,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot . '/totara/plan/lib.php');
 require_once($CFG->dirroot . '/totara/plan/components/objective/edit_form.php');
 require_once($CFG->dirroot . '/totara/core/js/lib/setup.php');
@@ -41,11 +41,7 @@ require_login();
 $plan = new development_plan($id);
 
 // Permissions check.
-$can_access = dp_can_view_users_plans($plan->userid);
-$can_view = dp_role_is_allowed_action($plan->role, 'view');
-$can_manage = dp_can_manage_users_plans($plan->userid);
-
-if (!$can_access || !$can_view) {
+if (!$plan->can_view()) {
     print_error('error:nopermissions', 'totara_plan');
 }
 
@@ -63,14 +59,14 @@ $evidence = new dp_evidence_relation($id, $componentname, $caid);
 $objectivename = get_string($componentname, 'totara_plan');
 $coursename = get_string('courseplural', 'totara_plan');
 $currenturl = new moodle_url('/totara/plan/components/objective/view.php', array('id' => $id, 'itemid' => $caid));
-$canupdate = $component->can_update_items() && $can_manage;
+$canupdate = $component->can_update_items();
 
 $systemcontext = context_system::instance();
 $PAGE->set_context($systemcontext);
 $PAGE->set_pagelayout('report');
 $PAGE->set_url($currenturl);
 $ownplan = ($USER->id == $plan->userid);
-$menuitem = ($ownplan) ? 'learningplans' : 'myteam';
+$menuitem = ($ownplan) ? '\totara_plan\totara\menu\learningplans' : '\totara_core\totara\menu\myteam';
 $PAGE->set_totara_menu_selected($menuitem);
 
 /// Javascript stuff
@@ -166,7 +162,7 @@ $PAGE->navbar->add($fullname, new moodle_url('/totara/plan/view.php', array('id'
 $PAGE->navbar->add(get_string("{$component->component}plural", 'totara_plan'), $component->get_url());
 $PAGE->navbar->add(get_string('viewitem', 'totara_plan'));
 
-$plan->print_header($componentname);
+$plan->print_header($componentname, array(), false);
 
 $component->display_objective_detail($caid, $canupdate);
 
@@ -201,20 +197,22 @@ if ($plan->get_component('course')->get_setting('enabled')) {
 // Display linked evidence
 echo $evidence->display_linked_evidence($currenturl, $canupdate, $plancompleted);
 
-// Comments
-echo $OUTPUT->heading(get_string('comments', 'totara_plan'), 3, null, 'comments');
-require_once($CFG->dirroot.'/comment/lib.php');
-comment::init();
-$options = new stdClass;
-$options->area    = 'plan_objective_item';
-$options->context = $systemcontext;
-$options->itemid  = $caid;
-$options->showcount = true;
-$options->component = 'totara_plan';
-$options->autostart = true;
-$options->notoggle = true;
-$comment = new comment($options);
-echo $comment->output(true);
+if (!empty($CFG->usecomments)) {
+    // Comments
+    echo $OUTPUT->heading(get_string('comments', 'totara_plan'), 3, null, 'comments');
+    require_once($CFG->dirroot.'/comment/lib.php');
+    comment::init();
+    $options = new stdClass();
+    $options->area    = 'plan_objective_item';
+    $options->context = $systemcontext;
+    $options->itemid  = $caid;
+    $options->showcount = true;
+    $options->component = 'totara_plan';
+    $options->autostart = true;
+    $options->notoggle = true;
+    $comment = new comment($options);
+    echo $comment->output(true);
+}
 
 echo $OUTPUT->container_end();
 

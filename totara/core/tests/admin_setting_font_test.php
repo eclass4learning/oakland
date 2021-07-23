@@ -86,9 +86,13 @@ class totara_core_admin_setting_font_testcase extends advanced_testcase {
         // Confirm the array contains exactly what we expect.
         // If this changes we want this test to fail, so that we don't unexpectedly add fonts!
         $expectedfiles = array (
+            // Cordiaupc. 
+            'cordiaupc.ctg.z', 'cordiaupc.php', 'cordiaupc.z',
             // Courier.
             'courier.php', 'courierb.php', 'courierbi.php', 'courieri.php',
             'freefont-20120503',
+            // Droidsansfallback. 
+            'droidsansfallback.ctg.z', 'droidsansfallback.php', 'droidsansfallback.z',
             // Freemono.
             'freemono.ctg.z', 'freemono.php', 'freemono.z',
             'freemonob.ctg.z', 'freemonob.php', 'freemonob.z',
@@ -138,7 +142,7 @@ class totara_core_admin_setting_font_testcase extends advanced_testcase {
 
         $property = new ReflectionProperty($setting1, 'choices');
         $choices = $property->getValue($setting1);
-        $this->assertInternalType('array', $choices);
+        $this->assertIsArray($choices);
         // Not all systems scandir in the same order.
         sort($defaultfonts);
         sort($choices);
@@ -148,7 +152,7 @@ class totara_core_admin_setting_font_testcase extends advanced_testcase {
         $defaultfonts = array_merge(['' => get_string('fontdefault', 'totara_core')], $defaultfonts);
         $property = new ReflectionProperty($setting2, 'choices');
         $choices = $property->getValue($setting2);
-        $this->assertInternalType('array', $choices);
+        $this->assertIsArray($choices);
         // Not all systems scandir in the same order.
         sort($defaultfonts);
         sort($choices);
@@ -156,7 +160,7 @@ class totara_core_admin_setting_font_testcase extends advanced_testcase {
 
         $property = new ReflectionProperty($setting3, 'choices');
         $choices = $property->getValue($setting3);
-        $this->assertInternalType('array', $choices);
+        $this->assertIsArray($choices);
         // Not all systems scandir in the same order.
         sort($defaultfonts);
         sort($choices);

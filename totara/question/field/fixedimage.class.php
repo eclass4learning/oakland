@@ -113,7 +113,7 @@ class question_fixedimage extends question_base{
      * @param MoodleQuickForm $form Form to alter
      */
     public function add_field_specific_edit_elements(MoodleQuickForm $form) {
-        $this->add_field_specific_view_elements($form);
+        // This should never be called.
     }
 
     /**
@@ -124,6 +124,17 @@ class question_fixedimage extends question_base{
      * @param MoodleQuickForm $form
      */
     public function add_field_specific_view_elements(MoodleQuickForm $form) {
+        // This should never be called.
+    }
+
+    /**
+     * Add form elements related to questions to form for user answers
+     * Default implementation for first mapped field.
+     * Override for all other cases.
+     *
+     * @param MoodleQuickForm $form
+     */
+    public function add_field_specific_static_elements(MoodleQuickForm $form) {
         global $CFG, $FILEPICKER_OPTIONS;
 
         require_once($CFG->libdir . '/resourcelib.php');
@@ -141,12 +152,16 @@ class question_fixedimage extends question_base{
             }
         }
 
-        $form->addElement('static', $this->get_prefix_form(), $this->name, $content);
-        $form->addElement('static', $this->get_prefix_form().'description', '', format_string($this->param1['description']));
+        $form->addElement('static', $this->get_prefix_form(), $this->name, html_writer::div($content, 'totara-question-without-label'));
+        $form->addElement('static', $this->get_prefix_form().'description', '', html_writer::div(format_string($this->param1['description']), 'totara-question-without-label'));
 
         // Remove label from form elements to get rid of empty space.
         $this->render_without_label($form, $this->get_prefix_form());
         $this->render_without_label($form, $this->get_prefix_form().'description');
+    }
+
+    protected function add_header() {
+        return false;
     }
 
 

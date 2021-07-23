@@ -70,6 +70,7 @@ $string['name'] = 'Name';
 $string['noavailabledashboards'] = 'No available dashboards found';
 $string['nodashboards'] = 'No dashboards';
 $string['options'] = 'Options';
+$string['pagetype-this-dashboard'] = 'This dashboard';
 $string['pluginname'] = 'Totara Dashboards';
 $string['publish'] = 'Publish';
 $string['resetalldashboard'] = 'Reset dashboard for all users';
@@ -77,18 +78,11 @@ $string['resetdashboard'] = 'Reset dashboard to default';
 $string['resetdashboardconfirm'] = 'Do you really want to reset dashboard {$a} layout for all assigned users?';
 $string['savechanges'] = 'Save changes';
 $string['totaradashboarddisabled'] = 'Totara Dashboard is not enabled on this site';
+$string['userdataitemtotara_dashboard'] = 'Customised dashboards';
+$string['userdataitemtotara_dashboard_help'] = 'When purging, all the user\'s dashboards will be reset to their original state. When exporting, this will include the name and ID of all the dashboards the user has customised.';
 $string['unpublish'] = 'Unpublish';
 $string['userhomepagechanged'] = 'Your default page was changed';
 
 // Deprecated in 9.0
 $string['updatelayoutoff'] = 'Stop customizing this dashboard';
 $string['updatelayouton'] = 'Customize dashboard';
-/**
- * BEGIN OAKLAND CUSTOMIZATIONS
- */
-$string['allowguest'] = 'Allow Guests';
-$string['allowguest_help'] = 'Check this box to allow this Dashboard to be viewable for non-logged in users who do not belong to any assigned audiences.';
-
-/**
- * END OAKLAND CUSTOMIZATIONS
- */

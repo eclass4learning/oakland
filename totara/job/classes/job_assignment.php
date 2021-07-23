@@ -23,9 +23,11 @@
 
 namespace totara_job;
 
-use Horde\Socket\Client\Exception;
+use \Exception;
+use totara_job\event\job_assignment_created;
 use totara_job\event\job_assignment_viewed;
 use totara_job\event\job_assignment_updated;
+use totara_job\event\job_assignment_deleted;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -56,6 +58,8 @@ defined('MOODLE_INTERNAL') || die();
  * @property-read int tempmanagerexpirydate   optional
  * @property-read int appraiserid             optional
  * @property-read int sortorder               automatic (set when job assignment is created, modified by functions)
+ * @property-read int totarasync              optional (defaults to zero, should be set to 1 if updates via HR Import are desired)
+ * @property-read int synctimemodified        optional (defaults to zero, represents the last time this record was updated in the external source)
  *
  * @package totara_job
  */
@@ -202,6 +206,22 @@ class job_assignment {
     private $sortorder;
 
     /**
+     * Whether or not this can be updated via HR Import. 1 means that it can.
+     *
+     * @var int
+     */
+    private $totarasync = 0;
+
+    /**
+     * The last time this record was updated in the external source. This value should either come
+     * directly from the HR Import data, representing how old that data was,
+     * or else specify the time of import if no external value was provided.
+     *
+     * @var int
+     */
+    private $synctimemodified = 0;
+
+    /**
      * Create instance of a job_assignment.
      *
      * @param \stdClass $record as returned by get_record('job_assignment', ...)
@@ -226,7 +246,7 @@ class job_assignment {
         $this->sortorder = $record->sortorder;
         $this->positionassignmentdate = $record->positionassignmentdate;
 
-        if (isset($record->fullname) && $record->fullname !== "") {
+        if (isset($record->fullname) && trim($record->fullname) !== "") {
             $this->fullname = $record->fullname;
         } else {
             $this->fullname = null;
@@ -286,6 +306,12 @@ class job_assignment {
         } else {
             $this->appraiserid = null;
         }
+        if (!empty($record->totarasync)) {
+            $this->totarasync = $record->totarasync;
+        }
+        if (!empty($record->synctimemodified)) {
+            $this->synctimemodified = $record->synctimemodified;
+        }
     }
 
     /**
@@ -297,7 +323,7 @@ class job_assignment {
      * @return job_assignment
      */
     public static function create($data) {
-        global $DB, $TEXTAREA_OPTIONS, $USER;
+        global $CFG, $DB, $TEXTAREA_OPTIONS, $USER;
 
         if (!is_array($data)) {
             $data = (array)$data;
@@ -310,10 +336,13 @@ class job_assignment {
         if (!isset($data['idnumber']) || $data['idnumber'] === "") {
             throw new exception('ID Number is required when creating new job assignment');
         }
+        if (empty($CFG->totara_job_allowmultiplejobs) && $DB->record_exists('job_assignment', ['userid' => $data['userid']])) {
+            throw new exception('Attempting to create multiple job assignments for user');
+        }
         foreach ($data as $key => $value) {
             if (!in_array($key, array('userid', 'fullname', 'shortname', 'idnumber', 'description', 'description_editor',
                                       'positionid', 'organisationid', 'startdate', 'enddate', 'managerjaid',
-                                      'tempmanagerjaid', 'tempmanagerexpirydate', 'appraiserid'))) {
+                                      'tempmanagerjaid', 'tempmanagerexpirydate', 'appraiserid', 'totarasync', 'synctimemodified'))) {
                 throw new exception('Invalid field specified when creating new job assignment');
             }
         }
@@ -381,7 +410,7 @@ class job_assignment {
             // Record is identical to the data in the database, so we can create the object from it.
             $jobassignment = new job_assignment($record);
 
-            $jobassignment->updated_manager(null, null);
+            $jobassignment->updated_manager(null);
             $jobassignment->updated_temporary_manager(null, null);
 
             $transaction->allow_commit();
@@ -389,7 +418,7 @@ class job_assignment {
             $transaction->rollback($e);
         }
 
-        $event = job_assignment_updated::create(
+        $event = job_assignment_created::create(
             array(
                 'objectid' => $jobassignment->id,
                 'context' => \context_system::instance(),
@@ -528,7 +557,7 @@ class job_assignment {
             return null;
 
         } else if ($name === 'fullname') {
-            if (!isset($this->fullname) || $this->fullname === "") {
+            if (!isset($this->fullname) || trim($this->fullname) === "") {
                 return get_string('jobassignmentdefaultfullname', 'totara_job', $this->idnumber);
             } else {
                 return $this->fullname;
@@ -537,7 +566,7 @@ class job_assignment {
         } else if (in_array($name, array('id', 'userid', 'shortname', 'idnumber', 'timecreated', 'timemodified', 'usermodified',
                                          'positionid', 'positionassignmentdate', 'organisationid', 'startdate', 'enddate',
                                          'managerjaid', 'managerjapath', 'tempmanagerjaid', 'tempmanagerexpirydate',
-                                         'appraiserid', 'sortorder'))) {
+                                         'appraiserid', 'sortorder', 'totarasync', 'synctimemodified'))) {
             return $this->$name;
 
         } else {
@@ -556,7 +585,7 @@ class job_assignment {
         $getproperties = array('id', 'userid', 'shortname', 'idnumber', 'timecreated', 'timemodified', 'usermodified',
             'positionid', 'positionassignmentdate', 'organisationid', 'startdate', 'enddate',
             'managerjaid', 'managerjapath', 'tempmanagerjaid', 'tempmanagerexpirydate',
-            'appraiserid', 'sortorder');
+            'appraiserid', 'sortorder', 'totarasync', 'synctimemodified');
         $getproperties[] = 'description';
         $getproperties[] = 'description_editor';
         $getproperties[] = 'managerid';
@@ -600,6 +629,8 @@ class job_assignment {
         $data->tempmanagerexpirydate  = $this->tempmanagerexpirydate;
         $data->appraiserid            = $this->appraiserid;
         $data->sortorder              = $this->sortorder;
+        $data->totarasync             = $this->totarasync;
+        $data->synctimemodified       = $this->synctimemodified;
 
         return $data;
     }
@@ -623,7 +654,7 @@ class job_assignment {
         foreach ($data as $key => $value) {
             if (!in_array($key, array('fullname', 'shortname', 'idnumber', 'description', 'description_editor', 'positionid',
                                       'organisationid', 'startdate', 'enddate', 'managerjaid',
-                                      'tempmanagerjaid', 'tempmanagerexpirydate', 'appraiserid'))) {
+                                      'tempmanagerjaid', 'tempmanagerexpirydate', 'appraiserid', 'totarasync', 'synctimemodified'))) {
                 throw new exception("Invalid field specified when updating job_assignment (not allowed or doesn't exist).");
             }
         }
@@ -649,8 +680,9 @@ class job_assignment {
             }
 
             // Check that it is unique for this user.
-            if ($data['idnumber'] != $this->idnumber &&
-                $DB->record_exists('job_assignment', array('userid' => $this->userid, 'idnumber' => $data['idnumber']))) {
+            $sql = "SELECT 'x' FROM {job_assignment} WHERE userid = :userid AND idnumber = :idnumber AND id <> :id";
+            $params = ['userid' => $this->userid, 'idnumber' => $data['idnumber'], 'id' => $this->id];
+            if ($data['idnumber'] != $this->idnumber && $DB->record_exists_sql($sql, $params)) {
                 throw new Exception('Tried to update job assignment to an idnumber which is not unique for this user');
             }
         }
@@ -734,6 +766,8 @@ class job_assignment {
      * Call when the manager might have changed. Will update the role assignments of the manager
      * and the manager paths of all (management) children.
      *
+     * Figures out if any change has actually occurred and does nothing if there is no change.
+     *
      * @param int $oldmanagerjaid
      */
     private function updated_manager($oldmanagerjaid) {
@@ -758,6 +792,8 @@ class job_assignment {
 
     /**
      * Given old and new managers, remove old manager role and add new manager role. Works with temp managers as well.
+     *
+     * Figures out if any change has actually occurred and does nothing if there is no change.
      *
      * @param int $oldmanagerjaid
      * @param int $newmanagerjaid
@@ -788,7 +824,11 @@ class job_assignment {
             return;
         }
 
-        $context = \context_user::instance($this->userid);
+        $context = \context_user::instance($this->userid, IGNORE_MISSING);
+        if (!$context) {
+            // Without a context we can't unassign. This could have happend during deletion of the user.
+            return;
+        }
         $roleid = $CFG->managerroleid;
 
         // Delete role assignment if there was an old manager, because it was removed.
@@ -808,6 +848,14 @@ class job_assignment {
 
     /**
      * Updates the manager job assignment paths of all management subordinates.
+     *
+     * Assumes that a change has occurred (check before calling) and that the manager's ja path has been updated.
+     *
+     * What's actually happening: This function was called because this user's manager changed. We need to update all
+     * the manager ja paths for all job assignments of which this job assignment is manager, and below. The set of users
+     * can't have changed due to this update - the same set of users will be managed after the update, but their manager
+     * path needs to be updated to include the new manager's manager (and above). The manager's ja path (above) must
+     * have already been recalculated before calling this function.
      */
     private function update_descendant_manager_paths() {
         global $DB;
@@ -819,11 +867,13 @@ class job_assignment {
         $substr_sql = $DB->sql_substr('managerjapath', "$position_sql + $length_sql");
 
         $managerjapath = $DB->sql_concat("'{$newjapath}/'", $substr_sql);
-        $like = $DB->sql_like('managerjapath', '?');
+        $now = time();
+        $like = $DB->sql_like('managerjapath', ':likethisid');
         $sql = "UPDATE {job_assignment}
-                   SET managerjapath = {$managerjapath}
+                   SET managerjapath = {$managerjapath},
+                       timemodified = :now
                  WHERE $like";
-        $params = array("%/{$this->id}/%");
+        $params = array('likethisid' => "%/{$this->id}/%", 'now' => $now);
 
         if (!$DB->execute($sql, $params)) {
             throw new exception('job_assignment::update_descendant_manager_paths: Could not update manager path of child items in manager hierarchy');
@@ -833,6 +883,8 @@ class job_assignment {
     /**
      * Call when the temp manager might have changed. Will update the role assignments of the temp manager
      * and trigger all messages that happen as the result of a change of temporary manager (including date change).
+     *
+     * Figures out if any change has actually occurred and does nothing if there is no change.
      *
      * Note that if the temporary manager stays the same but the job assignment is changed, this does not trigger new messages.
      *
@@ -965,11 +1017,18 @@ class job_assignment {
                 }
             }
 
-            // We don't need to remove this job assignment's manager and temp manager because the role assignment
-            // records should already have been deleted by delete_user() calling context_helper::delete_instance().
-
             // Delete the record.
             $DB->delete_records('job_assignment', array('id' => $jobassignment->id));
+
+            if ($jobassignment->managerjaid) {
+                // Now that job record is deleted, we can accurately update the role assignments for this user's staff.
+                $jobassignment->update_manager_role_assignments($jobassignment->managerjaid, null);
+            }
+
+            if ($jobassignment->tempmanagerjaid) {
+                // Now that job record is deleted, we can accurately update the role assignments for this user's temporary staff.
+                $jobassignment->update_manager_role_assignments($jobassignment->tempmanagerjaid, null);
+            }
 
             // Fix the sort order of the other job assignments.
             $followers = $DB->get_records_select(
@@ -987,11 +1046,14 @@ class job_assignment {
             }
 
             $transaction->allow_commit();
+
+            \totara_job\event\job_assignment_deleted::create_from_instance(
+                $jobassignment,
+                \context_system::instance()
+            )->trigger();
         } catch (Exception $e) {
             $transaction->rollback($e);
         }
-
-        //\totara_job\event\job_assignment_deleted::create_from_instance($this)->trigger();
 
         // Lose the object, so that it can't be used again.
         $jobassignment = null;
@@ -1064,7 +1126,7 @@ class job_assignment {
                                (tempmanagerjaid IS NOT NULL AND tempmanagerexpirydate > :now))";
                 $params['now'] = time();
             } else {
-                $sql = " AND managerjaid IS NOT NULL";
+                $sql .= " AND managerjaid IS NOT NULL";
             }
         }
 
@@ -1098,7 +1160,7 @@ class job_assignment {
             throw new exception("Invalid field specified in job_assignment::get_all_by_criteria");
         }
 
-        $sql = "SELECT * FROM {job_assignment} WHERE {$field} = :value";
+        $sql = "SELECT * FROM {job_assignment} WHERE {$field} = :value ORDER BY id";
         $params = array('value' => $value);
 
         $records = $DB->get_records_sql($sql, $params);
@@ -1515,6 +1577,30 @@ class job_assignment {
     }
 
     /**
+     * Gets number of staff users linked to a job assignment.
+     *
+     * @param  int $jobassignmentid
+     * @return int Number of staff users linked to the job assignment
+     */
+    public static function get_count_managed_users($jobassignmentid) {
+        global $DB;
+
+        return $DB->count_records('job_assignment', array('managerjaid' => $jobassignmentid));
+    }
+
+    /**
+     * Gets number of temp staff users linked to a job assignment.
+     *
+     * @param  int $jobassignmentid
+     * @return int Number of temp staff users linked to the job assignment
+     */
+    public static function get_count_temp_managed_users($jobassignmentid) {
+        global $DB;
+
+        return $DB->count_records('job_assignment', array('tempmanagerjaid' => $jobassignmentid));
+    }
+
+    /**
      * Run by cron to automatically remove temporary managers when they expire.
      * Also removes temporary managers who are not currently managers when tempmanagerrestrictselection is turned on.
      * Also removes all temporary managers if enabletempmanagers is turned off.
@@ -1744,9 +1830,10 @@ class job_assignment {
      * data that is for display, and has formatted those parts that need formatting.
      *
      * @param \renderer_base $output
+     * @param integer $courseid     The optional course id param for the view url.
      * @return \stdClass
      */
-    public function export_for_template(\renderer_base $output) {
+    public function export_for_template(\renderer_base $output, $courseid = null) {
 
         // Lets re-use the get_data method. Its a great starting point.
         $data = new \stdClass();
@@ -1767,7 +1854,13 @@ class job_assignment {
         $data->tempmanagerjaid        = $this->tempmanagerjaid;
         $data->appraiserid            = $this->appraiserid;
         $data->sortorder              = $this->sortorder;
-        $data->editurl = new \moodle_url('/totara/job/jobassignment.php', array('jobassignmentid' => $this->id));
+
+        $urlparams = array('jobassignmentid' => $this->id);
+        if (!empty($courseid)) {
+            $urlparams['course'] = $courseid;
+        }
+        $editurl = new \moodle_url('/totara/job/jobassignment.php', $urlparams);
+        $data->editurl = $editurl->out(false);
 
         $dates = ['startdate', 'enddate', 'positionassignmentdate', 'tempmanagerexpirydate', 'timecreated', 'timemodified'];
         foreach ($dates as $date) {

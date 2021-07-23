@@ -63,6 +63,7 @@ $search_info->id = 'id';
 $search_info->fullname = 'fullname';
 $search_info->sql = null;
 $search_info->params = null;
+$search_info->extrafields=null;
 
 // Check if user has capability to view emails.
 if (isset($this->context)) {
@@ -82,6 +83,9 @@ unset($context);
  *  + $search_info->fullname: Title of fullname field (defaults to 'fullname')
  *  + $search_info->sql: SQL after "SELECT .." fragment (e,g, 'FROM ... etc'), without the ORDER BY
  *  + $search_info->order: The "ORDER BY" SQL fragment (should contain the ORDER BY text also)
+ *  + $search_info->extrafields: The extra table's fields that should be added into the sql if the search sql needs the
+ *                               fields for different purposes, for example: DISTINCT sql needs the fields to appear in
+ *                               SELECT when fields were being used as for SORT ORDERED
  *
  *  Remember to generate and include the query SQL in your WHERE clause with:
  *     totara_dialog_get_search_clause()
@@ -257,7 +261,13 @@ switch ($searchtype) {
         }
 
         $search_info->sql .= " WHERE {$searchsql} ";
-        list($visibilitysql, $visibilityparams) = totara_visibility_where($USER->id, 'c.id', 'c.visible', 'c.audiencevisible');
+
+        if (empty($CFG->disable_visibility_maps)) {
+            [$visibilitysql, $visibilityparams] = \totara_core\visibility_controller::course()->sql_where_visible($USER->id, 'c');
+        } else {
+            list($visibilitysql, $visibilityparams) = totara_visibility_where($USER->id, 'c.id', 'c.visible', 'c.audiencevisible');
+        }
+
         $search_info->sql .= " AND {$visibilitysql}";
         $params = array_merge($params, $visibilityparams);
 
@@ -291,12 +301,18 @@ switch ($searchtype) {
         $keywords = totara_search_parse_keywords($query);
         $fields = array('p.fullname', 'p.shortname');
         list($searchsql, $params) = totara_search_get_keyword_where_clause($keywords, $fields, SQL_PARAMS_NAMED);
-        list($visibilitysql, $visibilityparams) = totara_visibility_where(null,
-                                                                          'p.id',
-                                                                          'p.visible',
-                                                                          'p.audiencevisible',
-                                                                          'p',
-                                                                          $searchtype);
+
+        if (empty($CFG->disable_visibility_maps)) {
+            [$visibilitysql, $visibilityparams] = \totara_core\visibility_controller::{$searchtype}()->sql_where_visible($USER->id, 'p');
+        } else {
+            list($visibilitysql, $visibilityparams) = totara_visibility_where(null,
+                'p.id',
+                'p.visible',
+                'p.audiencevisible',
+                'p',
+                $searchtype);
+        }
+
         $search_info->sql = "
             FROM
                 {prog} p
@@ -345,7 +361,7 @@ switch ($searchtype) {
             }
         }
         $contextids = array_filter($context->get_parent_context_ids(true),
-            create_function('$a', 'return has_capability("moodle/cohort:view", context::instance_by_id($a));'));
+            function($a) {return has_capability("moodle/cohort:view", context::instance_by_id($a));});
         $equal = true;
         if (!isset($instanceid) && $contextids) {
             // User passed capability check, search through entire cohort including all contextids.
@@ -423,7 +439,7 @@ switch ($searchtype) {
     case 'assign_manager':
         list($sql, $params) = $this->get_managers_joinsql_and_params(true);
 
-        $fields = get_all_user_name_fields(false, 'u');
+        $fields = get_all_user_name_fields(false, 'u', null, null, true);
 
         if ($canviewemail) {
             $allfields = array_merge ($fields, array('email' => 'u.email'));
@@ -431,8 +447,9 @@ switch ($searchtype) {
             $allfields = $fields;
         }
 
-        $search_info->id = 'COALESCE((' . $DB->sql_concat_join('\'-\'', array('u.id', 'managerja.id')) . '), '
-            . $DB->sql_concat('u.id', '\'-\'') . ')';
+        $search_info->id = 'DISTINCT(COALESCE((' . $DB->sql_concat_join('\'-\'', array('u.id', 'managerja.id')) . '), '
+            . $DB->sql_concat('u.id', '\'-\'') . '))';
+
         $search_info->fullnamefields = 'managerja.fullname, managerja.idnumber, u.id AS userid, managerja.id AS jaid, ' . implode(',', $allfields);
 
         $keywords = totara_search_parse_keywords($query);
@@ -509,7 +526,7 @@ switch ($searchtype) {
             $sqlsess = 'OR a.custom > 0 AND fsd.id = ?';
             $params = array_merge($params, array($sessionid));
         }
-        $search_info->id = 'a.id';
+        $search_info->id = 'DISTINCT a.id';
         $search_info->fullname = 'a.name';
         $search_info->sql = "
             FROM {facetoface_asset} a
@@ -522,6 +539,10 @@ switch ($searchtype) {
 
         $search_info->order = " ORDER BY a.name ASC";
         $search_info->params = $params;
+        $search_info->extrafields = "a.name, a.custom";
+        $search_info->name = 'a.name';
+        $search_info->custom = 'a.custom';
+        $search_info->datakeys = array('id', 'name', 'custom');
         break;
 
     /**
@@ -539,18 +560,59 @@ switch ($searchtype) {
         // Generate search SQL
         $keywords = totara_search_parse_keywords($query);
         $fields = array('r.name');
-        list($searchsql, $params) = totara_search_get_keyword_where_clause($keywords, $fields);
+        list($searchsql, $params) = totara_search_get_keyword_where_clause($keywords, $fields, SQL_PARAMS_NAMED);
 
         // Custom rooms for session id.
         $sqlsess = '';
-        $joinsess = '';
+
+        // The logic of checking whether the room was already within a sesison or not is working by checking the `timestart`
+        // of the queried rooms to be smaller than the `timefinish` from POST data and the `timefinish` to be bigger
+        // than `timestart` from POST data
+        $joinsess = 'LEFT JOIN {facetoface_sessions_dates} fsd ON (r.id = fsd.roomid)
+                     AND (fsd.timestart < :timestart AND fsd.timefinish > :timefinish
+                     AND r.allowconflicts = 0 %sessionsql%)';
+
+        // Since we are allowing the custom room created to be used in the same seminar but different
+        // event. Therefore, we need to exclude those custom rooms that have been used by different
+        // seminars.
+        $joinsess .= ' LEFT JOIN (
+            SELECT r2.id FROM {facetoface_room} r2
+            INNER JOIN {facetoface_sessions_dates} fsd2 ON fsd2.roomid = r2.id
+            INNER JOIN {facetoface_sessions} fs ON fs.id = fsd2.sessionid
+            WHERE r2.custom = 1 AND fs.facetoface <> :facetofaceid
+        ) AS usedrooms ON usedrooms.id = r.id ';
+
+        // Parameter for checking against `timestart`
+        $params['timestart'] = $this->customdata['timefinish'];
+        // Parameter for checking against `timefinish`
+        $params['timefinish'] = $this->customdata['timestart'];
+        $params['facetofaceid'] = $this->customdata['facetofaceid'];
+
+        // This is a small part of sql for getting those rooms that are not being used by the same session
+        $sessionsql = "";
         if ($sessionid) {
-            $joinsess = 'LEFT JOIN {facetoface_sessions_dates} fsd ON (r.id = fsd.roomid)';
-            $sqlsess = 'OR r.custom > 0 AND fsd.id = ?';
-            $params = array_merge($params, array($sessionid));
+            $sqlsess = 'OR fsd.sessionid = :sessionid1 ';
+            $params['sessionid1'] = $sessionid;
+
+            // Logic in english: The room that is being used by the same session should not be displayed as unavailable,
+            // however if the room is being used by a different session, then it should have a flag of unavailable up
+            $sessionsql = " AND fsd.sessionid <> :sessionid2 ";
+            $params['sessionid2'] = $this->customdata['sessionid'];
         }
-        $search_info->id = 'r.id';
-        $search_info->fullname = $DB->sql_concat("r.name", "' (" . get_string('capacity', 'facetoface') . ": '", "r.capacity", "')'");
+
+        // Update the sql
+        $joinsess = str_replace('%sessionsql%', $sessionsql, $joinsess);
+
+        $search_info->id = 'DISTINCT r.id';
+        // This field is required within SELECT, sinc the DISTINCT keyword onlys work well with ORDER BY key word if the
+        // the field is ordered also selected
+        $search_info->extrafields = "r.name, r.capacity, r.custom";
+        $sqlavailable = $DB->sql_concat("r.name", "' (" . get_string('capacity', 'facetoface') . ": '", "r.capacity", "')'");
+        $sqlunavailable = $DB->sql_concat("r.name",
+            "' (" . get_string('capacity', 'facetoface') . ": '", "r.capacity", "')'",
+            "' " . get_string('roomalreadybooked', 'facetoface') . "'"
+        );
+        $search_info->fullname = " CASE WHEN(fsd.id IS NULL) THEN {$sqlavailable} ELSE {$sqlunavailable} END";
 
         $search_info->sql = "
             FROM
@@ -558,12 +620,17 @@ switch ($searchtype) {
                 {$joinsess}
             WHERE
                 {$searchsql}
-                AND (r.custom = 0 {$sqlsess})
+                AND (r.custom=0 OR fsd.id IS NULL {$sqlsess})
                 AND r.hidden = 0
+                AND usedrooms.id IS NULL
         ";
 
         $search_info->order = " ORDER BY r.name ASC";
         $search_info->params = $params;
+        $search_info->name = 'r.name';
+        $search_info->capacity = 'r.capacity';
+        $search_info->custom = 'r.custom';
+        $search_info->datakeys = array('id', 'name', 'custom', 'capacity');
         break;
 
     case 'temporary_manager':
@@ -694,6 +761,9 @@ if (strlen($query)) {
     if (isset($search_info->email)) {
         $select .= ", {$search_info->email} AS email ";
     }
+    if (isset($search_info->extrafields)) {
+        $select .= ", {$search_info->extrafields} ";
+    }
     $count  = "SELECT COUNT({$search_info->id}) ";
 
     $total = $DB->count_records_sql($count.$search_info->sql, $search_info->params);
@@ -725,10 +795,14 @@ if (strlen($query)) {
                 $dialog->items = $this->get_search_items_array($results);
             } else {
                 foreach ($results as $result) {
-                    $item = new stdClass();
-
                     if (method_exists($this, 'search_can_display_result') && !$this->search_can_display_result($result->id)) {
                         continue;
+                    }
+
+                    // Add datakey attributes to item.
+                    $item = new stdClass();
+                    foreach ($this->datakeys as $key) {
+                        $item->$key = $result->$key;
                     }
 
                     $item->id = $result->id;

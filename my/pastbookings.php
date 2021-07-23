@@ -35,7 +35,7 @@ $debug  = optional_param('debug', 0, PARAM_INT);
 
 $PAGE->set_context(context_system::instance());
 $PAGE->set_url(new moodle_url('/my/pastbookings.php', array('userid' => $userid, 'format' => $format)));
-$PAGE->set_totara_menu_selected('mybookings');
+$PAGE->set_totara_menu_selected('\totara_core\totara\menu\mybookings');
 $PAGE->set_pagelayout('standard');
 $PAGE->set_pagetype('my-bookings');
 
@@ -48,10 +48,11 @@ if ($USER->id != $userid && !\totara_job\job_assignment::is_managing($USER->id, 
     print_error('error:cannotviewthispage', 'totara_core');
 }
 
+/** @var totara_reportbuilder_renderer $output */
 $output = $PAGE->get_renderer('totara_reportbuilder');
 
 if ($USER->id != $userid) {
-    $strheading = get_string('pastbookingsfor', 'totara_core').fullname($user, true);
+    $strheading = get_string('pastbookingsforheading', 'totara_core', fullname($user, true));
     if (totara_feature_visible('myteam')) {
         $menuitem = 'myteam';
         $url = new moodle_url('/my/teammembers.php');
@@ -71,7 +72,8 @@ $data = array(
     'userid' => $userid,
 );
 
-if (!$report = reportbuilder_get_embedded_report($shortname, $data, false, $sid)) {
+$config = (new rb_config())->set_sid($sid)->set_embeddata($data);
+if (!$report = reportbuilder::create_embedded($shortname, $config)) {
     print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
 }
 
@@ -121,14 +123,14 @@ echo $OUTPUT->header();
 $currenttab = "pastbookings";
 include('booking_tabs.php');
 
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $output->report_html($report, $debug);
+echo $debughtml;
+
 $report->display_restrictions();
 
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
-
 // Display heading including filtering stats.
-$heading = $strheading . ': ' .
-    $output->print_result_count_string($countfiltered, $countall);
+$heading = $strheading . ': ' . $output->result_count_info($report);
 echo $OUTPUT->heading($heading);
 
 print $output->print_description($report->description, $report->_id);
@@ -138,16 +140,11 @@ $report->display_sidebar_search();
 
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
-
 echo html_writer::empty_tag('br');
-
-print $output->showhide_button($report->_id, $report->shortname);
-
-$report->display_table();
+echo $output->showhide_button($report->_id, $report->shortname);
+echo $reporthtml;
 
 // Export button.
 $output->export_select($report, $sid);
 
 echo $OUTPUT->footer();
-
-?>

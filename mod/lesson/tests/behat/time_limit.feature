@@ -18,8 +18,7 @@ Feature: A teacher can set a time limit for a lesson
       | teacher1 | C1 | editingteacher |
       | student1 | C1 | student |
     And I log in as "teacher1"
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Lesson" to section "1" and I fill the form with:
       | Name | Test lesson |
       | Description | Test lesson description |
@@ -35,7 +34,7 @@ Feature: A teacher can set a time limit for a lesson
     And I press "Save page"
     And I log out
     And I log in as "student1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     When I follow "Test lesson"
     Then I should see "You have 1 min to finish the lesson."
     And I wait "3" seconds
@@ -43,7 +42,7 @@ Feature: A teacher can set a time limit for a lesson
     And I press "Single button"
     And I should see "0:00:"
     And I should see "Warning: You have 1 minute or less to finish the lesson."
-    And I wait "60" seconds
+    When I age the "Test lesson" "timer" in the "mod_lesson" plugin "60" seconds
     And I press "Single button"
     And I should see "You ran out of time for this lesson."
     And I should see "Your last answer may not have counted if it was answered after the time was up."

@@ -36,7 +36,7 @@ $string['cbmgrades'] = 'CBM grades';
 $string['cbmgrades_help'] = 'With Certainty Based Marking (CBM) getting every question correct with C=1 (low certainty) gives a grade of 100%. Grades may be as high as 300% if every question is correct with C=3 (high certainty). Misconceptions (confident wrong responses) lower grades much more than wrong responses that are acknowledged to be uncertain. This may even lead to negative overall grades.
 
 **Accuracy** is the % correct ignoring certainty but weighted for the maximum mark of each question. Successfully distinguishing more and less reliable responses gives a better grade than selecting the same certainty for each question. This is reflected in the **CBM Bonus**. **Accuracy** + **CBM Bonus** is a better measure of knowledge than **Accuracy**. Misconceptions can lead to a negative bonus, a warning to look carefully at what is and is not known.';
-$string['cbmgrades_link'] = 'qbehaviour/deferredcbm/certaintygrade';
+$string['cbmgrades_link'] = 'Question Behaviours';
 $string['certainty'] = 'Certainty';
 $string['certainty_help'] = 'Certainty-based marking requires you to indicate how reliable you think your answer is. The available levels are:
 
@@ -46,9 +46,8 @@ Mark if correct     |   1          |    2      |      3
 Mark if wrong       |   0          |   -2      |     -6
 Probability correct |  <67%        | 67-80%    |    >80%
 
-Best marks are gained by acknowledging uncertainty. For example, if you think there is more than a 1 in 3 chance of being wrong, you should enter C=1 and avoid the risk of a negative mark.
-';
-$string['certainty_link'] = 'qbehaviour/deferredcbm/certainty';
+Best marks are gained by acknowledging uncertainty. For example, if you think there is more than a 1 in 3 chance of being wrong, you should enter C=1 and avoid the risk of a negative mark.';
+$string['certainty_link'] = 'Question Behaviours';
 $string['certainty-1'] = 'No Idea';
 $string['certainty1'] = 'C=1 (Unsure: <67%)';
 $string['certainty2'] = 'C=2 (Mid: >67%)';

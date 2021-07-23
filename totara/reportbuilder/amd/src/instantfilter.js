@@ -40,9 +40,11 @@ define(['jquery', 'core/config', 'core/templates'], function ($, mdlcfg, templat
             // ignoredirty needs to be avoided as it is the password hack to stop browsers populating password fields
             $('.rb-sidebar input:not(.ignoredirty), .rb-sidebar select').change(function (event) {
                 // Force form dependency before processing (as it will enable fields that we might need to send).
-                formid = $(this).parents('form').attr('id');
-                if (typeof M.form.dependencyManagers[formid] != "undefined") {
+                try {
+                    var formid = $(this).parents('form').attr('id');
                     M.form.updateFormState(formid);
+                } catch (err) {
+                    // Cannot update form state: do nothing.
                 }
 
                 // Abort any call to instantreport that is already active.
@@ -122,7 +124,7 @@ define(['jquery', 'core/config', 'core/templates'], function ($, mdlcfg, templat
                 instantfilter.remove();
                 // Replace contents.
                 $('.rb-display-table-container').replaceWith($(data).find('.rb-display-table-container'));
-                $('.rb-record-count').replaceWith($(data).find('.rb-record-count'));
+                $('.rb-record-count').text($(data).find('.rb-record-count').text());
                 // All browsers, except MSIE 6-7-8.
                 $('.rb-report-svggraph').replaceWith($(data).find('.rb-report-svggraph'));
                 // Support MSIE 6-7-8.

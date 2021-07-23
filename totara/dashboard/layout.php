@@ -21,7 +21,7 @@
  * @package totara_dashboard
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/my/lib.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot . '/totara/dashboard/lib.php');
@@ -39,7 +39,7 @@ totara_dashboard::check_feature_enabled();
 $header = $SITE->shortname . ': ' . get_string('editdashboard', 'totara_dashboard');
 
 // Override pagetype to show blocks properly.
-$PAGE->set_pagetype('my-totara-dashboard-' . $id);
+$PAGE->set_pagetype('totara-dashboard-' . $id);
 $PAGE->set_subpage('default');
 
 $dashboard = new totara_dashboard($id);

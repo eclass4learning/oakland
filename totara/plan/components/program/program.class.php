@@ -85,6 +85,9 @@ class dp_program_component extends dp_base_component {
     /**
      * Get list of items assigned to plan
      *
+     * We don't check visiblity of items as we assume that if an item has
+     * been added to the plan then they should have visiblity of that item.
+     *
      * Optionally, filtered by status
      *
      * @access  public
@@ -122,14 +125,24 @@ class dp_program_component extends dp_base_component {
             AND pc.coursesetid = 0)";
         $params['planuserid'] = $this->plan->userid;
 
-        list($visibilitysql, $visibilityparams) = totara_visibility_where($this->plan->userid,
-                                                                          'p.id',
-                                                                          'p.visible',
-                                                                          'p.audiencevisible',
-                                                                          'p',
-                                                                          'program');
-        $params = array_merge($params, $visibilityparams);
-        $where .= " AND {$visibilitysql} ";
+        $systemcontext = context_system::instance();
+        $canviewhidden = has_capability('totara/program:viewhiddenprograms', $systemcontext, $this->plan->userid);
+
+        // Basic visiblity checks
+        // (we check program visiblity based on what the user the plan belongs to can see).
+        if (empty($CFG->audiencevisibility)) {
+            // If audience visiblity is off.
+            if (!$canviewhidden) {
+                $params = array_merge($params, array('programvisible' => '1'));
+                $where .= " AND p.visible = :programvisible ";
+            }
+        } else {
+            // Only hide if audience visiblity is set to "no users".
+            if (!$canviewhidden) {
+                $params = array_merge($params, array('audvisnousers' => COHORT_VISIBLE_NOUSERS));
+                $where .= " AND p.audiencevisible != :audvisnousers ";
+            }
+        }
 
         $countselect = '';
         $countjoin = '';
@@ -603,7 +616,7 @@ class dp_program_component extends dp_base_component {
                 $completionsettings['timedue'] = empty($item->duedate) ? COMPLETION_TIME_NOT_SET : $item->duedate;
             } else {
                 // There is already a due date, or we don't need any at all, so just get the date from the existing record.
-                $item->duedate = $existingprogcompletion->timedue;
+                $item->duedate = $existingprogcompletion->timedue <= 0 ? 0 : $existingprogcompletion->timedue;
             }
         } else {
             // Need to create the prog completion record and specify all fields.
@@ -643,25 +656,7 @@ class dp_program_component extends dp_base_component {
 
         // first unassign the program from the plan
         if ($result = parent::unassign_item($item)) {
-
-            // create a new program instance
-            $program = new program($item->programid);
-
-            // check that the program is not also part of the user's required learning
-            if ($program->assigned_to_users_required_learning($userid)) {
-                return $result;
-            }
-
-            // check that the program is not assigned to any other learning plans
-            if ($program->assigned_to_users_non_required_learning($userid)) {
-                return $result;
-            }
-
-            // check that the program is not complete (don't delete the history record if the program has already been completed)
-            if (!prog_is_complete($program->id, $userid)) {
-                $result = $program->delete_completion_record($userid);
-            }
-            return $result;
+            prog_conditionally_delete_completion($item->programid, $userid);
         }
         return $result;
     }
@@ -724,7 +719,10 @@ class dp_program_component extends dp_base_component {
      * @return string the item status
      */
     protected function display_list_item_progress($item) {
-        return $this->is_item_approved($item->approved) ? prog_display_progress($item->programid, $this->plan->userid) : get_string('unapproved', 'totara_plan');
+        if ($this->is_item_approved($item->approved)) {
+            return prog_display_progress($item->programid, $this->plan->userid);
+        }
+        return get_string('unapproved', 'totara_plan');
     }
 
     /**
@@ -759,7 +757,7 @@ class dp_program_component extends dp_base_component {
         $markup = '';
 
         // Actions
-        if ($this->can_delete_item($item) && dp_can_manage_users_plans($this->plan->userid)) {
+        if ($this->can_delete_item($item)) {
             $currenturl = $this->get_url();
             $strdelete = get_string('delete', 'totara_plan');
             $delete = $OUTPUT->action_icon(new moodle_url($currenturl, array('d' => $item->id)), new pix_icon('/t/delete', $strdelete));

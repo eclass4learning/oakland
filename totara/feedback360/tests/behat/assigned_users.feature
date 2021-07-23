@@ -60,7 +60,7 @@ Feature: Feedback360 assigned users
       | User Three  | Audience Cohort 1 |
 
     # Removing and adding users to the audience should be reflected in the feedback
-    When I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    When I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Cohort 1"
     And I follow "Edit members"
     And I set the field "Current users" to "User One (user1@example.com)"
@@ -71,7 +71,7 @@ Feature: Feedback360 assigned users
     And I press "Add"
     And I press "Back to audiences"
     Then the following should exist in the "cohort_admin" table:
-      | Audience Name    | ID   | No. of Members | Type     |
+      | Audience Name    | Id   | No. of Members | Type     |
       | Cohort 1         | CH1  | 4              | Set      |
 
     When I am on homepage
@@ -111,7 +111,7 @@ Feature: Feedback360 assigned users
       | User Three  |
 
     # Removing and adding users to the audience should have no impact on the assigned users
-    When I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    When I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Cohort 1"
     And I follow "Edit members"
     And I set the field "Current users" to "User One (user1@example.com)"
@@ -122,7 +122,7 @@ Feature: Feedback360 assigned users
     And I press "Add"
     And I press "Back to audiences"
     Then the following should exist in the "cohort_admin" table:
-      | Audience Name    | ID   | No. of Members | Type     |
+      | Audience Name    | Id   | No. of Members | Type     |
       | Cohort 1         | CH1  | 4              | Set      |
 
     When I am on homepage
@@ -146,7 +146,7 @@ Feature: Feedback360 assigned users
     When I follow "Activate"
     And I press "Continue"
     Then I should see "Assigned to 3 user(s)" in the "Test feedback" "table_row"
-    When I follow "Close"
+    When I click on "Close" "link" in the ".cell.lastcol" "css_element"
     And I press "Continue"
     Then I should see "Assigned to 3 user(s)" in the "Test feedback" "table_row"
 
@@ -162,7 +162,7 @@ Feature: Feedback360 assigned users
       | User Three  |
 
     # Removing and adding users to the audience should have no impact on the assigned users
-    When I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    When I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Cohort 1"
     And I follow "Edit members"
     And I set the field "Current users" to "User One (user1@example.com)"
@@ -173,7 +173,7 @@ Feature: Feedback360 assigned users
     And I press "Add"
     And I press "Back to audiences"
     Then the following should exist in the "cohort_admin" table:
-      | Audience Name    | ID   | No. of Members | Type     |
+      | Audience Name    | Id   | No. of Members | Type     |
       | Cohort 1         | CH1  | 4              | Set      |
 
     When I am on homepage

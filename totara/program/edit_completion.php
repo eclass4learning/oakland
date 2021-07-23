@@ -21,7 +21,7 @@
  * @package totara_program
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once('HTML/QuickForm/Renderer/QuickHtml.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot . '/totara/program/lib.php');
@@ -52,7 +52,7 @@ if ($program->is_certif()) {
 $user = $DB->get_record('user', array('id' => $userid), '*', MUST_EXIST);
 
 $url = new moodle_url('/totara/program/edit_completion.php', array('id' => $id, 'userid' => $userid));
-$PAGE->set_context($programcontext);
+$PAGE->set_program($program);
 
 // Load all the data about the user and program.
 $progcompletion = prog_load_completion($id, $userid, false);
@@ -97,7 +97,7 @@ if ($progcompletion && empty($exceptions) && !$dismissedexceptions) {
     $customdata = array(
         'id' => $id,
         'userid' => $userid,
-        'showinitialstateinvalid' => !empty($currentformdata->errors),
+        'showinitialstateinvalid' => !empty($errors),
         'hascurrentrecord' => !empty($progcompletion),
         'status' => $progcompletion->status,
         'solution' => prog_get_completion_error_solution($problemkey, $id, $userid, true),
@@ -137,6 +137,22 @@ if ($progcompletion && empty($exceptions) && !$dismissedexceptions) {
             if ($progcompletion->status == STATUS_PROGRAM_COMPLETE && $newprogcompletion->status == STATUS_PROGRAM_INCOMPLETE) {
                 prog_reset_course_set_completions($id, $userid);
             }
+
+            // Trigger an event to notify any listeners that the user state has been edited.
+            $event = \totara_program\event\program_completionstateedited::create(
+                array(
+                    'objectid' => $id,
+                    'context' => context_program::instance($id),
+                    'userid' => $userid,
+                    'other' => array(
+                        'oldstate' => $progcompletion->status,
+                        'newstate' => $newprogcompletion->status,
+                        'changedby' => $USER->id
+                    ),
+                )
+            );
+            $event->trigger();
+
             totara_set_notification(get_string('completionchangessaved', 'totara_program'),
                 $url,
                 array('class' => 'notifysuccess'));
@@ -146,7 +162,16 @@ if ($progcompletion && empty($exceptions) && !$dismissedexceptions) {
                 array('class' => 'notifyproblem'));
         }
     }
+
+    // Init form core js.
+    $args = $editform->_form->getLockOptionObject();
+    if (count($args[1]) > 0) {
+        $PAGE->requires->js_init_call('M.form.initFormDependencies', $args, false, moodleform::get_js_module());
+    }
 }
+
+// Mark the program progressinfo cache stale to ensure progress is re-read from database on next view
+\totara_program\progress\program_progress_cache::mark_progressinfo_stale($id, $userid);
 
 // Masquerade as the completion page for the sake of navigation.
 $PAGE->navigation->override_active_url(new moodle_url('/totara/program/completion.php', array('id' => $id)));
@@ -163,15 +188,13 @@ $heading = get_string('completionsforuserinprog', 'totara_program',
     array('user' => fullname($user), 'prog' => format_string($program->fullname)));
 
 // Javascript includes.
-$args = $editform->_form->getLockOptionObject();
-if (count($args[1]) > 0) {
-    $PAGE->requires->js_init_call('M.form.initFormDependencies', $args, false, moodleform::get_js_module());
+if (isset($editform)) {
+    $jsmodule = array(
+        'name' => 'totara_editprogcompletion',
+        'fullpath' => '/totara/program/edit_completion.js');
+    $PAGE->requires->js_init_call('M.totara_editprogcompletion.init', array(), false, $jsmodule);
+    $PAGE->requires->strings_for_js(array('bestguess', 'confirmdeletecompletion'), 'totara_program');
 }
-$jsmodule = array(
-    'name' => 'totara_editprogcompletion',
-    'fullpath' => '/totara/program/edit_completion.js');
-$PAGE->requires->js_init_call('M.totara_editprogcompletion.init', array(), false, $jsmodule);
-$PAGE->requires->strings_for_js(array('bestguess', 'confirmdeletecompletion'), 'totara_program');
 
 $PAGE->requires->strings_for_js(array('fixconfirmone', 'fixconfirmtitle'), 'totara_program');
 $PAGE->requires->js_call_amd('totara_program/check_completion', 'init');
@@ -184,8 +207,35 @@ $completionurl = new moodle_url('/totara/program/completion.php', array('id' => 
 echo html_writer::tag('ul', html_writer::tag('li', html_writer::link($completionurl,
     get_string('completionreturntoprogram', 'totara_program'))));
 
-// Display if and how this user is assigned, or otherwise why they might have the completion record.
-echo $OUTPUT->notification($program->display_completion_record_reason($user, $progcompletion), 'notifymessage');
+// Display if and how this user is assigned.
+echo $OUTPUT->notification($program->display_completion_record_reason($user), 'notifymessage');
+
+// If the program completion record is missing but should be there then provide a link to fix it.
+$missingcompletionrs = prog_find_missing_completions($program->id, $userid);
+if ($missingcompletionrs->valid()) {
+    $solution = prog_get_completion_error_solution('error:missingprogcompletion', $program->id, $userid, true);
+    echo $OUTPUT->notification(html_writer::span($solution, 'problemsolution'), 'notifyproblem');
+}
+$missingcompletionrs->close();
+
+// If the program completion record exists when it shouldn't then provide a link to fix it.
+$unassignedincompletecompletionrs = prog_find_unassigned_incomplete_completions($program->id, $userid);
+if ($unassignedincompletecompletionrs->valid()) {
+    $solution = prog_get_completion_error_solution('error:unassignedincompleteprogcompletion', $program->id, $userid, true);
+    echo $OUTPUT->notification(html_writer::span($solution, 'problemsolution'), 'notifyproblem');
+}
+$unassignedincompletecompletionrs->close();
+
+// If the certification completion record exists when it shouldn't then provide a link to fix it.
+$orphanedexceptionsrs = prog_find_orphaned_exceptions($program->id, $userid, 'program');
+if ($orphanedexceptionsrs->valid()) {
+    $problemkey = 'error:orphanedexception';
+    $solution = get_string($problemkey, 'totara_program') .
+        html_writer::empty_tag('br') .
+        prog_get_completion_error_solution($problemkey, $program->id, $userid, true);
+    echo $OUTPUT->notification(html_writer::span($solution, 'problemsolution'), 'notifyproblem');
+}
+$orphanedexceptionsrs->close();
 
 // Display the edit completion record form.
 if (isset($editform)) {

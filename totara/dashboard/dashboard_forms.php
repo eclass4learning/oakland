@@ -41,27 +41,13 @@ class totara_dashboard_edit_form extends moodleform {
         $mform->addElement('hidden', 'id');
         $mform->setType('id', PARAM_INT);
 
-        $mform->addElement('text', 'name', get_string('name', 'totara_dashboard'), 'maxlength="255" size="50"');
+        $mform->addElement('text', 'name', get_string('name', 'totara_dashboard'), ['size' => 50]);
         $mform->setType('name', PARAM_TEXT);
         $mform->addRule('name', null, 'required');
+        $mform->addRule('name', get_string('maximumchars', '', 1333), 'maxlength', 1333);
 
         $mform->addElement('checkbox', 'locked', get_string('locked', 'totara_dashboard'));
         $mform->addHelpButton('locked', 'locked', 'totara_dashboard');
-
-        $mform->addElement('checkbox', 'published', get_string('published', 'totara_dashboard'));
-        $mform->addHelpButton('published', 'published', 'totara_dashboard');
-
-        /**
-         * BEGIN OAKLAND CUSTOMIZATIONS
-         */
-        $mform->addElement('checkbox', 'allowguest', get_string('allowguest', 'totara_dashboard'));
-        $mform->addHelpButton('allowguest', 'allowguest', 'totara_dashboard');
-        $mform->addElement('hidden', 'oaklandgroupid');
-        $mform->setType('oaklandgroupid', PARAM_INT);
-
-        /**
-         * END OAKLAND CUSTOMIZATIONS
-         */
 
         // Cohorts.
         $mform->addElement('header', 'assignedcohortshdr', get_string('assignedcohorts', 'totara_dashboard'));

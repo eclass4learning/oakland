@@ -25,7 +25,7 @@
  * This class is an ajax back-end for deleting a single rule param
  */
 define('AJAX_SCRIPT', true);
-require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot . '/cohort/lib.php');
 
 $ruleparamid = required_param('ruleparamid', PARAM_INT);
@@ -33,8 +33,17 @@ $ruleparamid = required_param('ruleparamid', PARAM_INT);
 require_login();
 require_sesskey();
 
-$syscontext = context_system::instance();
-require_capability('totara/cohort:managerules', $syscontext);
+$sql = "SELECT c.contextid AS contextid
+        FROM {cohort_rule_params} crp
+        INNER JOIN {cohort_rules} cr ON crp.ruleid = cr.id
+        INNER JOIN {cohort_rulesets} crs ON cr.rulesetid = crs.id
+        INNER JOIN {cohort_rule_collections} crc ON crs.rulecollectionid = crc.id
+        INNER JOIN {cohort} c ON crc.cohortid = c.id
+        WHERE crp.id = :ruleparamid";
+
+$contextid = $DB->get_field_sql($sql, array('ruleparamid' => $ruleparamid), MUST_EXIST);
+$context = context::instance_by_id($contextid, MUST_EXIST);
+require_capability('totara/cohort:managerules', $context);
 
 if (!$ruleparam = $DB->get_record('cohort_rule_params', array('id' => $ruleparamid), '*', MUST_EXIST)) {
     exit;

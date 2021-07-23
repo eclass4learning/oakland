@@ -23,7 +23,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/totara/program/lib.php');
 require_once($CFG->dirroot . '/totara/core/js/lib/setup.php');
 
@@ -46,7 +46,7 @@ if ($filter == 'program') {
     print_error('programsandcertificationsdisabled', 'totara_program');
 }
 
-$PAGE->set_url('/totara/program/required.php');
+$PAGE->set_url('/totara/program/required.php', array('id' => $programid, 'userid' => $userid, 'filter' => $filter));
 $PAGE->set_pagelayout('report');
 
 //
@@ -158,7 +158,6 @@ if (isset($program) && $program->user_is_assigned($userid)) {
         local_js(array(
             TOTARA_JS_DIALOG,
             TOTARA_JS_TREEVIEW,
-            TOTARA_JS_PLACEHOLDER,
             TOTARA_JS_DATEPICKER
         ));
 
@@ -178,14 +177,14 @@ if (isset($program) && $program->user_is_assigned($userid)) {
         ///
 
         $heading = $program->fullname;
-        $pagetitle = format_string(get_string('program', 'totara_program').': '.$heading);
+        $pagetitle = get_string('program', 'totara_program') . ': ' . $heading;
 
         prog_add_required_learning_base_navlinks($userid);
 
         $PAGE->navbar->add($heading);
 
         $PAGE->set_title($pagetitle);
-        $PAGE->set_heading(format_string($SITE->fullname));
+        $PAGE->set_heading($SITE->fullname);
         dp_display_plans_menu($userid, 0 , $role, 'courses', 'none', true, $program->id, true);
         echo $OUTPUT->header();
 
@@ -200,7 +199,7 @@ if (isset($program) && $program->user_is_assigned($userid)) {
         // Program page content
         echo $OUTPUT->container_start('', 'program-content');
 
-        echo $OUTPUT->heading($heading);
+        echo $OUTPUT->heading(format_string($heading));
 
         echo $program->display($userid);
 
@@ -212,17 +211,17 @@ if (isset($program) && $program->user_is_assigned($userid)) {
         // and unavailiable message
 
         $heading = $program->fullname;
-        $pagetitle = format_string(get_string('program', 'totara_program').': '.$heading);
+        $pagetitle = get_string('program', 'totara_program') . ': ' . $heading;
 
         prog_add_required_learning_base_navlinks($userid);
 
         $PAGE->navbar->add($heading);
 
         $PAGE->set_title($pagetitle);
-        $PAGE->set_heading(format_string($SITE->fullname));
+        $PAGE->set_heading($SITE->fullname);
         echo $OUTPUT->header();
 
-        echo $OUTPUT->heading($heading);
+        echo $OUTPUT->heading(format_string($heading));
 
         echo html_writer::start_tag('p') . get_string('programnotcurrentlyavailable', 'totara_program') . html_writer::end_tag('p');
 
@@ -234,12 +233,11 @@ if (isset($program) && $program->user_is_assigned($userid)) {
     //
 
     $heading = get_string('requiredlearning', 'totara_program');
-    $pagetitle = format_string(get_string('requiredlearning', 'totara_program'));
 
     prog_add_required_learning_base_navlinks($userid);
 
     $PAGE->set_title($heading);
-    $PAGE->set_heading($pagetitle);
+    $PAGE->set_heading($heading);
     dp_display_plans_menu($userid, 0, $role, 'courses', 'none');
     echo $OUTPUT->header();
 

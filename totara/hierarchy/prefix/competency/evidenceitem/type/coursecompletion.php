@@ -111,7 +111,6 @@ class competency_evidence_type_coursecompletion extends competency_evidence_type
             INNER JOIN
                 {course_completions} cc
               ON cc.course = c.id
-             AND cc.timecompleted IS NOT NULL
             INNER JOIN
                 {comp_scale_assignments} csa
             ON co.frameworkid = csa.frameworkid
@@ -142,8 +141,18 @@ class competency_evidence_type_coursecompletion extends competency_evidence_type
             AND proficient.proficient IS NOT NULL
             AND
             (
-                ccr.proficiencymeasured <> proficient.proficient
-             OR ccr.proficiencymeasured IS NULL
+                (
+                    cc.timecompleted IS NOT NULL
+                    AND (
+                        ccr.proficiencymeasured <> proficient.proficient
+                        OR ccr.proficiencymeasured IS NULL
+                    )
+                )
+                OR
+                (
+                    cc.timecompleted IS NULL
+                    AND ccr.proficiencymeasured = proficient.proficient
+                )
             )
         ";
 
@@ -160,11 +169,13 @@ class competency_evidence_type_coursecompletion extends competency_evidence_type
                 if ($record->timecompleted) {
                     $evidence->proficiencymeasured = $record->proficient;
                 }
-                else if ($record->defaultid) {
-                    $evidence->proficiencymeasured = $record->defaultid;
-                }
                 else {
-                    continue;
+                    if ($record->defaultid) {
+                        $evidence->proficiencymeasured = $record->defaultid;
+                    }
+                    else {
+                        $evidence->proficiencymeasured = null;
+                    }
                 }
 
                 $evidence->save();

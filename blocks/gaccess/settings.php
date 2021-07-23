@@ -41,8 +41,6 @@ $configs[] = new admin_setting_configcheckbox('newwinlink', get_string('newwinli
 $configs[] = new admin_setting_configcheckbox('gmail', get_string('gmail', 'block_gaccess'), get_string('gmail_desc', 'block_gaccess'), '0');
 $configs[] = new admin_setting_configcheckbox('docs', get_string('docs', 'block_gaccess'), get_string('docs_desc', 'block_gaccess'), '0');
 $configs[] = new admin_setting_configcheckbox('calendar', get_string('calendar', 'block_gaccess'), get_string('calendar_desc', 'block_gaccess'), '0');
-$configs[] = new admin_setting_configcheckbox('hangouts', get_string('hangouts', 'block_gaccess'), get_string('hangouts_desc', 'block_gaccess'), '0');
-$configs[] = new admin_setting_configcheckbox('youtube', get_string('youtube', 'block_gaccess'), get_string('youtube_desc', 'block_gaccess'), '0');
 
 // Define the config plugin so it is saved to
 // the config_plugin table then add to the settings page

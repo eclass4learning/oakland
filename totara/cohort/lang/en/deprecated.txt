@@ -1,3 +1,4 @@
+cohortbugheading,totara_cohort
 ruledesc-org-id,totara_cohort
 ruledesc-org-idnumber,totara_cohort
 ruledesc-org-orgtype,totara_cohort
@@ -24,3 +25,4 @@ rulename-pos-startdate,totara_cohort
 rulename-pos-timevalidfrom,totara_cohort
 rulename-pos-timevalidto,totara_cohort
 rulehelp-pos-postitle,totara_cohort
+successfullycreatedplans,totara_cohort

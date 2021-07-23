@@ -18,16 +18,14 @@ Feature: Check previous and upcomings sections are right populated
       | student1 | C1     | student        |
       | teacher1 | C1     | editingteacher |
     And I log in as "admin"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name                                 | Test seminar in progress |
       | Description                          | Test seminar in progress |
-      | Users can sign-up to multiple events | 1                        |
+      | How many times the user can sign-up? | Unlimited                |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I fill seminar session with relative date in form data:
       | sessiontimezone    | Pacific/Auckland |
       | timestart[day]     | -2               |
@@ -42,7 +40,7 @@ Feature: Check previous and upcomings sections are right populated
       | timefinish[minute] | 0                |
     And I press "OK"
 
-    And I press "Add a new date"
+    And I press "Add a new session"
     And I follow "show-selectdate1-dialog"
     And I fill seminar session with relative date in form data:
       | sessiontimezone    | Pacific/Auckland |
@@ -58,7 +56,7 @@ Feature: Check previous and upcomings sections are right populated
       | timefinish[minute] | 0                |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
 
-    And I press "Add a new date"
+    And I press "Add a new session"
     And I follow "show-selectdate2-dialog"
     And I fill seminar session with relative date in form data:
       | sessiontimezone    | Pacific/Auckland |
@@ -76,7 +74,7 @@ Feature: Check previous and upcomings sections are right populated
     And I press "Save changes"
 
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
@@ -92,16 +90,16 @@ Feature: Check previous and upcomings sections are right populated
     And I press "Save changes"
 
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
+      | timestart[year]    | 2037 |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
+      | timefinish[year]   | 2037 |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I press "OK"
@@ -110,41 +108,43 @@ Feature: Check previous and upcomings sections are right populated
 
   Scenario: Check upcoming and previous events are displayed accordingly
     Given I log in as "student1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "View all events"
     Then I should see "Event in progress" in the ".upcomingsessionlist" "css_element"
-    And I should see "1 January 2020" in the ".upcomingsessionlist" "css_element"
+    And I should see "1 January 2037" in the ".upcomingsessionlist" "css_element"
     And I should see "1 January 1999" in the ".previoussessionlist" "css_element"
 
     When I follow "C1"
     Then I should see "Event in progress"
-    And I should see "1 January 2020"
+    And I should see "1 January 2037"
     And I should not see "1 January 1999"
 
     # Sign up for a session and make sure it is displayed in the course page.
-    And I click on "Sign-up" "link" in the "1 January 2020" "table_row"
+    And I click on "Sign-up" "link" in the "1 January 2037" "table_row"
     And I press "Sign-up"
     When I follow "C1"
-    Then I should see "Event in progress"
-    And I should see "1 January 2020"
-    And I should not see "1 January 1999"
+    Then I should see "Booked"
+    And I should not see "Event in progress"
+    And I should not see "Event over"
+    And I follow "View all events"
+    Then I should see "Booked"
+    And I should see "Event in progress"
+    And I should see "Event over"
     And I log out
 
     # Change sign up for multiple events setting.
     And I log in as "admin"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "View all events"
-    And I press "Update this Seminar"
-    And I set the field "Users can sign-up to multiple events" to "0"
+    And I navigate to "Edit settings" in current page administration
+    And I expand all fieldsets
+    And I set the field "How many times the user can sign-up?" to "1"
     And I press "Save and return to course"
     And I log out
 
     When I log in as "student1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    Then I should see "1 January 2020"
+    And I am on "Course 1" course homepage
+    Then I should see "1 January 2037"
     And I should not see "1 January 1999"
     And I should not see "Event in progress"
     And I log out

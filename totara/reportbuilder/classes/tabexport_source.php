@@ -44,6 +44,9 @@ class tabexport_source extends \totara_core\tabexport_source {
     /** @var array $cache data caching info */
     protected $cache;
 
+    /** @var  string $font export font */
+    protected $font;
+
     public function __construct(\reportbuilder $report) {
         global $DB;
         $this->report = $report;
@@ -63,7 +66,8 @@ class tabexport_source extends \totara_core\tabexport_source {
             }
         }
 
-        $this->rs = $DB->get_recordset_sql($sql . $order, $params);
+        $reportdb = $this->report->get_report_db();
+        $this->rs = $reportdb->get_recordset_sql($sql . $order, $params);
     }
 
     /**
@@ -73,6 +77,16 @@ class tabexport_source extends \totara_core\tabexport_source {
      */
     public function get_fullname() {
         return format_string($this->report->fullname);
+    }
+
+    /**
+     * Returns brief summary of the report suitable for caption.
+     *
+     * @return string
+     */
+    public function get_summary() {
+        // Strip any links and embedded files as they don't play nice with the PDF export
+        return format_string($this->report->description);
     }
 
     /**
@@ -121,16 +135,21 @@ class tabexport_source extends \totara_core\tabexport_source {
     public function get_svg_graph($w, $h) {
         global $DB;
 
-        $graphrecord = $DB->get_record('report_builder_graph', array('reportid' => $this->report->_id));
-        if (empty($graphrecord->type)) {
+        $graph = new \totara_reportbuilder\local\graph($this->report);
+        if (!$graph->is_valid()) {
             return null;
         }
-        $graph = new \totara_reportbuilder\local\graph($graphrecord, $this->report, false);
+        // Get current language to set the font properly.
+        $graph->set_font($this->font);
+
+        // Get report sort.
+        $order = $this->report->get_report_sort();
 
         list($sql, $params) = $this->report->build_query(false, true, true);
 
-        $rs = $DB->get_recordset_sql($sql, $params, 0, $graphrecord->maxrecords);
-        foreach($rs as $record) {
+        $reportdb = $this->report->get_report_db();
+        $rs = $reportdb->get_recordset_sql($sql.$order, $params, 0, $graph->get_max_records());
+        foreach ($rs as $record) {
             $graph->add_record($record);
         }
         $rs->close();
@@ -141,6 +160,15 @@ class tabexport_source extends \totara_core\tabexport_source {
         }
 
         return $svgdata;
+    }
+
+    /**
+     * When exporting a report from the report builder as a PDF this is the font that will be used.
+     *
+     * @param string $font
+     */
+    public function set_font($font) {
+        $this->font = $font;
     }
 
     /**

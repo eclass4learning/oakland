@@ -282,7 +282,7 @@ class totara_assign_core {
      * @param $limitfrom int
      * @param $limitnum int
      * @param $forcegroup boolean A flag that makes the function return only the active users.
-     * @return recordset Containing basic information about users.
+     * @return moodle_recordset Containing basic information about users.
      */
     public function get_current_users($search=null, $limitfrom=null, $limitnum=null, $forcegroup=false) {
         global $DB;
@@ -1178,8 +1178,14 @@ function totara_setup_assigndialogs($module, $itemid, $datatable = false, $notic
         'name' => 'totara_assigngroups',
         'fullpath' => '/totara/core/lib/assign/assigngroup_dialog.js',
         'requires' => array('json'));
-    $args = array('args' => '{"module":"'.$module.'", "suffix": "'.$suffix.'", "sesskey":"'.sesskey() .
-                            '","notice":"'.addslashes_js($notice).'"}');
+    $args = array(
+        'args' => json_encode((object)[
+            'module' => $module,
+            'suffix' => $suffix,
+            'sesskey' => sesskey(),
+            'notice' => $notice
+        ]
+    ));
 
     $PAGE->requires->js_init_call('M.totara_assigngroupdialog.init', $args, false, $jsmodule);
 

@@ -25,9 +25,9 @@
 $string['accept'] = 'Accept';
 $string['alert_description'] = 'Listed below are all the alerts you\'ve received. You can click links in the alert title to view more detail or dismiss an alert by clicking the dismiss icon to the right of the list. You may also choose to filter which alerts are shown in the list by making use of the "Search by" functionality.';
 $string['alertfooter'] = 'To change your preferences for receiving these emails, go to your <a href={$a}>Profile -> Messages</a> tab.';
-$string['alertfooter2'] = 'To change your preferences for receiving these emails, go to My Profile Settings -> Messaging here:
+$string['alertfooter2'] = 'To change your preferences for receiving these emails, go to Notification preferences here:
 {$a}';
-$string['alertfooter2html'] = 'To change your preferences for receiving these emails, go to your <a href="{$a}">My Profile Settings -> Messaging</a>.';
+$string['alertfooter2html'] = 'To change your preferences for receiving these emails, go to your <a href="{$a}">Notification preferences</a>.';
 $string['alerts'] = 'Alerts';
 $string['blended'] = 'Blended';
 $string['cannotsavemessage'] = 'Cannot save message';

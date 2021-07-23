@@ -29,6 +29,9 @@ if (!defined('MOODLE_INTERNAL')) {
 global $CFG;
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
 
+/**
+ * @group totara_reportbuilder
+ */
 class totara_reportbuilder_rb_plan_programs_completion_history_embedded_testcase extends advanced_testcase {
     /**
      * Prepare mock data for testing.
@@ -40,7 +43,6 @@ class totara_reportbuilder_rb_plan_programs_completion_history_embedded_testcase
         set_config('enablecompletion', 1);
         $this->setAdminUser();
         $this->resetAfterTest(true);
-        $this->preventResetByRollback();
 
         // Create users.
         $this->user1 = $this->getDataGenerator()->create_user();
@@ -69,7 +71,8 @@ class totara_reportbuilder_rb_plan_programs_completion_history_embedded_testcase
 
         // Set up report and embedded object for is_capable checks.
         $shortname = 'plan_programs_completion_history';
-        $report = reportbuilder_get_embedded_report($shortname, array('userid' => $this->user1->id), false, 0);
+        $config = (new rb_config())->set_embeddata(array('userid' => $this->user1->id));
+        $report = reportbuilder::create_embedded($shortname, $config);
         $embeddedobject = $report->embedobj;
 
         // Test admin can access report.

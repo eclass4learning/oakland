@@ -55,8 +55,7 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Normal visibility (default), hidden.
     When I log in as "admin"
-    And I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    And I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visible" to "0"
@@ -88,8 +87,7 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Normal visibility (default), hidden, 2nd certification assigned.
     When I log in as "admin"
-    And I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    And I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visible" to "0"
@@ -121,8 +119,7 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Normal vis hidden, switch to audience vis.
     When I log in as "admin"
-    And I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    And I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visible" to "0"
@@ -142,7 +139,7 @@ Feature: See that certification visibility affects Record of Learning: Certifica
     # Switch the site setting, certification is now set to all users (default).
     When I log out
     And I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
@@ -171,7 +168,7 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Audience visibility, all users (default).
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
@@ -199,13 +196,12 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Audience visibility, enrolled users and auds.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "Enrolled users and members of the selected audiences"
@@ -235,13 +231,12 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Audience visibility, enrolled users.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "Enrolled users only"
@@ -271,13 +266,12 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Audience visibility, no users.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "No users"
@@ -301,13 +295,12 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Audience visibility, no users, 2nd certification assigned.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "No users"
@@ -337,14 +330,13 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Certification ROL: Audience visibility, no users, newly assigned in 1st certification and then unassigned.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I set the field "Enable program completion editor" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "No users"
@@ -355,10 +347,8 @@ Feature: See that certification visibility affects Record of Learning: Certifica
     Then I should see "Not certified" in the "fn_002 ln_002" "table_row"
 
     When I switch to "Assignments" tab
-    And I click on "Delete" "link" in the "fn_002 ln_002" "table_row"
-    And I press "Save changes"
-    And I press "Save all changes"
-    Then I should see "Program assignments saved successfully"
+    And I click on "Remove program assignment" "link" in the "fn_002 ln_002" "table_row"
+    And I click on "Remove" "button"
 
     # RoL: Certs tab should be visible but not contain the certification for learner.
     When I log out
@@ -383,14 +373,13 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Certification ROL: Audience visibility, no users, certified, before window opens in 1st certification and then unassigned.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I set the field "Enable program completion editor" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "No users"
@@ -416,16 +405,19 @@ Feature: See that certification visibility affects Record of Learning: Certifica
       | timeexpires[year]              | 2030                           |
       | timeexpires[hour]              | 12                             |
       | timeexpires[minute]            | 30                             |
+      | baselinetimeexpires[day]       | 3                              |
+      | baselinetimeexpires[month]     | September                      |
+      | baselinetimeexpires[year]      | 2030                           |
+      | baselinetimeexpires[hour]      | 12                             |
+      | baselinetimeexpires[minute]    | 30                             |
     And I click on "Save changes" "button"
     And I click on "Save changes" "button"
     Then I should see "Completion changes have been saved"
 
     When I follow "Return to certification"
     And I switch to "Assignments" tab
-    And I click on "Delete" "link" in the "fn_002 ln_002" "table_row"
-    And I press "Save changes"
-    And I press "Save all changes"
-    Then I should see "Program assignments saved successfully"
+    And I click on "Remove program assignment" "link" in the "fn_002 ln_002" "table_row"
+    And I click on "Remove" "button"
 
     # RoL: Certs tab should be visible but not contain the certification for learner.
     When I log out
@@ -450,14 +442,13 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Certification ROL: Audience visibility, no users, certified, window is open in 1st certification and then unassigned.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I set the field "Enable program completion editor" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "No users"
@@ -467,32 +458,36 @@ Feature: See that certification visibility affects Record of Learning: Certifica
     When I switch to "Completion" tab
     And I click on "Edit completion records" "link" in the "fn_002 ln_002" "table_row"
     And I set the following fields to these values:
-      | Certification completion state | Certified, window is open      |
-      | timecompleted[day]             | 1                              |
-      | timecompleted[month]           | September                      |
-      | timecompleted[year]            | 2030                           |
-      | timecompleted[hour]            | 12                             |
-      | timecompleted[minute]          | 30                             |
-      | timewindowopens[day]           | 2                              |
-      | timewindowopens[month]         | September                      |
-      | timewindowopens[year]          | 2030                           |
-      | timewindowopens[hour]          | 12                             |
-      | timewindowopens[minute]        | 30                             |
-      | timeexpires[day]               | 3                              |
-      | timeexpires[month]             | September                      |
-      | timeexpires[year]              | 2030                           |
-      | timeexpires[hour]              | 12                             |
-      | timeexpires[minute]            | 30                             |
+      | Certification completion state | Certified, window is open |
+      | timecompleted[day]             | 1                         |
+      | timecompleted[month]           | September                 |
+      | timecompleted[year]            | 2030                      |
+      | timecompleted[hour]            | 12                        |
+      | timecompleted[minute]          | 30                        |
+      | timewindowopens[day]           | 2                         |
+      | timewindowopens[month]         | September                 |
+      | timewindowopens[year]          | 2030                      |
+      | timewindowopens[hour]          | 12                        |
+      | timewindowopens[minute]        | 30                        |
+      | timeexpires[day]               | 3                         |
+      | timeexpires[month]             | September                 |
+      | timeexpires[year]              | 2030                      |
+      | timeexpires[hour]              | 12                        |
+      | timeexpires[minute]            | 30                        |
+      | baselinetimeexpires[day]       | 3                         |
+      | baselinetimeexpires[month]     | September                 |
+      | baselinetimeexpires[year]      | 2030                      |
+      | baselinetimeexpires[hour]      | 12                        |
+      | baselinetimeexpires[minute]    | 30                        |
     And I click on "Save changes" "button"
     And I click on "Save changes" "button"
     Then I should see "Completion changes have been saved"
 
     When I follow "Return to certification"
     And I switch to "Assignments" tab
-    And I click on "Delete" "link" in the "fn_002 ln_002" "table_row"
-    And I press "Save changes"
-    And I press "Save all changes"
-    Then I should see "Program assignments saved successfully"
+    And I click on "Remove program assignment" "link" in the "fn_002 ln_002" "table_row"
+    And I click on "Remove" "button"
+    Then I should see "'fn_002 ln_002' has been removed from the program"
 
     # RoL: Certs tab should be visible but not contain the certification for learner.
     When I log out
@@ -517,14 +512,13 @@ Feature: See that certification visibility affects Record of Learning: Certifica
   @javascript
   Scenario: Certification ROL: Audience visibility, no users, expired in 2nd certification and then unassigned.
     When I log in as "admin"
-    And I navigate to "Advanced features" node in "Site administration"
+    And I navigate to "Advanced features" node in "Site administration > System information"
     And I set the field "Enable audience-based visibility" to "1"
     And I set the field "Enable program completion editor" to "1"
     And I press "Save changes"
     Then I should see "Changes saved"
 
-    When I click on "Certifications" in the totara menu
-    And I click on "RoLCertVisibility Test Cert 1" "link"
+    When I am on "RoLCertVisibility Test Cert 1" certification homepage
     And I click on "Edit certification details" "button"
     And I click on "Details" "link"
     And I set the field "Visibility" to "No users"
@@ -546,10 +540,8 @@ Feature: See that certification visibility affects Record of Learning: Certifica
 
     When I follow "Return to certification"
     And I switch to "Assignments" tab
-    And I click on "Delete" "link" in the "fn_002 ln_002" "table_row"
-    And I press "Save changes"
-    And I press "Save all changes"
-    Then I should see "Program assignments saved successfully"
+    And I click on "Remove program assignment" "link" in the "fn_002 ln_002" "table_row"
+    And I click on "Remove" "button"
 
   # RoL: Certs tab should be visible but not contain the certification for learner.
     When I log out

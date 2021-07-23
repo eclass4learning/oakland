@@ -37,11 +37,11 @@ class rb_facetoface_rooms_embedded extends rb_base_embedded {
             array('type' => 'room', 'value' => 'visible', 'heading' => null),
             array('type' => 'room', 'value' => 'actions', 'heading' => null)
         );
-
         $this->filters = array(
             array('type' => 'room', 'value' => 'name', 'advanced' => 0),
             array('type' => 'room', 'value' => 'roomavailable', 'advanced' => 0)
         );
+        $this->defaultsortcolumn = 'room_name';
 
         $this->contentmode = REPORT_BUILDER_CONTENT_MODE_NONE;
 

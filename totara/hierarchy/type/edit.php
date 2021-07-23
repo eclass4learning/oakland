@@ -22,7 +22,7 @@
  * @subpackage totara_hierarchy
  */
 
-require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot.'/totara/hierarchy/lib.php');
 require_once($CFG->dirroot.'/totara/core/js/lib/setup.php');
@@ -94,8 +94,7 @@ local_js(array(
             TOTARA_JS_ICON_PREVIEW,
             TOTARA_JS_DIALOG,
             TOTARA_JS_TREEVIEW,
-            TOTARA_JS_DATEPICKER,
-            TOTARA_JS_PLACEHOLDER
+            TOTARA_JS_DATEPICKER
         ));
 
 // Enrolled audiences for personal goals only.
@@ -178,7 +177,9 @@ if ($typeform->is_cancelled()) {
         $notification->text = $prefix . 'updatetype';
         $notification->params = array('class' => 'notifysuccess');
     }
-    totara_set_notification(get_string($notification->text, 'totara_hierarchy', $typenew->fullname), $notification->url, $notification->params);
+    totara_set_notification(get_string($notification->text, 'totara_hierarchy', format_string($typenew->fullname)),
+        $notification->url, $notification->params
+    );
 }
 
 

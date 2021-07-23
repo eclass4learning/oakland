@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 /**
  * Check that database user has enough permission for database upgrade
  * @param environment_results $result
- * @return environment_results
+ * @return environment_results|null
  */
 function totara_core_mysql_environment_check(environment_results $result) {
     global $DB;
@@ -40,23 +40,7 @@ function totara_core_mysql_environment_check(environment_results $result) {
             $result->setStatus(false);
             return $result;
         }
-
-        $fileformat = $DB->get_record_sql("SHOW VARIABLES LIKE 'innodb_file_format'");
-        if (!$fileformat or $fileformat->value !== 'Barracuda') {
-            $result->setRestrictStr(array('mysqlneedsbarracuda', 'totara_core', $engine));
-            $result->setStatus(false);
-            return $result;
-        }
-
-        $filepertable = $DB->get_record_sql("SHOW VARIABLES LIKE 'innodb_file_per_table'");
-        if (!$filepertable or $filepertable->value !== 'ON') {
-            $result->setRestrictStr(array('mysqlneedsfilepertable', 'totara_core', $engine));
-            $result->setStatus(false);
-            return $result;
-        }
-
-        $result->setStatus(true);
-        return $result;
+        // Do not show this entry unless we have a problem.
     }
 
     // Do not show anything for other databases.
@@ -89,4 +73,118 @@ function totara_core_linear_upgrade_check(environment_results $result) {
 
     // Everything is fine, no need for any info.
     return null;
+}
+
+/**
+ * Used to recursively check a DOMDocument for a given string.
+ *
+ * @param DOMDocument|DOMElement $dom
+ * @param string $text
+ * @return bool true if string found, false if not.
+ */
+function totara_core_xml_external_entities_check_searchdom($dom, $text) {
+    $found = false;
+    /** @var DOMElement $childNode */
+    foreach($dom->childNodes as $childNode) {
+        if (strpos($childNode->nodeValue, $text) !== false) {
+            $found = true;
+            break;
+        }
+        if ($childNode->hasChildNodes()) {
+            if ($found = totara_core_xml_external_entities_check_searchdom($childNode, $text)) {
+                break;
+            }
+        }
+    }
+
+    return $found;
+}
+
+/**
+ * Checks whether xml loaded with one of the libraries that uses libxml, we've chosen DOMDocument here,
+ * are loading external entities by default. If they are, this means parts of the site could be
+ * vulnerable to local file inclusion. Recent versions of PHP and libxml should not have this vulnerability.
+ *
+ * @param environment_results $result
+ * @return environment_results|null - null is returned if check finds nothing wrong.
+ */
+function totara_core_xml_external_entities_check(environment_results $result) {
+    global $CFG;
+
+    if (!class_exists('DOMDocument')) {
+        // They should have libxml installed to have loaded the environment.xml, but perhaps this particular class
+        // is not enabled somehow. It's unlikely and this is the class referenced in security discussions
+        // so is the best to test against.
+        $result->setInfo(get_string('domdocumentnotfound', 'admin'));
+        $result->setStatus(false);
+        return $result;
+    }
+
+    $dom = new DOMDocument();
+    $dom->load($CFG->dirroot . "/totara/core/tests/fixtures/extentities.xml");
+
+    if (totara_core_xml_external_entities_check_searchdom($dom, 'filetext')) {
+        $result->setInfo(get_string('xmllibraryentitycheckerror', 'admin'));
+        $result->setStatus(false);
+        return $result;
+    }
+
+    // The test passed, no text from the external file was found.
+    return null;
+}
+
+/**
+ * NGRAM is a parser plugin for full-text index. Which helps to optimize diacritics search and compound word search,
+ * only for the full-text indexed columns. At this point, only MySQL supports this plugin, but not MariaDB.
+ *
+ * @param environment_results $result
+ * @return environment_results
+ */
+function totara_core_check_for_ngram(environment_results $result) {
+    global $DB;
+    if ($DB->get_dbvendor() !== "mysql") {
+        // Nothing to check, so lets keep it out of the list of results
+        return null;
+    }
+
+    $ngram = $DB->record_exists_sql(
+        "SELECT 1 FROM information_schema.PLUGINS WHERE PLUGIN_NAME = 'ngram' AND PLUGIN_STATUS = 'ACTIVE'"
+    );
+
+    $result->setStatus($ngram);
+    $result->setInfo(get_string('ngramcheckinfo', 'totara_core'));
+
+    if (!$ngram) {
+        $result->setFeedbackStr(['ngramenvironmentmsg', 'totara_core']);
+    }
+
+    return $result;
+}
+
+/**
+ * @param environment_results $result
+ * @return environment_results
+ */
+function totara_core_mnet_deprecated_check(environment_results $result) {
+    global $DB, $CFG;
+
+    $result->setInfo(get_string('mnetdeprecated', 'totara_core'));
+
+    if ($DB->get_manager()->table_exists('user')) {
+        $sql = "SELECT id
+                  FROM {user}
+                 WHERE deleted = 0 AND mnethostid <> ?";
+        $mnetusers = $DB->record_exists_sql($sql, [$CFG->mnet_localhost_id]);
+    } else {
+        $mnetusers = false;
+    }
+
+    if ($mnetusers) {
+        $result->setStatus(false);
+        $result->setFeedbackStr(['mnetdeprecateduserspresent', 'totara_core']);
+    } else {
+        $result->setStatus(true);
+    }
+
+    return $result;
 }

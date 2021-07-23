@@ -59,7 +59,6 @@ class appraisal_edit_form extends moodleform {
             $mform->addHelpButton('name', 'name', 'totara_appraisal');
 
             $mform->addElement('editor', 'description_editor', get_string('description'), null, $TEXTAREA_OPTIONS);
-            $mform->addHelpButton('description_editor', 'description', 'totara_appraisal');
 
             $submittitle = get_string('createappraisal', 'totara_appraisal');
             if ($appraisal->id > 0) {
@@ -132,6 +131,7 @@ class appraisal_answer_form extends moodleform {
         $roleassignment = $this->_customdata['roleassignment'];
         $action = $this->_customdata['action'];
         $preview = $this->_customdata['preview'];
+        $export = isset($this->_customdata['export']) ? $this->_customdata['export'] : false;
         $islastpage = $this->_customdata['islastpage'];
         $otherassignments = $this->_customdata['otherassignments'];
         $readonly = isset($this->_customdata['readonly']) ? $this->_customdata['readonly'] : false;
@@ -144,6 +144,20 @@ class appraisal_answer_form extends moodleform {
         $showformfields = !$pageislocked && $stage->can_be_answered($roleassignment->appraisalrole);
         $showsubmitbutton = $showformfields && !$preview;
         $isactivepage = ($roleassignment->activepageid == $page->id) && !$stageiscomplete;
+        $pagecanbeanswered = $page->can_be_answered($roleassignment->appraisalrole);
+
+        $button = null;
+        if ($showsubmitbutton) {
+            if ($isactivepage) {
+                if ($islastpage) {
+                    $button = 'completestage';
+                } else {
+                    $button = 'next';
+                }
+            } else if ($pagecanbeanswered) {
+                $button = 'savechanges';
+            }
+        }
 
         $mform->addElement('hidden', 'pageid')->setValue($page->id);
         $mform->addElement('hidden', 'role')->setValue($roleassignment->appraisalrole);
@@ -152,6 +166,7 @@ class appraisal_answer_form extends moodleform {
         $mform->addElement('hidden', 'stageid')->setValue($page->appraisalstageid);
         $mform->addElement('hidden', 'action')->setValue($action);
         $mform->addElement('hidden', 'preview')->setValue($preview);
+        $mform->addElement('hidden', 'export')->setValue($export);
 
         $questions = appraisal_question::fetch_page_role($page->id, $roleassignment);
 
@@ -161,7 +176,9 @@ class appraisal_answer_form extends moodleform {
             $question->name = format_string($question->name);
             $isviewonlyquestion = true;
             $elem = $question->get_element();
-            $rights = $question->roles[$roleassignment->appraisalrole];
+            $rights = array_key_exists($roleassignment->appraisalrole, $question->roles)
+                      ? $question->roles[$roleassignment->appraisalrole]
+                      : 0;
 
             if (($rights & appraisal::ACCESS_CANANSWER) == appraisal::ACCESS_CANANSWER) {
                 $isviewonlyquestion = false;
@@ -191,16 +208,17 @@ class appraisal_answer_form extends moodleform {
             }
 
             if (($rights & appraisal::ACCESS_CANVIEWOTHER) == appraisal::ACCESS_CANVIEWOTHER) {
-                if (!$question->populate_roles_element($roleassignment, $otherassignments, $nouserpic)) {
+                if ($question->populate_roles_element($roleassignment, $otherassignments, $nouserpic)) {
                     $isviewonlyquestion = false;
                 }
             }
 
-            if ((($rights & appraisal::ACCESS_CANANSWER) != appraisal::ACCESS_CANANSWER) && !$isviewonlyquestion) {
+            // The question is either a viewonly question or the role doesn't have permissions to answer it.
+            if (($rights & appraisal::ACCESS_CANANSWER) != appraisal::ACCESS_CANANSWER || $isviewonlyquestion) {
                 $elem->cananswer = false;
             }
 
-            if ($isviewonlyquestion) {
+            if ($isviewonlyquestion || $button == null) {
                 $elem->set_viewonly(true);
             } else if ($spaces) {
                 $spaceelem = $mform->addElement('static', '', ' ', ' ');
@@ -208,28 +226,20 @@ class appraisal_answer_form extends moodleform {
                 $spaceelem->_elementTemplateType = 'default';
             }
 
+            if ($preview) {
+                $elem->set_viewonly(false);
+            } else if (!$showsubmitbutton || (!$isactivepage && !$pagecanbeanswered)) {
+                $elem->set_viewonly(true);
+            }
+
             $elem->set_preview($preview);
 
             $elem->add_field_form_elements($mform);
         }
 
-        $button = null;
-        if ($showsubmitbutton) {
-            if ($isactivepage) {
-                if ($islastpage) {
-                    $mform->addElement('hidden', 'submitaction')->setValue('completestage');
-                    $button = 'completestage';
-                } else {
-                    $mform->addElement('hidden', 'submitaction')->setValue('next');
-                    $button = 'next';
-                }
-            } else if ($page->can_be_answered($roleassignment->appraisalrole)) {
-                $mform->addElement('hidden', 'submitaction')->setValue('savechanges');
-                $button = 'savechanges';
-            }
-        }
         if ($button) {
             $this->add_action_buttons(false, get_string($button, 'totara_appraisal'));
+            $mform->addElement('hidden', 'submitaction')->setValue($button);
         }
     }
 
@@ -387,7 +397,7 @@ class appraisal_stage_page_edit_form extends moodleform {
  */
 class appraisal_add_quest_form extends question_choose_element_form {
 
-    public function definition() {
+    public function definition($excludegroups = array(), $excludetypes = array()) {
         $this->prefix = 'appraisal';
         $mform = & $this->_form;
         $mform->disable_form_change_checker();
@@ -669,6 +679,8 @@ class appraisal_quest_edit_form extends question_base_form {
             }
         }
 
+        $err = array_merge($err, appraisal_question::add_custom_validation($element, $data));
+
         return $err;
     }
 
@@ -716,7 +728,6 @@ class appraisal_quest_edit_form extends question_base_form {
         }
         parent::set_data($default_values);
     }
-
 }
 
 /**
@@ -760,11 +771,12 @@ class appraisal_message_form extends moodleform {
 
         // Timing.
         $timegrp = array();
-        $timegrp[] = $mform->createElement('radio', 'timing', '', get_string('eventtimenow', 'totara_appraisal'), '0');
+        $timegrp[] = $mform->createElement('radio', 'timing', '', get_string('eventtimenowcron', 'totara_appraisal'), '0');
         $timegrp[] = $mform->createElement('radio', 'timing', '', get_string('eventtimebefore', 'totara_appraisal'), '-1');
         $timegrp[] = $mform->createElement('radio', 'timing', '', get_string('eventtimeafter', 'totara_appraisal'), '1');
 
         $mform->addGroup($timegrp, 'timinggrp', get_string('eventtiming', 'totara_appraisal'), html_writer::empty_tag('br'));
+        $mform->addHelpButton('timinggrp', 'eventtiming', 'totara_appraisal');
 
         // How much.
         $deltatypes = array(appraisal_message::PERIOD_DAY => get_string('perioddays', 'totara_appraisal'),
@@ -786,6 +798,7 @@ class appraisal_message_form extends moodleform {
             $rolesgrp[] = $mform->createElement('advcheckbox', $role, '', $name);
         }
         $mform->addGroup($rolesgrp, 'rolegrp', get_string('eventrecipients', 'totara_appraisal'), html_writer::empty_tag('br'));
+        $mform->addHelpButton('rolegrp', 'eventrecipients', 'totara_appraisal');
         $mform->addRule('rolegrp', null, 'required');
 
         // Send for completed.
@@ -813,10 +826,12 @@ class appraisal_message_form extends moodleform {
                 get_string('eventmessagetitle', 'totara_appraisal') . $requiredstr,
                 array('class' => 'appraisal-event-title hide-disabled'));
         $mform->setType('messagetitle[0]', PARAM_CLEANHTML);
+        $mform->addHelpButton("messagetitle[0]", "messageplaceholders", "totara_appraisal");
         $mform->addElement('textarea', 'messagebody[0]',
                 get_string('eventmessagebody', 'totara_appraisal') . $requiredstr,
                 array('class' => 'appraisal-event-body hide-disabled'));
         $mform->setType('messagebody[0]', PARAM_CLEANHTML);
+        $mform->addHelpButton("messagebody[0]", "messageplaceholders", "totara_appraisal");
         $mform->disabledIf('messagetitle[0]', 'messagetoall', 'eq', 'each');
         $mform->disabledIf('messagetitle[0]', 'messagetoall', 'eqhide', 'each');
         $mform->disabledIf('messagebody[0]', 'messagetoall', 'eq', 'each');
@@ -828,10 +843,12 @@ class appraisal_message_form extends moodleform {
                     get_string('eventmessageroletitle', 'totara_appraisal', $name) . $requiredstr,
                     array('class' => 'appraisal-event-title hide-disabled'));
             $mform->setType("messagetitle[$role]", PARAM_CLEANHTML);
+            $mform->addHelpButton("messagetitle[$role]", "messageplaceholders", "totara_appraisal");
             $mform->addElement('textarea', "messagebody[$role]",
                     get_string('eventmessagerolebody', 'totara_appraisal', $name) . $requiredstr,
                     array('class' => 'appraisal-event-body hide-disabled'));
             $mform->setType("messagebody[$role]", PARAM_CLEANHTML);
+            $mform->addHelpButton("messagebody[$role]", "messageplaceholders", "totara_appraisal");
             $mform->disabledIf("messagetitle[$role]", 'messagetoall', 'eq', 'all');
             $mform->disabledIf("messagetitle[$role]", 'messagetoall', 'eqhide', 'all');
             $mform->disabledIf("messagebody[$role]", 'messagetoall', 'eq', 'all');
@@ -851,15 +868,13 @@ class appraisal_message_form extends moodleform {
     public function validation($data, $files) {
         $err = array();
         if ($data['eventid'] == 0) {
-            // Appraisal activation checked.
-            // No before.
+            // Appraisal activation checked - Disable the before options since we don't know when this is until it happens.
             if ($data['timinggrp']['timing'] < 0) {
                 $err["timinggrp[timing]"] = get_string('error:beforedisabled', 'totara_appraisal');
             }
         } else {
             if ($data['eventtype'] == 'stage_completion') {
-                // Stage completion.
-                // No before.
+                // Stage completion - Disable the before options since we don't know when this is until it happens.
                 if ($data['timinggrp']['timing'] < 0) {
                     $err["timinggrp[timing]"] = get_string('error:beforedisabled', 'totara_appraisal');
                 }
@@ -869,11 +884,12 @@ class appraisal_message_form extends moodleform {
                 if ($data['timinggrp']['timing'] != 0) {
                     $isdeltaperiod = in_array($data['deltaperiod'], array(appraisal_message::PERIOD_DAY,
                         appraisal_message::PERIOD_WEEK, appraisal_message::PERIOD_MONTH));
-                    if (!$isdeltaperiod || (int) $data['delta'] < 1) {
+                    if (!$isdeltaperiod || (int) $data['delta'] < 0) {
                         $err['deltagrp'] = get_string('error:numberrequired', 'totara_appraisal');
                     }
                 }
             }
+
         }
 
         // At least one role is selected.

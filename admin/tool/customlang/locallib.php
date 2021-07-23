@@ -141,6 +141,8 @@ class tool_customlang_utils {
             }
             $local = $stringman->load_component_strings($component->name, $lang, true, false);
 
+            // Totara - Change string IDs to lowercase.
+            $lcurrent = array_change_key_case($current, CASE_LOWER);
             foreach ($english as $stringid => $stringoriginal) {
                 $stringmaster = isset($master[$stringid]) ? $master[$stringid] : null;
                 $stringlocal = isset($local[$stringid]) ? $local[$stringid] : null;
@@ -152,7 +154,8 @@ class tool_customlang_utils {
                     $progressbar->update_full($donepercent, $strinprogress);
                 }
 
-                if (isset($current[$stringid])) {
+                if (isset($current[$stringid]) || isset($lcurrent[$stringid])) {
+                    $current[$stringid] = !isset($current[$stringid]) ? $lcurrent[$stringid] : $current[$stringid];
                     $needsupdate     = false;
                     $currentoriginal = $current[$stringid]->original;
                     $currentmaster   = $current[$stringid]->master;
@@ -169,6 +172,11 @@ class tool_customlang_utils {
                     if ($stringmaster !== $stringlocal) {
                         $needsupdate = true;
                         $current[$stringid]->local          = $stringlocal;
+                        $current[$stringid]->timecustomized = $now;
+                    } else if (isset($currentlocal) && $stringlocal !== $currentlocal) {
+                        // If local string has been removed, we need to remove also the old local value from DB.
+                        $needsupdate = true;
+                        $current[$stringid]->local          = null;
                         $current[$stringid]->timecustomized = $now;
                     }
 
@@ -229,6 +237,8 @@ class tool_customlang_utils {
         $files = array();
         foreach ($strings as $string) {
             if (!is_null($string->local)) {
+                // Totara - Change string IDs to lowercase.
+                $string->stringid = strtolower($string->stringid);
                 $files[$string->component][$string->stringid] = $string->local;
             }
         }

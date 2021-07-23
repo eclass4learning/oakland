@@ -73,6 +73,14 @@ class file extends handler {
         // NOTE: we cannot set any lock acquiring timeout here - bad luck.
         ini_set('session.save_handler', 'files');
         ini_set('session.save_path', $this->sessiondir);
+
+        // Make sure admins did not break things by forcing PHP settings in web server config.
+        if (ini_get('session.save_handler') !== 'files') {
+            error_log("Error setting 'session.save_handler' handler to 'files', Totara sessions will not work properly");
+        }
+        if (ini_get('session.save_path') !== $this->sessiondir) {
+            error_log("Error setting 'session.save_path', Totara sessions will not work properly");
+        }
     }
 
     /**

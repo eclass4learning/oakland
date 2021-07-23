@@ -30,6 +30,7 @@ class rb_base_embedded {
     public $url, $source, $fullname, $filters, $columns;
     public $contentmode, $contentsettings, $embeddedparams;
     public $hidden, $accessmode, $accesssettings, $shortname;
+    public $defaultsortcolumn, $defaultsortorder;
 
 /**
  * Class constructor
@@ -90,9 +91,22 @@ class rb_base_embedded {
      * If true returned the report is not displayed in the list of all embedded reports.
      * If source is ignored then this method is irrelevant.
      *
+     * @deprecated since Totara 12.3
      * @return bool
      */
     public function is_ignored() {
+        return false;
+    }
+
+    /**
+     * Is this embedded report usable?
+     *
+     * If true returned, the report is not displayed in the list of all embedded reports.
+     * If source is ignored, then this method is irrelevant.
+     *
+     * @return bool
+     */
+    public static function is_report_ignored() {
         return false;
     }
 

@@ -64,7 +64,7 @@ class block_course_overview extends block_base {
         $content = array();
 
         $updatemynumber = optional_param('mynumber', -1, PARAM_INT);
-        if ($updatemynumber >= 0) {
+        if ($updatemynumber >= 0 && optional_param('sesskey', '', PARAM_RAW) && confirm_sesskey()) {
             block_course_overview_update_mynumber($updatemynumber);
         }
 
@@ -85,14 +85,6 @@ class block_course_overview extends block_base {
         // Number of sites to display.
         if ($this->page->user_is_editing() && empty($config->forcedefaultmaxcourses)) {
             $this->content->text .= $renderer->editing_bar_head($totalcourses);
-        }
-
-        // Remove Oakland group courses from being displayed
-        foreach ($sortedcourses as $key => $value) {
-            if ($value->oaklandgroupid != null) {
-                unset($sortedcourses[$key]);
-                --$totalcourses;
-            }
         }
 
         if (empty($sortedcourses)) {

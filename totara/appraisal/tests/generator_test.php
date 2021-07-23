@@ -160,7 +160,11 @@ class totara_appraisal_generator_testcase extends advanced_testcase {
         $this->assertEquals('appraisal_activation', $verify->type);
         $this->assertEquals(0, $verify->delta);
         $this->assertEquals(0, $verify->deltaperiod);
-        $this->assertEquals($this->allroles, $verify->roles);
+        $allroles = $this->allroles;
+        $verifyroles = $verify->roles;
+        sort($allroles);
+        sort($verifyroles);
+        $this->assertEquals($allroles, $verifyroles);
 
         foreach ($this->allroles as $role) {
             $content = $verify->get_message($role);
@@ -249,14 +253,14 @@ class totara_appraisal_generator_testcase extends advanced_testcase {
         $stage = $this->appraisalgenerator->create_stage($appraisalid);
         $page = $this->appraisalgenerator->create_page($stage->id);
 
-        // NOTE: MySQL has relatively low limits on number of varchar table columns, we cannot use 'text' here.
-        $data = array('datatype' => 'datepicker', 'startyear' => 1975, 'stopyear' => 2020, 'withtime' => 0);
-        for ($i = 1; $i <= 200; $i++) {
-            $question = $this->appraisalgenerator->create_question($page->id, $data);
+        // MySQL has relatively low limits on number of varchar/text table columns, but should be able to deal with at least 180 text questions.
+        $num_questions = 180;
+        for ($i = 1; $i <= $num_questions; $i++) {
+            $this->appraisalgenerator->create_question($page->id, ['datatype' => 'text']);
         }
 
         $questions = $DB->get_records('appraisal_quest_field', array('appraisalstagepageid' => $page->id));
-        $this->assertEquals(200, count($questions));
+        $this->assertEquals($num_questions, count($questions));
 
         // Create cohort and assign a user to it.
         $learner = $this->getDataGenerator()->create_user(array('username' => 'user1'));

@@ -24,6 +24,8 @@
 
 namespace auth_connect\task;
 
+defined('MOODLE_INTERNAL') || die();
+
 /**
  * General cleanup task.
  */
@@ -51,7 +53,7 @@ class cleanup_task extends \core\task\scheduled_task {
         }
 
         $select = "timecreated < ?";
-        $params = array(time() - 60 * 60);
+        $params = array(time() - \auth_connect\util::REQUEST_LOGIN_TIMEOUT);
         $DB->delete_records_select('auth_connect_sso_requests', $select, $params);
     }
 }

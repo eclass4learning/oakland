@@ -2,16 +2,7 @@
 
 // This file defines settingpages and externalpages under the "users" category
 
-$ADMIN->add('users', new admin_category('accounts', new lang_string('accounts', 'admin')));
-$ADMIN->add('users', new admin_category('roles', new lang_string('permissions', 'role')));
-/**
- * BEGIN OAKLAND ADD GROUPS
- */
-$ADMIN->add('users', new admin_category('groups', new lang_string('groups', 'oakland_groups')));
-/**
- *  new admin_externalpage('groups', new lang_string('groups','oakland_groups'), "$CFG->wwwroot/oakland/groups/index.php"));
- * END OAKLAND ADD GROUPS
- */
+// Totara: Removed 'accounts' and 'roles' categories.
 
 if ($hassiteconfig
  or has_capability('moodle/user:create', $systemcontext)
@@ -23,33 +14,49 @@ if ($hassiteconfig
  or has_capability('moodle/cohort:view', $systemcontext)) { // speedup for non-admins, add all caps used on this page
 
 
-    if (empty($CFG->loginhttps)) {
-        $securewwwroot = $CFG->wwwroot;
-    } else {
-        $securewwwroot = str_replace('http:','https:',$CFG->wwwroot);
+    // Totara: stuff under the "Users" subcategory
+    $ADMIN->add('users', new admin_externalpage('editusers', new lang_string('userlist','admin'), "$CFG->wwwroot/$CFG->admin/user.php", array('moodle/user:update', 'moodle/user:delete')));
+    $ADMIN->add('users', new admin_externalpage('userbulk', new lang_string('userbulk','admin'), "$CFG->wwwroot/$CFG->admin/user/user_bulk.php", array('moodle/user:update', 'moodle/user:delete')));
+
+    // "User default preferences" settingpage.
+    $temp = new admin_settingpage('userdefaultpreferences', new lang_string('userdefaultpreferences', 'admin'));
+    if ($ADMIN->fulltree) {
+        $choices = array();
+        $choices['0'] = new lang_string('emaildisplayno');
+        $choices['1'] = new lang_string('emaildisplayyes');
+        $choices['2'] = new lang_string('emaildisplaycourse');
+        $temp->add(new admin_setting_configselect('defaultpreference_maildisplay', new lang_string('emaildisplay'),
+            '', 2, $choices));
+
+        $choices = array();
+        $choices['0'] = new lang_string('textformat');
+        $choices['1'] = new lang_string('htmlformat');
+        $temp->add(new admin_setting_configselect('defaultpreference_mailformat', new lang_string('emailformat'), '', 1, $choices));
+
+        $choices = array();
+        $choices['0'] = new lang_string('emaildigestoff');
+        $choices['1'] = new lang_string('emaildigestcomplete');
+        $choices['2'] = new lang_string('emaildigestsubjects');
+        $temp->add(new admin_setting_configselect('defaultpreference_maildigest', new lang_string('emaildigest'),
+            new lang_string('emaildigest_help'), 0, $choices));
+
+
+        $choices = array();
+        $choices['1'] = new lang_string('autosubscribeyes');
+        $choices['0'] = new lang_string('autosubscribeno');
+        $temp->add(new admin_setting_configselect('defaultpreference_autosubscribe', new lang_string('autosubscribe'),
+            '', 1, $choices));
+
+        $choices = array();
+        $choices['0'] = new lang_string('trackforumsno');
+        $choices['1'] = new lang_string('trackforumsyes');
+        $temp->add(new admin_setting_configselect('defaultpreference_trackforums', new lang_string('trackforums'),
+            '', 0, $choices));
     }
-    // stuff under the "accounts" subcategory
-    $ADMIN->add('accounts', new admin_externalpage('editusers', new lang_string('userlist','admin'), "$CFG->wwwroot/$CFG->admin/user.php", array('moodle/user:update', 'moodle/user:delete')));
-    $ADMIN->add('accounts', new admin_externalpage('userbulk', new lang_string('userbulk','admin'), "$CFG->wwwroot/$CFG->admin/user/user_bulk.php", array('moodle/user:update', 'moodle/user:delete')));
-    $ADMIN->add('accounts', new admin_externalpage('addnewuser', new lang_string('addnewuser'), "$securewwwroot/user/editadvanced.php?id=-1", 'moodle/user:create'));
-    $ADMIN->add('accounts', new admin_externalpage('profilefields', new lang_string('profilefields','admin'), "$CFG->wwwroot/user/profile/index.php", 'moodle/site:config'));
-    $ADMIN->add('accounts', new admin_externalpage('cohorts', new lang_string('cohorts', 'cohort'), $CFG->wwwroot . '/cohort/index.php', array('moodle/cohort:manage', 'moodle/cohort:view')));
-    $ADMIN->add('accounts', new admin_externalpage('cohortglobalsettings', new lang_string('cohortglobalsettings', 'totara_cohort'), $CFG->wwwroot . '/totara/cohort/globalsettings.php', array('moodle/cohort:manage', 'moodle/cohort:view')));
-
-    /**
-     * BEGIN OAKLAND ADD GROUPS
-     */
-
-    $ADMIN->add('groups',new admin_externalpage('managegroups', new lang_string('managegroups','oakland_groups'), "$CFG->wwwroot/oakland/groups/index.php"));
-
-    /**
-     * END OAKLAND ADD GROUPS
-     */
-
-    $ADMIN->add('accounts', new admin_externalpage('profilefields', new lang_string('profilefields','admin'), "$CFG->wwwroot/user/profile/index.php", array('moodle/site:config', 'totara/core:manageprofilefields')));
-    $ADMIN->add('accounts', new admin_externalpage('cohorts', new lang_string('cohorts', 'cohort'), $CFG->wwwroot . '/cohort/index.php', array('moodle/cohort:manage', 'moodle/cohort:view')));
-
-    // stuff under the "roles" subcategory
+    // TOTARA: Admin restructure.
+    $ADMIN->add('users', $temp);
+    $ADMIN->add('users', new admin_externalpage('profilefields', new lang_string('profilefields','admin'), "$CFG->wwwroot/user/profile/index.php", array('moodle/site:config', 'totara/core:manageprofilefields')));
+    $ADMIN->add('users', new admin_externalpage('profilepage', new lang_string('myprofile', 'admin'), $CFG->wwwroot . '/user/profilesys.php', array('totara/core:appearance')));
 
     // "userpolicies" settingpage
     $temp = new admin_settingpage('userpolicies', new lang_string('userpolicies', 'admin'));
@@ -201,7 +208,10 @@ if ($hassiteconfig
                     'department'  => new lang_string('department'),
                     'institution' => new lang_string('institution'),
                 )));
-        $temp->add(new admin_setting_configtext('fullnamedisplay', new lang_string('fullnamedisplay', 'admin'), new lang_string('configfullnamedisplay', 'admin'), 'language', PARAM_TEXT, 50));
+        $setting = new admin_setting_configtext('fullnamedisplay', new lang_string('fullnamedisplay', 'admin'),
+            new lang_string('configfullnamedisplay', 'admin'), 'language', PARAM_TEXT, 50);
+        $setting->set_force_ltr(true);
+        $temp->add($setting);
         $temp->add(new admin_setting_configtext('alternativefullnameformat', new lang_string('alternativefullnameformat', 'admin'),
                 new lang_string('alternativefullnameformat_desc', 'admin'),
                 'language', PARAM_RAW, 50));

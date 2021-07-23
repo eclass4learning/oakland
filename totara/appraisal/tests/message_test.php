@@ -97,7 +97,10 @@ class appraisal_message_test extends appraisal_testcase {
         $this->assertEquals(appraisal_message::EVENT_APPRAISAL_ACTIVATION, $msgtest->type);
         $this->assertEquals(0, $msgtest->delta);
         $this->assertEquals(0, $msgtest->deltaperiod);
-        $this->assertEquals($roles, $msgtest->roles);
+        $msgtestroles = $msgtest->roles;
+        sort($roles);
+        sort($msgtestroles);
+        $this->assertEquals($roles, $msgtestroles);
         $this->assertEquals(0, $msgtest->stageiscompleted);
         foreach ($roles as $role) {
             $content = $msgtest->get_message($role);
@@ -365,7 +368,7 @@ class appraisal_message_test extends appraisal_testcase {
     }
 
     public function test_process_event() {
-        global $CFG, $DB, $UNITTEST;
+        global $CFG, $DB;
 
         $this->resetAfterTest();
         $this->preventResetByRollback();
@@ -489,24 +492,37 @@ class appraisal_message_test extends appraisal_testcase {
         // Record the time after activation has completed. The scheduled times should be relative to a time in between.
         $maxactivationtime = time();
 
-        // Get the emails that were just sent.
+        // Check the emails haven't been sent immediately.
         $emails = $sink->get_messages();
-        $this->assertCount(3, $emails);
-        $expectedemails = array(
-            array('Appraisal activation immediate', 'username1@example.com'),
-            array('Appraisal activation immediate', 'username2@example.com'),
-            array('Appraisal activation immediate', 'username3@example.com'));
+        $this->assertCount(0, $emails);
+
+        // Run scheduled messages code, make sure the activation messages have been sent.
+        \appraisal::send_scheduled();
+        $emails = $sink->get_messages();
+        $this->assertCount(6, $emails);
+        $expectedactivation = array('username1@example.com', 'username2@example.com', 'username3@example.com');
+        $expectedduedatemsg = array('username1@example.com', 'username2@example.com', 'username3@example.com');
         foreach ($emails as $email) {
-            $location = array_search(array($email->subject, $email->to), $expectedemails);
-            $this->assertInternalType('int', $location);
-            unset($expectedemails[$location]);
+            if ($email->subject == 'Appraisal activation immediate') {
+                $location = array_search($email->to, $expectedactivation);
+                $this->assertIsInt($location);
+                unset($expectedactivation[$location]);
+            } else if ($email->subject == 'Stage due before') {
+                $location = array_search($email->to, $expectedduedatemsg);
+                $this->assertIsInt($location);
+                unset($expectedduedatemsg[$location]);
+            } else {
+                $this->assertTrue(false, 'Unexpected Email Type');
+            }
         }
-        $sink->close();
+        $this->assertEmpty($expectedactivation);
+        $this->assertEmpty($expectedduedatemsg);
 
         // Check that the appraisal activation immediate event has been marked triggered.
         $msgappractivateimmediatetest = new appraisal_message($msgappractivateimmediateid);
         $this->assertEquals(1, $msgappractivateimmediatetest->wastriggered);
-
+        $this->assertGreaterThanOrEqual($minactivationtime, $msgappractivateimmediatetest->timescheduled);
+        $this->assertLessThanOrEqual($maxactivationtime, $msgappractivateimmediatetest->timescheduled);
         // Check that the appraisal activation after and stage due events have not been marked triggered and are scheduled.
         $msgappractivateaftertest = new appraisal_message($msgappractivateafterid);
         $this->assertEquals(0, $msgappractivateaftertest->wastriggered);
@@ -514,7 +530,7 @@ class appraisal_message_test extends appraisal_testcase {
         $this->assertLessThanOrEqual($maxactivationtime + DAYSECS, $msgappractivateaftertest->timescheduled);
         unset($msgappractivateaftertest);
         $msgstageduebeforetest = new appraisal_message($msgstageduebeforeid);
-        $this->assertEquals(0, $msgstageduebeforetest->wastriggered);
+        $this->assertEquals(1, $msgstageduebeforetest->wastriggered);
         $this->assertGreaterThanOrEqual($minactivationtime, $msgstageduebeforetest->timescheduled);
         $this->assertLessThanOrEqual($maxactivationtime, $msgstageduebeforetest->timescheduled);
         unset($msgstageduebeforetest);
@@ -529,38 +545,13 @@ class appraisal_message_test extends appraisal_testcase {
         $this->assertLessThanOrEqual($maxactivationtime + DAYSECS * 2, $msgstagedueaftertest->timescheduled);
         unset($msgstagedueaftertest);
 
-        // Testing Part 2 - Run cron now. The following should occur:
-        // Three stage due before messages are sent.
-        // The stage due before event is marked triggered.
-        // This occurs because the stage due before message is scheduled one day before the stage is due, which
-        // in the data generator is one day after the appraisal was created (so must be before $nowtime).
-
-        // Make sure we are redirecting emails.
-        $sink = $this->redirectEmails();
-        $this->assertTrue(phpunit_util::is_redirecting_phpmailer());
-
-        // Run the cron, specifying $nowtime.
-        totara_appraisal_observer::send_scheduled($maxactivationtime);
-
-        // Get the emails that were just sent.
-        $emails = $sink->get_messages();
-        $this->assertCount(3, $emails);
-        $expectedemails = array(
-            array('Stage due before', 'username1@example.com'),
-            array('Stage due before', 'username2@example.com'),
-            array('Stage due before', 'username3@example.com'));
-        foreach ($emails as $email) {
-            $location = array_search(array($email->subject, $email->to), $expectedemails);
-            $this->assertInternalType('int', $location);
-            unset($expectedemails[$location]);
-        }
         $sink->close();
 
         // Check that the stage due before event has been marked triggered.
         $msgstageduebeforetest = new appraisal_message($msgstageduebeforeid);
         $this->assertEquals(1, $msgstageduebeforetest->wastriggered);
 
-        // Testing Part 3 - Run cron after one day. The following should occur:
+        // Testing Part 2 - Run cron after one day. The following should occur:
         // Three appraisal activation after messages are sent.
         // Three stage due immediate messages are sent.
         // The appraisal activation after and stage due immediate events are marked triggered.
@@ -570,7 +561,7 @@ class appraisal_message_test extends appraisal_testcase {
         $this->assertTrue(phpunit_util::is_redirecting_phpmailer());
 
         // Run the cron, specifying $maxactivationtime plus one day (just enough for those scheduled for one day after).
-        totara_appraisal_observer::send_scheduled($maxactivationtime + DAYSECS);
+        \appraisal::send_scheduled($maxactivationtime + DAYSECS);
 
         // Get the emails that were just sent.
         $emails = $sink->get_messages();
@@ -584,7 +575,7 @@ class appraisal_message_test extends appraisal_testcase {
             array('Stage due immediate', 'username3@example.com'));
         foreach ($emails as $email) {
             $location = array_search(array($email->subject, $email->to), $expectedemails);
-            $this->assertInternalType('int', $location);
+            $this->assertIsInt($location);
             unset($expectedemails[$location]);
         }
         $sink->close();
@@ -597,7 +588,7 @@ class appraisal_message_test extends appraisal_testcase {
         $this->assertEquals(1, $msgstageduebeforetest->wastriggered);
         unset($msgstageduebeforetest);
 
-        // Testing Part 4 - Complete the stage for one user. The following should occur:
+        // Testing Part 3 - Complete the stage for one user. The following should occur:
         // One stage complete immediate message is sent.
         // One stage complete after message is scheduled in appraisal_user_event.
         // The stage complete immediate event should NOT be marked triggered.
@@ -623,7 +614,7 @@ class appraisal_message_test extends appraisal_testcase {
             array('Stage completion immediate', 'username1@example.com'));
         foreach ($emails as $email) {
             $location = array_search(array($email->subject, $email->to), $expectedemails);
-            $this->assertInternalType('int', $location);
+            $this->assertIsInt($location);
             unset($expectedemails[$location]);
         }
         $sink->close();
@@ -646,7 +637,7 @@ class appraisal_message_test extends appraisal_testcase {
         $this->assertLessThanOrEqual($maxcompletetime + DAYSECS, $userevent->timescheduled);
         unset($msgstagecompaftertest);
 
-        // Testing Part 5 - Run cron after three days. The following should occur:
+        // Testing Part 4 - Run cron after three days. The following should occur:
         // One stage completion after message should be sent and the appraisal_user_event record should be deleted.
         // One stage due after complete message should be sent.
         // Two stage due after incomplete messages should be sent.
@@ -655,8 +646,8 @@ class appraisal_message_test extends appraisal_testcase {
         $sink = $this->redirectEmails();
         $this->assertTrue(phpunit_util::is_redirecting_phpmailer());
 
-        // Run the cron, specifying $maxcompletetime plus three days (enough that all remaining scheduled should be sent).
-        totara_appraisal_observer::send_scheduled($maxactivationtime + DAYSECS * 3);
+        // Run scheduled messages code, specifying $maxcompletetime plus three days (enough that all remaining scheduled should be sent).
+        \appraisal::send_scheduled($maxactivationtime + DAYSECS * 3);
 
         // Get the emails that were just sent.
         $emails = $sink->get_messages();
@@ -668,7 +659,7 @@ class appraisal_message_test extends appraisal_testcase {
             array('Stage due after incomplete', 'username3@example.com'));
         foreach ($emails as $email) {
             $location = array_search(array($email->subject, $email->to), $expectedemails);
-            $this->assertInternalType('int', $location);
+            $this->assertIsInt($location);
             unset($expectedemails[$location]);
         }
         $sink->close();
@@ -677,6 +668,128 @@ class appraisal_message_test extends appraisal_testcase {
         $userevents = $DB->get_records('appraisal_user_event');
         $this->assertCount(0, $userevents); // This could fail if other tests add user events, but is unlikely.
 
+        // Make sure we are redirecting emails.
+        $sink = $this->redirectEmails();
+        $this->assertTrue(phpunit_util::is_redirecting_phpmailer());
+
+        $closedata = new stdClass();
+        $closedata->sendalert = true;
+        $closedata->id = $appraisal->id;
+        $closedata->alerttitle = 'Appraisal Closure Message Subject';
+        $closedata->alertbody_editor = array('text' => 'Appraisal Closure Message Body');
+        $appraisal->close($closedata);
+
+        // Check this doesn't happen immediately.
+        $emails = $sink->get_messages();
+        $this->assertCount(0, $emails);
+
+        // Run the cron, the closure messages should now be sent.
+        \appraisal::send_scheduled(time());
+
+        $exptrcpt = array('username2@example.com', 'username3@example.com');
+        $emails = $sink->get_messages();
+        foreach ($emails as $email) {
+            $this->assertTrue(in_array($email->to, $exptrcpt)); // Closure messages don't go to completed users.
+            $this->assertEquals('Appraisal Closure Message Subject', $email->subject);
+        }
+
         ini_set('error_log', $oldlog);
+    }
+
+    public function test_activated_appraisal_new_appraisee_notification() {
+        $this->resetAfterTest();
+        $sink = $this->redirectEmails();
+        $this->assertTrue(phpunit_util::is_redirecting_phpmailer());
+
+        $learner1 = $this->getDataGenerator()->create_user(array('username' => 'learner1'));
+        [$appraisal] = $this->prepare_appraisal_with_users([], [$learner1]);
+
+        $roles = [appraisal::ROLE_LEARNER];
+        $notification = new appraisal_message();
+        $notification->event_appraisal($appraisal->id); // By default this is activation.
+        $notification->set_delta(0);
+        $notification->set_roles($roles);
+        $notification->set_message(0, 'Appraisal activation', 'Body 1');
+        $notification->save();
+
+        $validationstatus = $appraisal->validate();
+        $this->assertEmpty($validationstatus[0]);
+        $this->assertEmpty($validationstatus[1]);
+
+        $appraisal->activate();
+        \appraisal::send_scheduled();
+
+        $emails = $sink->get_messages();
+        $this->assertCount(1, $emails);
+        $this->assertSame('Appraisal activation', $emails[0]->subject, "wrong subject");
+        $this->assertSame($learner1->email, $emails[0]->to, "wrong email");
+        $sink->clear();
+
+        // Add new appraisees after activation.
+        $learner2 = $this->getDataGenerator()->create_user(['username' => 'learner2']);
+        $cohortgenerator = $this->getDataGenerator()->get_plugin_generator('totara_cohort');
+        $cohort = $cohortgenerator->create_cohort(['name' => 'newappraisees']);
+        $cohortgenerator->cohort_assign_users($cohort->id, [$learner2->id]);
+        $this->getDataGenerator()->get_plugin_generator('totara_appraisal')->create_group_assignment($appraisal, 'cohort', $cohort->id);
+
+        // Simulate a cron run.
+        $appraisal->check_assignment_changes();
+
+        $emails = $sink->get_messages();
+        $this->assertCount(1, $emails);
+        $this->assertSame('Appraisal activation', $emails[0]->subject, "wrong subject");
+        $this->assertSame($learner2->email, $emails[0]->to, "wrong email");
+        $sink->clear();
+
+        $sink->close();
+    }
+
+    public function test_appraisal_close() {
+        $this->resetAfterTest();
+        $sink = $this->redirectEmails();
+        $this->setAdminUser();
+        /** @var appraisal $appraisal */
+        list($appraisal, $users) = $this->prepare_appraisal_with_users();
+        $this->assertCount(2, $users);
+        $appraisal->validate();
+        $appraisal->activate();
+
+        $formdata = new stdClass();
+        $formdata->sendalert = true;
+        $formdata->id = $appraisal->id;
+        $formdata->alerttitle = 'Test alert title';
+        $formdata->alertbody_editor['text'] = 'Test alert body text';
+
+        $appraisal->close($formdata);
+        appraisal::send_scheduled();
+
+        $emails = $sink->get_messages();
+        $this->assertCount(2, $emails);
+        $this->assertSame('Test alert title', $emails[0]->subject);
+        $this->assertSame('Test alert title', $emails[1]->subject);
+
+        // Check that both emails have the same content.
+        // Remove multipart boundary because that's the only expected difference between the two messages.
+        preg_match('|\R--(.{0,69})\R|', $emails[0]->body, $matches);
+        $boundary = $matches[1];
+        $body_0 = str_replace($boundary, '', $emails[0]->body);
+
+        preg_match('|\R--(.{0,69})\R|', $emails[1]->body, $matches);
+        $boundary = $matches[1];
+        $body_1 = str_replace($boundary, '', $emails[1]->body);
+
+        $this->assertContains('Test alert body text', $body_0);
+
+        // Remove everything after notification preferences link before comparison.
+        $body_0 = preg_replace('/notificationpreferences\.php.*/s', '', $body_0);
+        $body_1 = preg_replace('/notificationpreferences\.php.*/s', '', $body_1);
+
+        // A bug (TL-20258) used to append a contexturl string for each appraisal closure message.
+        // Make sure the bug is not re-introduced by checking both bodies are the same and don't contain this text.
+        $this->assertSame($body_0, $body_1);
+        $this->assertNotContains('More details can be found at', $body_1);
+
+        $sink->clear();
+        $sink->close();
     }
 }

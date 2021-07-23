@@ -31,14 +31,16 @@
 
 // NOTE: no MOODLE_INTERNAL test here, this file may be required by behat before including /config.php.
 
-use Behat\Behat\Context\Step\Then as Then;
 use Behat\Gherkin\Node\TableNode as TableNode;
-use Behat\Behat\Exception\PendingException as PendingException;
+use Behat\Behat\Tester\Exception\PendingException as PendingException;
 
 class behat_totara_hierarchy extends behat_base {
 
     protected static $generator = null;
 
+    /**
+     * @return totara_hierarchy_generator
+     */
     protected function get_data_generator() {
         global $CFG;
         if (self::$generator === null) {
@@ -58,6 +60,8 @@ class behat_totara_hierarchy extends behat_base {
      * @throws Exception
      */
     public function the_following_frameworks_exist($prefix, TableNode $table) {
+        \behat_hooks::set_step_readonly(true); // Backend action.
+
         $required = array(
             'idnumber'
         );
@@ -103,6 +107,8 @@ class behat_totara_hierarchy extends behat_base {
      * @throws Exception
      */
     public function the_following_hierarchy_exists($prefix, TableNode $table) {
+        \behat_hooks::set_step_readonly(true); // Backend action.
+
         global $DB;
 
         $required = array(
@@ -115,6 +121,7 @@ class behat_totara_hierarchy extends behat_base {
             'visible',
             'parent', // ID number.
             'type', // ID number.
+            'targetdate' // For goals. Uses d/m/Y format.
         );
 
         $data = $table->getHash();
@@ -134,7 +141,11 @@ class behat_totara_hierarchy extends behat_base {
                 if (in_array($fieldname, $required)) {
                     $record[$fieldname] = $value;
                 } else if (in_array($fieldname, $optional)) {
-                    $record[$fieldname] = $value;
+                    if ($fieldname === 'targetdate') {
+                        $record[$fieldname] = totara_date_parse_from_format('d/m/Y', $value);
+                    } else {
+                        $record[$fieldname] = $value;
+                    }
                 } else {
                     throw new Exception('Unknown field '.$fieldname.' in hierarchy definition');
                 }
@@ -167,6 +178,192 @@ class behat_totara_hierarchy extends behat_base {
     }
 
     /**
+     * Create the requested hierarchy element
+     *
+     * @Given /^the following hierarchy types exist:$/
+     * @param TableNode $table
+     * @throws Exception
+     */
+    public function the_following_hierarchy_types_exist(TableNode $table) {
+        \behat_hooks::set_step_readonly(true); // Backend action.
+
+        $required = array(
+            'hierarchy',
+        );
+        $optional = array(
+            'idnumber',
+            'fullname',
+        );
+
+        $data = $table->getHash();
+        $firstrow = reset($data);
+
+        // Check required fields are present.
+        foreach ($required as $reqname) {
+            if (!isset($firstrow[$reqname])) {
+                throw new Exception('Hierarchy elements require the field '.$reqname.' to be set');
+            }
+        }
+
+        $generator = $this->get_data_generator();
+
+        foreach ($data as $row) {
+            // Copy values, ready to pass on to the generator.
+            $record = array();
+            foreach ($row as $fieldname => $value) {
+                if (in_array($fieldname, $required)) {
+                    $record[$fieldname] = $value;
+                } else if (in_array($fieldname, $optional)) {
+                    $record[$fieldname] = $value;
+                } else {
+                    throw new Exception('Unknown field '.$fieldname.' in hierarchy definition');
+                }
+            }
+
+            $hierarchytype = $record['hierarchy'];
+            unset($record['hierarchy']);
+
+            $generator->create_hierarchy_type($hierarchytype, $record);
+        }
+    }
+
+    /**
+     * Create the requested hierarchy type custom fields
+     *
+     * @Given /^the following hierarchy type custom fields exist:$/
+     * @param TableNode $table
+     * @throws Exception
+     */
+    public function the_following_hierarchy_type_custom_fields_exist(TableNode $table) {
+        \behat_hooks::set_step_readonly(true); // Backend action.
+
+        $required = array(
+            'hierarchy',
+            'typeidnumber',
+            'type',
+            'value',
+        );
+        $optional = array(
+            'fullname',
+            'shortname',
+        );
+
+        $data = $table->getHash();
+        $firstrow = reset($data);
+
+        // Check required fields are present.
+        foreach ($required as $reqname) {
+            if (!isset($firstrow[$reqname])) {
+                throw new Exception('Hierarchy elements require the field '.$reqname.' to be set');
+            }
+        }
+
+        $generator = $this->get_data_generator();
+
+        foreach ($data as $row) {
+            // Copy values, ready to pass on to the generator.
+            $record = array();
+            foreach ($row as $fieldname => $value) {
+                if (in_array($fieldname, $required)) {
+                    $record[$fieldname] = $value;
+                } else if (in_array($fieldname, $optional)) {
+                    $record[$fieldname] = $value;
+                } else {
+                    throw new Exception('Unknown field '.$fieldname.' in hierarchy definition');
+                }
+            }
+
+            $type = $record['type'];
+            unset($record['type']);
+
+            switch($type) {
+                case 'checkbox':
+                    $generator->create_hierarchy_type_checkbox($record);
+                    break;
+                case 'assign':
+                    $generator->create_hierarchy_type_assign($record);
+                    break;
+                case 'datetime':
+                    $generator->create_hierarchy_type_datetime($record);
+                    break;
+                case 'location':
+                    $generator->create_hierarchy_type_location($record);
+                    break;
+                case 'text':
+                    $generator->create_hierarchy_type_text($record);
+                    break;
+                case 'url':
+                    $generator->create_hierarchy_type_url($record);
+                    break;
+                case 'textarea':
+                    $generator->create_hierarchy_type_textarea($record);
+                    break;
+                default:
+                    throw new Exception('Invalid custom field type '.$record['type']);
+
+            }
+        }
+    }
+
+    /**
+     * @Given /^a goal scale called "(?P<scalename_string>(?:[^"]|\\")*)" exists with the following values:$/
+     * @param string $scalename
+     * @param TableNode $table
+     * @throws Exception
+     */
+    public function goal_scale_called_exists($scalename, TableNode $table) {
+        \behat_hooks::set_step_readonly(true); // Backend action.
+        global $USER, $DB;
+
+        $required = array(
+            'value'
+        );
+
+        $data = $table->getHash();
+        $firstrow = reset($data);
+
+        // Check required fields are present.
+        foreach ($required as $reqname) {
+            if (!isset($firstrow[$reqname])) {
+                throw new Exception('Goal scale values require the field '.$reqname.' to be set');
+            }
+        }
+
+        // The below is largely copied from totara/hierarchy/prefix/goal/scale/edit.php.
+        $scalenew = new stdClass();
+        $scalenew->name = $scalename;
+        $scalenew->timemodified = time();
+        if (empty($USER->id)) {
+            $scalenew->usermodified = get_admin()->id;
+        } else {
+            $scalenew->usermodified = $USER->id;
+        }
+        $scalenew->description = '';
+        $scalenew->id = $DB->insert_record('goal_scale', $scalenew);
+
+        $sortorder = 1;
+        $scaleidlist = array();
+        foreach ($data as $row) {
+            $scalevalrec = new stdClass();
+            $scalevalrec->scaleid = $scalenew->id;
+            $scalevalrec->name = trim($row['value']);
+            $scalevalrec->sortorder = $sortorder;
+            $scalevalrec->timemodified = time();
+            $scalevalrec->usermodified = $scalenew->usermodified;
+            $scalevalrec->proficient = ($sortorder == 1) ? 1 : 0;
+            $result = $DB->insert_record('goal_scale_values', $scalevalrec);
+            $scaleidlist[] = $result;
+            $sortorder++;
+        }
+
+        if (count($scaleidlist)) {
+            $scalenew->defaultid = $scaleidlist[count($scaleidlist)-1];
+            $scalenew->proficient = $scaleidlist[0];
+            $DB->update_record('goal_scale', $scalenew);
+        }
+    }
+
+    /**
      * Create or update the requested job assignment
      *
      * @Given /^the following job assignments exist:$/
@@ -175,6 +372,7 @@ class behat_totara_hierarchy extends behat_base {
      * @throws coding_exception
      */
     public function the_following_job_assignments_exist(TableNode $table) {
+        \behat_hooks::set_step_readonly(true); // Backend action.
         global $DB, $CFG;
 
         require_once($CFG->dirroot.'/totara/hierarchy/prefix/position/lib.php');
@@ -196,6 +394,8 @@ class behat_totara_hierarchy extends behat_base {
             'tempmanager', // Username.
             'tempmanagerjaidnumber', // String.
             'tempmanagerexpirydate', // Unix datetime
+            'totarasync',
+            'usefirst'
         );
 
         $data = $table->getHash();
@@ -306,8 +506,18 @@ class behat_totara_hierarchy extends behat_base {
             }
             unset($record['position']);
 
+            $usefirst = !empty($record['usefirst']) ? true : false;
+            unset($record['usefirst']);
+
+            // Check if we should use the first assignment
+            if ($usefirst) {
+                $ja = \totara_job\job_assignment::get_first($userid);
+                if (!empty($ja)) {
+                    $ja->update($record);
+                    continue; // Don't need to create new job assignment.
+                }
             // Check if this is an update.
-            if (!empty($record['idnumber'])) {
+            } else if (!empty($record['idnumber'])) {
                 $ja = \totara_job\job_assignment::get_with_idnumber($userid, $record['idnumber'], false);
                 if (!empty($ja)) {
                     $ja->update($record);
@@ -325,9 +535,8 @@ class behat_totara_hierarchy extends behat_base {
      *
      * @Then /^I should see these hierarchy items at the following depths:$/
      */
-    public function iShouldSeeTheseHierarchyItemsAtTheFollowingDepths(TableNode $table)
-    {
-        $commands = array();
+    public function iShouldSeeTheseHierarchyItemsAtTheFollowingDepths(TableNode $table) {
+        \behat_hooks::set_step_readonly(true);
         $data = $table->getRows();
 
         foreach ($data as $row => $columns) {
@@ -338,10 +547,8 @@ class behat_totara_hierarchy extends behat_base {
                 throw new Exception("The depth of hierarchy item \"{$columns[0]}\" is zero or missing. It must be a value or 1 or higher.");
             }
 
-            $commands[] = new Then("I should see hierarchy item \"{$columns[0]}\" in the \"" . ($row + 1) . "\" table row at depth \"{$columns[1]}\"");
+            $this->execute('behat_totara_hierarchy::iShouldSeeHierarchyItemInTheTableRowAtDepth', array($columns[0], $row + 1, $columns[1]));
         }
-
-        return $commands;
     }
 
     /**
@@ -360,9 +567,7 @@ class behat_totara_hierarchy extends behat_base {
             throw new Exception("The depth of '{$itemname}' heirarchy item is zero or missing. You must provide a value of 1 or higher.");
         }
 
-        return array(
-            new Then("I should see \"{$itemname}\" in the \"//table/tbody/tr[{$tablerow}]/td[1]/div[contains(@class, 'depth{$depth}')]/a\" \"xpath_element\"")
-        );
+        $this->execute('behat_general::assert_element_contains_text', array($itemname, "//table/tbody/tr[{$tablerow}]/td[1]/div[contains(@class, 'depth{$depth}')]/a", 'xpath_element'));
     }
 
 }

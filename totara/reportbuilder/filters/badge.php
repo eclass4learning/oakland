@@ -47,6 +47,7 @@ class rb_filter_badge extends rb_filter_type {
         global $SESSION;
         $label = format_string($this->label);
         $advanced = $this->advanced;
+        $defaultvalue = $this->defaultvalue;
 
         $mform->addElement('static', $this->name.'_list', $label,
             // Container for currently selected badges.
@@ -63,7 +64,10 @@ class rb_filter_badge extends rb_filter_type {
         // Set default values.
         if (isset($SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name])) {
             $defaults = $SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name];
+        } else if (!empty($defaultvalue)) {
+            $this->set_data($defaultvalue);
         }
+
         if (isset($defaults['value'])) {
             $mform->setDefault($this->name, $defaults['value']);
         }
@@ -211,7 +215,7 @@ class rb_filter_badge extends rb_filter_type {
         $jsdetails->strings = array(
             'badges' => array('choosebadges')
         );
-        $jsdetails->args = array('filter_to_load' => 'badge', 'reportid' => $this->report->_id);
+        $jsdetails->args = array('filter_to_load' => 'badge', null, null, $this->name, 'reportid' => $this->report->_id);
 
         foreach ($jsdetails->strings as $scomponent => $sstrings) {
             $PAGE->requires->strings_for_js($sstrings, $scomponent);

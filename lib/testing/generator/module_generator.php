@@ -248,6 +248,10 @@ abstract class testing_module_generator extends component_generator_base {
             $record->introformat = FORMAT_MOODLE;
         }
 
+        if (isset($record->tags) && !is_array($record->tags)) {
+            $record->tags = preg_split('/\s*,\s*/', trim($record->tags), -1, PREG_SPLIT_NO_EMPTY);
+        }
+
         // Before Moodle 2.6 it was possible to create a module with completion tracking when
         // it is not setup for course and/or site-wide. Display debugging message so it is
         // easier to trace an error in unittests.
@@ -260,15 +264,6 @@ abstract class testing_module_generator extends component_generator_base {
 
         // Add the module to the course.
         $moduleinfo = add_moduleinfo($record, $course, $mform = null);
-
-        // TODO: upstream to Moodle
-        $modcontext = context_module::instance($moduleinfo->coursemodule);
-        // Trigger event.
-        $eventdata = clone $moduleinfo;
-        $eventdata->modname = $eventdata->modulename;
-        $eventdata->id = $eventdata->coursemodule;
-        $event = \core\event\course_module_created::create_from_cm($eventdata, $modcontext);
-        $event->trigger();
         $moduleinfo = edit_module_post_actions($moduleinfo, $course);
         // Prepare object to return with additional field cmid.
         $instance = $DB->get_record($this->get_modulename(), array('id' => $moduleinfo->instance), '*', MUST_EXIST);

@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+// Hub functionality as been deprecated with version 11 and will be removed entirely in the next major version.
+
 /**
  *
  * Hub related strings
@@ -37,7 +39,7 @@ $string['allowpublicsearch'] = 'Publish this hub so people can join it';
 $string['audience'] = 'Audience';
 $string['audience_help'] = 'Select the intended audience for the course.';
 $string['audienceeducators'] = 'Educators';
-$string['audiencestudents'] = 'Students';
+$string['audiencestudents'] = 'Learners';
 $string['audienceadmins'] = 'Moodle administrators';
 $string['badurlformat'] = 'Bad URL format';
 $string['badgesnumber'] = 'Number of badges ({$a})';
@@ -68,7 +70,7 @@ $string['courseurl_help'] = 'It is the URL of your course. This URL is displayed
 $string['creatorname'] = 'Creator';
 $string['creatorname_help'] = 'The creator is the course creator.';
 $string['creatornotes'] = 'Creator notes';
-$string['creatornotes_help'] = 'Creator notes are a guide for teachers on how to use the course.';
+$string['creatornotes_help'] = 'Creator notes are a guide for trainers on how to use the course.';
 $string['deletescreenshots'] = 'Delete these screenshots';
 $string['deletescreenshots_help'] = 'Delete all the currently uploaded screenshots.';
 $string['demourl'] = 'Demo URL';
@@ -98,7 +100,7 @@ $string['errorcronnoxmlrpc'] = 'XML-RPC must be enabled in order to update the r
 $string['errorhublisting'] = 'An error occurred when retrieving the hub listing from Moodle. Please try again later. ({$a})';
 $string['errorlangnotrecognized'] = 'The provided language code is unknown by Moodle. Please contact {$a}';
 $string['errorregistration'] = 'An error occurred during registration, please try again later. ({$a})';
-$string['errorunpublishcourses']= 'Due to an unexpected error, the courses could not be deleted on the hub. Try again later (recommended) or contact the hub administrator.';
+$string['errorunpublishcourses'] = 'Due to an unexpected error, the courses could not be deleted on the hub. Try again later (recommended) or contact the hub administrator.';
 $string['existingscreenshotnumber'] = '{$a} existing screenshots. You will be able to see these screenshots on this page, only once the hub administrator enables your course.';
 $string['existingscreenshots'] = 'Existing screenshots';
 $string['forceunregister'] = 'Yes, clean registration data';
@@ -190,7 +192,7 @@ $string['share'] = 'Share this course for people to download';
 $string['shared'] = 'Shared';
 $string['shareon'] = 'Upload this course to {$a}';
 $string['shareonhub'] = 'Upload this course to a hub';
-$string['sharepublication_help'] = 'Uploading this course to a community hub server will enable people to download it and install it on their own Moodle sites.';
+$string['sharepublication_help'] = 'Uploading this course to a community hub server will enable people to download it and install it on their own Totara sites.';
 $string['siteadmin'] = 'Administrator';
 $string['siteadmin_help'] = 'The full name of the site administrator.';
 $string['sitecountry'] = 'Country';
@@ -219,14 +221,14 @@ $string['siteregistrationemail'] = 'Email notifications';
 $string['siteregistrationemail_help'] = 'If you enable this the hub administrator may email you to inform you of important news like security issues.';
 $string['siteregistrationupdated'] = 'Site registration updated';
 $string['siterelease'] = 'Moodle release';
-$string['siterelease_help'] = 'Moodle release number of this site.';
+$string['siterelease_help'] = 'Totara release number of this site.';
 $string['siteupdatedcron'] = 'Site registration updated on "{$a}"';
 $string['siteupdatesend'] = 'Finished registration update on hubs.';
 $string['siteupdatesstart'] = 'Starting registration update on hubs...';
 $string['siteurl'] = 'Site URL';
 $string['siteurl_help'] = 'The URL is the address of this site.  If privacy settings allow people to see site addresses then this is the URL that will be used.';
 $string['siteversion'] = 'Moodle version';
-$string['siteversion_help'] = 'The Moodle version of this site.';
+$string['siteversion_help'] = 'The Totara version of this site.';
 $string['subject'] = 'Subject';
 $string['subject_help'] = 'Select the main subject area which the course covers.';
 $string['specifichubregistrationdetail'] = 'You can also register your site with other community and private hubs.';

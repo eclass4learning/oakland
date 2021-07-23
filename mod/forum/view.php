@@ -87,27 +87,7 @@
     }
 
     if (!$PAGE->button) {
-        /**
-         * BEGIN OAKLAND CHANGES
-         * - display Back to Group button
-         */
-        if($course->oaklandgroupid != null){
-            global $DB;
-            $buttons = forum_search_form($course, $search);
-            $dashboard = $DB->get_record('totara_dashboard',array('oaklandgroupid'=>$course->oaklandgroupid));
-            $buttons .= "<div style='margin-top:10px; float:right;'>";
-            $buttons .= html_writer::start_tag('form',array('action'=>new moodle_url('/totara/dashboard/index.php')));
-            $buttons .= html_writer::empty_tag('input',array('type'=>'hidden','value'=>$dashboard->id,'name'=>'id'));
-            $buttons .= html_writer::tag('button','Go Back To Group');
-            $buttons .= html_writer::end_tag('form');
-            $buttons .= "</div>";
-            $PAGE->set_button($buttons);
-        }else{
-            $PAGE->set_button(forum_search_form($course, $search));
-        }
-        /**
-         * END OAKLAND CHANGES
-         */
+        $PAGE->set_button(forum_search_form($course, $search));
     }
 
     $context = context_module::instance($cm->id);
@@ -126,13 +106,15 @@
     $PAGE->add_body_class('forumtype-'.$forum->type);
     $PAGE->set_heading($course->fullname);
 
-/// Some capability checks.
+    // Some capability checks.
+    $courselink = new moodle_url('/course/view.php', ['id' => $cm->course]);
+
     if (empty($cm->visible) and !has_capability('moodle/course:viewhiddenactivities', $context)) {
-        notice(get_string("activityiscurrentlyhidden"));
+        notice(get_string("activityiscurrentlyhidden"), $courselink);
     }
 
     if (!has_capability('mod/forum:viewdiscussion', $context)) {
-        notice(get_string('noviewdiscussionspermission', 'forum'));
+        notice(get_string('noviewdiscussionspermission', 'forum'), $courselink);
     }
 
     // Mark viewed and trigger the course_module_viewed event.
@@ -141,6 +123,9 @@
     echo $OUTPUT->header();
 
     echo $OUTPUT->heading(format_string($forum->name), 2);
+
+    echo self_completion_form($cm, $course);
+
     if (!empty($forum->intro) && $forum->type != 'single' && $forum->type != 'teacher') {
         echo $OUTPUT->box(format_module_intro('forum', $forum, $cm->id), 'generalbox', 'intro');
     }
@@ -162,6 +147,11 @@
             $discussion = array_pop($discussions);
         }
         if ($discussion) {
+            // Confirmation of unlocking only needs to occur if the discussion is currently locked.
+            if (forum_discussion_is_locked($forum, $discussion)) {
+                echo $OUTPUT->notification(get_string('discussionlocked', 'forum'), 'info');
+            }
+
             if ($mode) {
                 set_user_preference("forum_displaymode", $mode);
             }
@@ -227,9 +217,9 @@
         case 'blog':
             echo '<br />';
             if (!empty($showall)) {
-                forum_print_latest_discussions($course, $forum, 0, 'plain', 'p.created DESC', -1, -1, -1, 0, $cm);
+                forum_print_latest_discussions($course, $forum, 0, 'plain', 'd.pinned DESC, p.created DESC', -1, -1, -1, 0, $cm);
             } else {
-                forum_print_latest_discussions($course, $forum, -1, 'plain', 'p.created DESC', -1, -1, $page,
+                forum_print_latest_discussions($course, $forum, -1, 'plain', 'd.pinned DESC, p.created DESC', -1, -1, $page,
                     $CFG->forum_manydiscussions, $cm);
             }
             break;

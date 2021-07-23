@@ -23,7 +23,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/totara/plan/lib.php');
 require_once($CFG->dirroot . '/totara/core/js/lib/setup.php');
 
@@ -48,11 +48,7 @@ $PAGE->set_pagelayout('report');
 $planurl = "{$CFG->wwwroot}/totara/plan/view.php?id={$id}";
 $plan = new development_plan($id);
 
-// If the user can't manage and approve this plan, they shouldn't be able to approve changes.
-$can_manage = dp_can_manage_users_plans($plan->userid);
-$can_approve = dp_role_is_allowed_action($plan->role, 'approve', 'approve');
-
-if (!$can_manage || !$can_approve) {
+if (!$plan->can_approve_plan()) {
     print_error('error:nopermissions', 'totara_plan');
 }
 

@@ -31,8 +31,8 @@ class rb_filter_grpconcat_date extends rb_filter_date {
 
     private $datefield, $datejoin;
 
-    public function __construct($type, $value, $advanced, $region, $report) {
-        parent::__construct($type, $value, $advanced, $region, $report);
+    public function __construct($type, $value, $advanced, $region, $report, $defaultvalue) {
+        parent::__construct($type, $value, $advanced, $region, $report, $defaultvalue);
 
         if (!isset($this->options['prefix']) || !isset($this->options['datefield'])) {
             throw new ReportBuilderException('concatenated date filters must have a \'datefield\' set that maps
@@ -51,13 +51,12 @@ class rb_filter_grpconcat_date extends rb_filter_date {
      */
     function get_sql_filter($data) {
         $unique = rb_unique_param('grpdt_flt');
-        $field = $this->get_field();
-        $usertab  = $this->joins;
+        $userfield = $this->get_field();
 
         $daysbefore = $data['daysbefore'];
         $daysafter = $data['daysafter'];
-        $precond = ' (1 = 0) ';
-        $postcond = ' (1 = 0) ';
+        $precond = ' (1 = 1) ';
+        $postcond = ' (1 = 1) ';
         $params = array();
 
         $fromsql = '';
@@ -130,9 +129,9 @@ class rb_filter_grpconcat_date extends rb_filter_date {
 
             $sql = " EXISTS ( SELECT 1
                              {$fromsql}
-                               WHERE ja.userid = {$usertab}.id
+                               WHERE ja.userid = {$userfield}
                                  AND {$field} != :{$uniquenull}
-                                 AND ( {$precond} OR {$postcond} )
+                                 AND ( {$precond} AND {$postcond} )
                             )";
             return array($sql, $params);
         }

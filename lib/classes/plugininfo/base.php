@@ -64,9 +64,6 @@ abstract class base {
     /** @var core_plugin_manager the plugin manager this plugin info is part of */
     public $pluginman;
 
-    /** @var array|null array of {@link \core\update\info} for this plugin */
-    protected $availableupdates;
-
     /**
      * Finds all enabled plugins, the result may include missing plugins.
      * @return array|null of enabled plugins $pluginname=>$pluginname, null means unknown
@@ -132,7 +129,23 @@ abstract class base {
      * @return base the instance of $typeclass
      */
     protected static function make_plugin_instance($type, $typerootdir, $name, $namerootdir, $typeclass, $pluginman) {
-        $plugin              = new $typeclass();
+        // Totara: allow plugins to extend the type class,
+        //         this allows us to add plugin specific meta data to plugininfo class.
+        $plugin = null;
+        if ($type !== 'core') {
+            $pluginclass = "{$type}_{$name}\\plugininfo";
+            if (class_exists($pluginclass)) {
+                if (in_array(ltrim($typeclass, '\\'), class_parents($pluginclass))) {
+                    $plugin = new $pluginclass();
+                } else {
+                    debugging('Class ' . $pluginclass . ' must extend ' . $typeclass, DEBUG_DEVELOPER);
+                }
+            }
+        }
+        if (!$plugin) {
+            $plugin = new $typeclass();
+        }
+
         $plugin->type        = $type;
         $plugin->typerootdir = $typerootdir;
         $plugin->name        = $name;
@@ -406,24 +419,6 @@ abstract class base {
     }
 
     /**
-     * If there are updates for this plugin available, returns them.
-     *
-     * Returns array of {@link \core\update\info} objects, if some update
-     * is available. Returns null if there is no update available or if the update
-     * availability is unknown.
-     *
-     * Populates the property {@link $availableupdates} on first call (lazy
-     * loading).
-     *
-     * @deprecated Not implemented in Totara
-     *
-     * @return array|null
-     */
-    public function available_updates() {
-        return null;
-    }
-
-    /**
      * Returns the node name used in admin settings menu for this plugin settings (if applicable)
      *
      * @return null|string node name or null if plugin does not create settings node (default)
@@ -563,5 +558,20 @@ abstract class base {
             'confirm' => 0,
             'return' => $return,
         ));
+    }
+
+    /**
+     * Optional method allowing component to provide usage
+     * data for the component, which will be merged with other
+     * components and returned with site registration data.
+     * Data returned should be general, anonymous information about
+     * the component's usage.
+     *
+     * @since Totara 12
+     *
+     * @return array|null Data to return, or null if none.
+     */
+    public function get_usage_for_registration_data() {
+        return null;
     }
 }

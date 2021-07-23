@@ -23,7 +23,7 @@
  * @subpackage cohort
  */
 
-require_once(dirname(dirname(dirname(__FILE__))).'/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot.'/totara/cohort/cohort_forms.php');
 require_once($CFG->dirroot.'/cohort/lib.php');
@@ -59,6 +59,7 @@ $currenturl = qualified_me();
 local_js(array(TOTARA_JS_DIALOG));
 
 $PAGE->requires->strings_for_js(array('confirmcreateplans'), 'totara_plan');
+$PAGE->requires->strings_for_js(array('taskplanswillbecreated'), 'totara_cohort');
 $PAGE->requires->strings_for_js(array('continue', 'cancel'), 'moodle');
 $args = array('args' => '{"id":"'.$cohort->id.'"}');
 $jsmodule = array(
@@ -86,15 +87,19 @@ if ($data = $form->get_data()) {
         $planconfig->plantemplateid = $data->plantemplateid;
         $planconfig->save();
 
-        // Create the plans, if required.
-        $createdplancount = \totara_cohort\learning_plan_helper::create_plans($planconfig);
+        // Create the plans on an adhoc scheduled task.
+        $adhoctask = new \totara_cohort\task\create_learning_plans_task();
+        $adhoctask->set_custom_data(array('config' => $planconfig, 'userid' => $USER->id));
+        $adhoctask->set_component('totara_cohort');
+        \core\task\manager::queue_adhoc_task($adhoctask);
 
         totara_set_notification(get_string('saved', 'totara_cohort'), null, array('class' => 'notifysuccess'));
-        if ($createdplancount) {
-            totara_set_notification(get_string('successfullycreatedplans', 'totara_cohort', $createdplancount), null, array('class' => 'notifysuccess'));
-        }
+        totara_set_notification(get_string('taskplanswillbecreated', 'totara_cohort'), null, array('class' => 'notifysuccess'));
     }
 }
+
+$strheading = get_string('learningplan', 'totara_cohort');
+totara_cohort_navlinks($cohort->id, format_string($cohort->name), $strheading);
 
 echo $OUTPUT->header();
 
@@ -132,6 +137,7 @@ $table = new flexible_table('cohortplancreatehistory');
 $table->define_baseurl(qualified_me());
 $table->define_columns($tablecolumns);
 $table->define_headers($tableheaders);
+$table->attributes['id'] = 'cohortplancreatehistory';
 
 $table->attributes['class'] = 'fullwidth';
 

@@ -26,13 +26,12 @@ Feature: Verify a learner cannot access a course they don't have access to via t
 
     # Hide the course.
     When I log in as "admin"
-    And I navigate to "Manage courses and categories" node in "Site administration > Courses"
+    And I navigate to "Courses and categories" node in "Site administration > Courses"
     And I click on "Hide" "link" in the "#course-listing" "css_element"
     And I log out
 
     # Login in as the learner and check the course can't be accessed.
     When I log in as "learner1"
     And I click on "Dashboard" in the totara menu
-    And I click on "Course 1" "link" in the "Last Course Accessed" "block"
-    Then I should see "This course is currently unavailable to students"
+    Then "Last Course Accessed" "block" should not exist
 

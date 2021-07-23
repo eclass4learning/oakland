@@ -33,7 +33,6 @@ M.totara_cohortenrolledlearning = M.totara_cohortenrolledlearning || {
      */
     init: function(Y) {
         // save a reference to the Y instance (all of its dependencies included)
-        var module = this;
         this.Y = Y;
 
         // Check jQuery dependency is available.
@@ -59,8 +58,9 @@ M.totara_cohortenrolledlearning = M.totara_cohortenrolledlearning || {
 
         // On click events for column sorting and paging inside "View dates" popup.
         $('#page-admin-totara-cohort-enrolledlearning').on('click',
-            '.moodle-dialogue-content #program_assignment_duedates a, ' +
-            '.moodle-dialogue-content #cert_assignment_duedates a', function(event){
+            '.moodle-dialogue-bd #program_assignment_duedates a, ' +
+            '.moodle-dialogue-bd #cert_assignment_duedates a, ' +
+            '.moodle-dialogue-bd .paging', function(event){
             if (!event.target.closest('td') || !$(event.target.closest('td')).hasClass('cell')) {
                 $.get($(event.target).attr('href'), function(result){
                     M.totara_cohortenrolledlearning.datesDialogue.bodyNode.setHTML(result);

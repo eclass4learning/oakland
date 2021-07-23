@@ -51,7 +51,8 @@ class behat_repository_upload extends behat_files {
      * @param string $filemanagerelement
      */
     public function i_upload_file_to_filemanager($filepath, $filemanagerelement) {
-        $this->upload_file_to_filemanager($filepath, $filemanagerelement, new TableNode(), false);
+        \behat_hooks::set_step_readonly(false);
+        $this->upload_file_to_filemanager($filepath, $filemanagerelement, new TableNode(array()), false);
     }
 
     /**
@@ -63,7 +64,8 @@ class behat_repository_upload extends behat_files {
      * @param string $filemanagerelement
      */
     public function i_upload_and_overwrite_file_to_filemanager($filepath, $filemanagerelement) {
-        $this->upload_file_to_filemanager($filepath, $filemanagerelement, new TableNode(),
+        \behat_hooks::set_step_readonly(false);
+        $this->upload_file_to_filemanager($filepath, $filemanagerelement, new TableNode(array()),
                 get_string('overwrite', 'repository'));
     }
 
@@ -77,6 +79,7 @@ class behat_repository_upload extends behat_files {
      * @param TableNode $data Data to fill in upload form
      */
     public function i_upload_file_to_filemanager_as($filepath, $filemanagerelement, TableNode $data) {
+        \behat_hooks::set_step_readonly(false);
         $this->upload_file_to_filemanager($filepath, $filemanagerelement, $data, false);
     }
 
@@ -90,6 +93,7 @@ class behat_repository_upload extends behat_files {
      * @param TableNode $data Data to fill in upload form
      */
     public function i_upload_and_overwrite_file_to_filemanager_as($filepath, $filemanagerelement, TableNode $data) {
+        \behat_hooks::set_step_readonly(false);
         $this->upload_file_to_filemanager($filepath, $filemanagerelement, $data,
                 get_string('overwrite', 'repository'));
     }
@@ -149,6 +153,7 @@ class behat_repository_upload extends behat_files {
         // After this we have the elements we want to interact with.
 
         $fileelement->click();
+        $this->wait_for_pending_js();
 
         // Fill the form in Upload window.
         $datahash = $data->getRowsHash();
@@ -161,13 +166,14 @@ class behat_repository_upload extends behat_files {
             // Delegates to the field class.
             $field->set_value($value);
         }
+        $this->wait_for_pending_js();
 
         // Submit the file.
         $submit = $this->find_button(get_string('getfile', 'repository'));
         $submit->press();
 
         // We wait for all the JS to finish as it is performing an action.
-        $this->getSession()->wait(self::TIMEOUT, self::PAGE_READY_JS);
+        $this->getSession()->wait(self::get_timeout(), self::PAGE_READY_JS);
 
         if ($overwriteaction !== false) {
             $overwritebutton = $this->find_button($overwriteaction);
@@ -175,9 +181,10 @@ class behat_repository_upload extends behat_files {
             $overwritebutton->click();
 
             // We wait for all the JS to finish.
-            $this->getSession()->wait(self::TIMEOUT, self::PAGE_READY_JS);
+            $this->getSession()->wait(self::get_timeout(), self::PAGE_READY_JS);
         }
 
+        $this->wait_for_pending_js();
     }
 
 }

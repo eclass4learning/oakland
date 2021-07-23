@@ -120,6 +120,9 @@ class dp_course_component extends dp_base_component {
     /**
      * Get list of items assigned to plan
      *
+     * We don't check visiblity of items as we assume that if an item has
+     * been added to the plan then they should have visiblity of that item.
+     *
      * Optionally, filtered by status
      *
      * @access  public
@@ -131,7 +134,7 @@ class dp_course_component extends dp_base_component {
      * @return  array
      */
     public function get_assigned_items($approved = null, $orderby='', $limitfrom='', $limitnum='', $linkedcounts=false) {
-        global $DB;
+        global $DB, $CFG;
 
         // Generate where clause (using named parameters because of how query is built)
         $where = "a.planid = :planid";
@@ -165,13 +168,6 @@ class dp_course_component extends dp_base_component {
                 AND cc.userid = :planuserid )";
             $params['planuserid'] = $this->plan->userid;
         }
-
-        list($visibilitysql, $visibilityparams) = totara_visibility_where($this->plan->userid,
-                                                                          'c.id',
-                                                                          'c.visible',
-                                                                          'c.audiencevisible',
-                                                                          'c',
-                                                                          'course');
 
         $countselect = '';
         $countjoin = '';
@@ -209,9 +205,24 @@ class dp_course_component extends dp_base_component {
             $params['comp2'] = 'competency';
         }
 
+        $systemcontext = context_system::instance();
+        $canviewhidden = has_capability('moodle/course:viewhiddencourses', $systemcontext, $this->plan->userid);
 
-        $params = array_merge($params, $visibilityparams);
-        $where .= " AND {$visibilitysql} ";
+        // Basic visiblity checks
+        // (we check course visiblity based on what the user the plan belongs to can see).
+        if (empty($CFG->audiencevisibility)) {
+            // If audience visiblity is off.
+            if (!$canviewhidden) {
+                $params = array_merge($params, array('coursevisible' => '1'));
+                $where .= " AND c.visible = :coursevisible ";
+            }
+        } else {
+            // Only hide if audience visiblity is set to "no users".
+            if (!$canviewhidden) {
+                $params = array_merge($params, array('audvisnousers' => COHORT_VISIBLE_NOUSERS));
+                $where .= " AND c.audiencevisible != :audvisnousers ";
+            }
+        }
 
         $sql = "
             SELECT
@@ -378,7 +389,7 @@ class dp_course_component extends dp_base_component {
     public function setup_picker() {
         global $PAGE;
         // If we are showing dialog
-        if ($this->can_update_items() && dp_can_manage_users_plans($this->plan->userid)) {
+        if ($this->can_update_items()) {
             // Setup lightbox
             local_js(array(
                 TOTARA_JS_DIALOG,
@@ -491,7 +502,7 @@ class dp_course_component extends dp_base_component {
      * @return  false|string  $out  the table to display
      */
     function display_linked_courses($list, $mandatory_list = null) {
-        global $DB;
+        global $DB, $CFG;
 
         if (!is_array($list) || count($list) == 0) {
             return false;
@@ -525,12 +536,16 @@ class dp_course_component extends dp_base_component {
             $params['userid'] = $this->plan->userid;
         }
 
-        list($visibilitysql, $visibilityparams) = totara_visibility_where($this->plan->userid,
-                                                                          'c.id',
-                                                                          'c.visible',
-                                                                          'c.audiencevisible',
-                                                                          'c',
-                                                                          'course');
+        if (empty($CFG->disable_visibility_maps)) {
+            [$visibilitysql, $visibilityparams] = \totara_core\visibility_controller::course()->sql_where_visible($this->plan->userid, 'c');
+        } else {
+            list($visibilitysql, $visibilityparams) = totara_visibility_where($this->plan->userid,
+                'c.id',
+                'c.visible',
+                'c.audiencevisible',
+                'c',
+                'course');
+        }
 
         $select = "SELECT ca.*, c.fullname, c.icon, c.visible, c.audiencevisible, psv.name AS priorityname, $completion_field";
 
@@ -554,9 +569,10 @@ class dp_course_component extends dp_base_component {
         $params['pscaleid'] = $priorityscaleid;
         list($insql, $inparams) = $DB->get_in_or_equal($list, SQL_PARAMS_NAMED);
         $where = " WHERE ca.id $insql
-            AND ca.approved = :approved ";
+            AND ca.approved >= :status ";
         $params = array_merge($params, $inparams, $visibilityparams);
-        $params['approved'] = DP_APPROVAL_APPROVED;
+        // We are looking for courses that were added to an approved plan by a user with "Request" permission.
+        $params['status'] = DP_APPROVAL_UNAPPROVED;
         $where .= " AND {$visibilitysql} ";
         $sort = " ORDER BY c.fullname";
 
@@ -616,12 +632,15 @@ class dp_course_component extends dp_base_component {
 
                 if (!$this->plan->is_complete() && $this->can_update_items()) {
                     //if the course is mandatory disable the delete checkbox
+                    $id = 'delete_linked_course_assign_' . $ca->id;
+                    $a = array('name' => $ca->fullname, 'component' => get_string('course'));
+                    $label = html_writer::label(get_string('selectlinked','totara_plan', $a), $id, '', array('class' => 'sr-only'));
                     if (!empty($mandatory_list) && in_array($ca->id, $mandatory_list)) {
-                        $row[] = html_writer::checkbox('delete_linked_course_assign['.$ca->id.']', '1', false,
-                            get_string('mandatory', 'totara_plan'), array('disabled' => 'true'));
+                        $row[] = $label . html_writer::checkbox('delete_linked_course_assign['.$ca->id.']', '1', false,
+                            get_string('mandatory', 'totara_plan'), array('disabled' => 'true', 'id' => $id));
                     }
                     else{
-                        $row[] = html_writer::checkbox('delete_linked_course_assign['.$ca->id.']', '1', false);
+                        $row[] = $label . html_writer::checkbox('delete_linked_course_assign['.$ca->id.']', '1', false, '', array('id' => $id));
                     }
                 }
 
@@ -658,7 +677,7 @@ class dp_course_component extends dp_base_component {
 
         if ($approved) {
             $class = '';
-            $action_link = $OUTPUT->action_link(new moodle_url('/course/view.php', array('id' => $item->courseid)), get_string('launchcourse', 'totara_plan'), null, array('class' => 'link-as-button btn btn-default'));
+            $action_link = $OUTPUT->action_link(new moodle_url('/course/view.php', array('id' => $item->courseid)), get_string('launchcourse', 'totara_plan'), null, array('class' => 'btn btn-default'));
             $launch = $OUTPUT->container(html_writer::tag('small', $action_link), "plan-launch-course-button");
         } else {
             $class = 'dimmed';
@@ -763,7 +782,7 @@ class dp_course_component extends dp_base_component {
      * @return string $out display markup
      */
     function display_status_as_progress_bar($item) {
-        return totara_display_course_progress_icon($this->plan->userid, $item->courseid, $item->coursecompletion);
+        return totara_display_course_progress_bar($this->plan->userid, $item->courseid, $item->coursecompletion);
     }
 
 
@@ -1068,7 +1087,7 @@ class dp_course_component extends dp_base_component {
         $approved = $this->is_item_approved($item->approved);
 
         // Actions
-        if (dp_can_manage_users_plans($this->plan->userid)) {
+        if ($this->plan->can_manage()) {
             if ($this->can_delete_item($item)) {
                 $strdelete = get_string('delete', 'totara_plan');
                 $currenturl = $this->get_url();

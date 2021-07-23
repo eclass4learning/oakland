@@ -50,7 +50,7 @@ class core_question_generator extends component_generator_base {
             'contextid'  => context_system::instance()->id,
             'info'       => '',
             'infoformat' => FORMAT_HTML,
-            'stamp'      => '',
+            'stamp'      => make_unique_id_code(),
             'parent'     => 0,
             'sortorder'  => 999,
         );
@@ -71,7 +71,7 @@ class core_question_generator extends component_generator_base {
      * @param array|stdClass $overrides any fields that should be different from the base example.
      */
     public function create_question($qtype, $which = null, $overrides = null) {
-        global $CFG;
+        global $CFG, $USER, $DB;
         require_once($CFG->dirroot . '/question/engine/tests/helpers.php');
 
         $fromform = test_question_maker::get_question_form_data($qtype, $which);
@@ -82,6 +82,12 @@ class core_question_generator extends component_generator_base {
         $question->category  = $fromform->category;
         $question->qtype     = $qtype;
         $question->createdby = 0;
-        return question_bank::get_qtype($qtype)->save_question($question, $fromform);
+        // Totara: After saving, update createdby field if specified.
+        $saved = question_bank::get_qtype($qtype)->save_question($question, $fromform);
+        if (!empty($fromform->createdby) && $fromform->createdby != $USER->id) {
+            $saved->createdby = $fromform->createdby;
+            $DB->update_record('question', $saved);
+        }
+        return $saved;
     }
 }

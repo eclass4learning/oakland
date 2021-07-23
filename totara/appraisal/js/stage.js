@@ -265,7 +265,6 @@ M.totara_appraisal_stage = M.totara_appraisal_stage || {
         focusOn      : []
       });
       dialogue.render();
-      dialogue.show();
       dialogue.on('visibleChange', function(e) {
         if (e.newVal == false) {
           dialogue.destroy();
@@ -276,15 +275,6 @@ M.totara_appraisal_stage = M.totara_appraisal_stage || {
       $content.find('script').each(function() {
         $.globalEval($(this).html());
       });
-      if (typeof tinyMCE != 'undefined') {
-        var listener = dialogue.before('destroy', function() {
-          for (edId in tinyMCE.editors) {
-            tinyMCE.editors[edId].save();
-            tinyMCE.editors[edId].destroy();
-          }
-          listener.detach(); // We only want to fire this once.
-        });
-      }
       $.extend(true, M.str, strings);
       $content.find('input[type="text"]').eq(0).focus();
       if (prevRoles.length) {
@@ -316,17 +306,7 @@ M.totara_appraisal_stage = M.totara_appraisal_stage || {
         action: function() {
           var $theFrm = $content.find('form.mform');
 
-          // Save all tinyMCE editors if any.
           // TODO: T-11236 Find way for event propagation.
-          if (typeof tinyMCE != 'undefined') {
-              if (tinymce.activeEditor) {
-                  tinymce.activeEditor.save();
-              }
-              for (edId in tinyMCE.editors) {
-                  tinyMCE.editors[edId].save();
-                  tinyMCE.editors[edId].destroy();
-              }
-          }
           var apprObj = $theFrm.serialize();
           apprObj += ('&submitbutton=' + $(this).attr('value'));
           $.post($theFrm.attr('action'), apprObj).done(function(data){
@@ -351,6 +331,64 @@ M.totara_appraisal_stage = M.totara_appraisal_stage || {
         }
       });
       $('.moodle-dialogue-ft button').removeClass('yui3-button');
+
+      // Leave this as late as possible (see below).
+      dialogue.show();
+
+      // Workaround for race conditions.
+      // Issue TL-14426 relates to enableScrollLock()
+      // being called via dialogue.show() before the
+      // filepicker has finished loading. There does
+      // not appear to be a clean way to subscribe to
+      // the filemanager and be notified that loading
+      // has completed here. Moving dialogue.show() to
+      // end of method appears to solve the issue with a
+      // good network connection although this is not
+      // entirely robust. The following resets the
+      // scroll lock repeatedly at short intervals to
+      // mitigate the issue under slower connections.
+      var resetScrollLock = (function(dialogue) {
+
+        // Only reset when filemanagers are present.
+        var $filemanagerNodes = $(dialogue.bodyNode.getDOMNode()).find('.felement.ffilemanager');
+        if($filemanagerNodes.length === 0) {
+            return function() {};
+        }
+
+        var count = 0;
+        var delay = 300;
+        var iterations = 40;  // 300ms * 40 = 12sec
+        var timerID;
+
+        return function() {
+
+          if (timerID !== undefined) {
+              window.clearTimeout(timerID);
+          }
+
+          if (count < iterations) {
+            timerID = window.setTimeout(function() {
+
+              if (typeof dialogue === 'undefined') {
+                  // Dialogue was closed.
+                  return;
+              }
+
+              // The lockScroll property may or may not be initialised
+              // at this point so check first to prevent error.
+              if (typeof dialogue.lockScroll !== 'undefined') {
+                  dialogue.lockScroll.disableScrollLock();
+                  dialogue.lockScroll.enableScrollLock();
+              }
+
+              count += 1;
+              resetScrollLock();
+            }, delay)
+          }
+        };
+      })(dialogue);
+
+      resetScrollLock();
     }
 
     /**
@@ -433,8 +471,25 @@ M.totara_appraisal_stage = M.totara_appraisal_stage || {
         // button to add a new question
         $('#id_submitbutton').on('click', function(e) {
           e.preventDefault();
-          var apprObj = $appQuestions.find('form.mform').serialize();
-          $.post($appQuestions.find('form.mform').attr('action'), apprObj).done(function(data){
+
+          var mform = $appQuestions.find('form.mform'),
+              datatype = mform.find('#id_datatype').val();
+
+          if (datatype === '') {
+            // Nothing has been selected, throw up a notification and return.
+            require(['core/str', 'core/notification'], function (str, notification) {
+              str.get_strings([
+                  {key: 'error', component: 'error'},
+                  {key: 'selectquestiontype_notselected', component: 'totara_appraisal'},
+                  {key: 'ok', component: 'core'}
+              ]).done(function(strings) {
+                  notification.alert(strings[0], strings[1], strings[2]);
+              });
+            });
+            return false;
+          }
+
+          $.post(mform.attr('action'), mform.serialize()).done(function (data) {
             modalAddEditQuestion(data, url);
           });
         });
@@ -462,7 +517,7 @@ M.totara_appraisal_stage = M.totara_appraisal_stage || {
 
         // delete question action-icon link
         $('a.action-icon.delete', '#appraisal-quest-list').on('click', function() {
-          modalDelete($(this).attr('href'), $(this).closest('li'));
+          modalDelete($(this).attr('href'), $(this).closest('li'), 'pageContent', [url]);
           return false;
         });
 

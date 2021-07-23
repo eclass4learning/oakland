@@ -38,6 +38,7 @@ $string['langpackuptodate'] = 'Language pack \'{$a}\' is up-to-date';
 $string['langpackupdated'] = 'Language pack \'{$a}\' was successfully updated';
 $string['langpackupdatedevent'] = 'Language pack updated';
 $string['langupdatecomplete'] = 'Language pack update completed';
+$string['localecheck'] = 'Locale compatibility check';
 $string['missingcfglangotherroot'] = 'Missing configuration value $CFG->langotherroot';
 $string['missinglangparent'] = 'Missing parent language <em>{$a->parent}</em> of <em>{$a->lang}</em>.';
 $string['noenglishuninstall'] = 'The English language pack cannot be uninstalled.';

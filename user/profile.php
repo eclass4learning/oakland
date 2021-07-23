@@ -32,9 +32,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require_once(dirname(__FILE__) . '/../config.php');
+require_once(__DIR__ . '/../config.php');
 require_once($CFG->dirroot . '/my/lib.php');
-require_once($CFG->dirroot . '/tag/lib.php');
 require_once($CFG->dirroot . '/user/profile/lib.php');
 require_once($CFG->dirroot . '/user/lib.php');
 require_once($CFG->libdir.'/filelib.php');
@@ -42,7 +41,6 @@ require_once($CFG->libdir.'/filelib.php');
 $userid         = optional_param('id', 0, PARAM_INT);
 $edit           = optional_param('edit', null, PARAM_BOOL);    // Turn editing on and off.
 $reset          = optional_param('reset', null, PARAM_BOOL);
-$showallcourses = optional_param('showallcourses', 0, PARAM_INT);
 
 $PAGE->set_url('/user/profile.php', array('id' => $userid));
 
@@ -51,9 +49,19 @@ if (!empty($CFG->forceloginforprofiles)) {
     if (isguestuser()) {
         $PAGE->set_context(context_system::instance());
         echo $OUTPUT->header();
+
+        // Use a GET button
+        $continue_button = new single_button(
+            new moodle_url(get_login_url()),
+            get_string('continue'),
+            'get',
+            true
+        );
         echo $OUTPUT->confirm(get_string('guestcantaccessprofiles', 'error'),
-                              get_login_url(),
-                              $CFG->wwwroot);
+            $continue_button,
+            $CFG->wwwroot
+        );
+
         echo $OUTPUT->footer();
         die;
     }
@@ -84,6 +92,7 @@ if (!user_can_view_profile($user, null, $context)) {
     $PAGE->set_context(context_system::instance());
     $PAGE->set_title("$SITE->shortname: $struser");  // Do not leak the name.
     $PAGE->set_heading($struser);
+    $PAGE->set_pagelayout('mypublic');
     $PAGE->set_url('/user/profile.php', array('id' => $userid));
     $PAGE->navbar->add($struser);
     echo $OUTPUT->header();
@@ -111,18 +120,6 @@ if (isguestuser()) {     // Guests can never edit their profile.
     } else {
         $PAGE->set_blocks_editing_capability('moodle/user:manageblocks');
     }
-}
-
-if (has_capability('moodle/user:viewhiddendetails', $context)) {
-    $hiddenfields = array();
-} else {
-    $hiddenfields = array_flip(explode(',', $CFG->hiddenuserfields));
-}
-
-if (has_capability('moodle/site:viewuseridentity', $context)) {
-    $identityfields = array_flip(explode(',', $CFG->showuseridentity));
-} else {
-    $identityfields = array();
 }
 
 // Start setting up the page.

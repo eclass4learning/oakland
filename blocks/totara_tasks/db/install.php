@@ -30,7 +30,7 @@ function xmldb_block_totara_tasks_install() {
     // A separate set up for a quicklinks block as it needs additional data to be added on install.
     $blockinstance = (object)array(
         'blockname'=> 'totara_tasks',
-        'parentcontextid' => SITEID,
+        'parentcontextid' => SYSCONTEXTID,
         'showinsubcontexts' => 0,
         'pagetypepattern' => 'my-index',
         'subpagepattern' => $mypageid,

@@ -39,12 +39,14 @@ class pgsql_native_moodle_database extends moodle_database {
 
     /** @var resource $pgsql database resource */
     protected $pgsql     = null;
-    protected $bytea_oid = null;
 
     protected $last_error_reporting; // To handle pgsql driver default verbosity
 
     /** @var bool savepoint hack for MDL-35506 - workaround for automatic transaction rollback on error */
     protected $savepointpresent = false;
+
+    /** @var array cached server information */
+    protected $serverinfo = null;
 
     /**
      * Detects if all needed PHP stuff installed.
@@ -135,11 +137,12 @@ class pgsql_native_moodle_database extends moodle_database {
         if (!empty($this->dboptions['dbsocket']) and ($this->dbhost === 'localhost' or $this->dbhost === '127.0.0.1')) {
             $connection = "user='$this->dbuser' password='$pass' dbname='$this->dbname'";
             if (strpos($this->dboptions['dbsocket'], '/') !== false) {
-                $connection = $connection." host='".$this->dboptions['dbsocket']."'";
-                if (!empty($this->dboptions['dbport'])) {
-                    // Somehow non-standard port is important for sockets - see MDL-44862.
-                    $connection = $connection." port ='".$this->dboptions['dbport']."'";
-                }
+                // A directory was specified as the socket location.
+                $connection .= " host='".$this->dboptions['dbsocket']."'";
+            }
+            if (!empty($this->dboptions['dbport'])) {
+                // A port as specified, add it to the connection as it's used as part of the socket path.
+                $connection .= " port ='".$this->dboptions['dbport']."'";
             }
         } else {
             $this->dboptions['dbsocket'] = '';
@@ -152,6 +155,17 @@ class pgsql_native_moodle_database extends moodle_database {
                 $port = "port ='".$this->dboptions['dbport']."'";
             }
             $connection = "host='$this->dbhost' $port user='$this->dbuser' password='$pass' dbname='$this->dbname'";
+        }
+
+        if (empty($this->dboptions['dbhandlesoptions'])) {
+            // ALTER USER and ALTER DATABASE are overridden by these settings.
+            $options = array('--client_encoding=utf8', '--standard_conforming_strings=on');
+            // Select schema if specified, otherwise the first one wins.
+            if (!empty($this->dboptions['dbschema'])) {
+                $options[] = "-c search_path=" . addcslashes($this->dboptions['dbschema'], "'\\");
+            }
+
+            $connection .= " options='" . implode(' ', $options) . "'";
         }
 
         ob_start();
@@ -170,32 +184,19 @@ class pgsql_native_moodle_database extends moodle_database {
             throw new dml_connection_exception($dberr);
         }
 
-        $this->query_start("--pg_set_client_encoding()", null, SQL_QUERY_AUX);
-        pg_set_client_encoding($this->pgsql, 'utf8');
-        $this->query_end(true);
-
-        $sql = '';
-        // Only for 9.0 and upwards, set bytea encoding to old format.
-        if ($this->is_min_version('9.0')) {
-            $sql = "SET bytea_output = 'escape'; ";
-        }
-
-        // Select schema if specified, otherwise the first one wins.
-        if (!empty($this->dboptions['dbschema'])) {
-            $sql .= "SET search_path = '".$this->dboptions['dbschema']."'; ";
-        }
-
-        // Find out the bytea oid.
-        $sql .= "SELECT oid FROM pg_type WHERE typname = 'bytea'";
-        $this->query_start($sql, null, SQL_QUERY_AUX);
-        $result = pg_query($this->pgsql, $sql);
-        $this->query_end($result);
-
-        $this->bytea_oid = pg_fetch_result($result, 0, 0);
-        pg_free_result($result);
-        if ($this->bytea_oid === false) {
-            $this->pgsql = null;
-            throw new dml_connection_exception('Can not read bytea type.');
+        if (!empty($this->dboptions['dbhandlesoptions'])) {
+            /* We don't trust people who just set the dbhandlesoptions, this code checks up on them.
+             * These functions do not talk to the server, they use the client library knowledge to determine state.
+             */
+            if (!empty($this->dboptions['dbschema'])) {
+                throw new dml_connection_exception('You cannot specify a schema with dbhandlesoptions, use the database to set it.');
+            }
+            if (pg_client_encoding($this->pgsql) != 'UTF8') {
+                throw new dml_connection_exception('client_encoding = UTF8 not set, it is: ' . pg_client_encoding($this->pgsql));
+            }
+            if (pg_escape_string($this->pgsql, '\\') != '\\') {
+                throw new dml_connection_exception('standard_conforming_strings = on, must be set at the database.');
+            }
         }
 
         // Connection stabilised and configured, going to instantiate the temptables controller
@@ -264,25 +265,28 @@ class pgsql_native_moodle_database extends moodle_database {
      * @return array Array containing 'description' and 'version' info
      */
     public function get_server_info() {
-        static $info;
-        if (!$info) {
-            $this->query_start("--pg_version()", null, SQL_QUERY_AUX);
-            $info = pg_version($this->pgsql);
-            $this->query_end(true);
+        if (!$this->pgsql) {
+            return null;
         }
-        return array('description'=>$info['server'], 'version'=>$info['server']);
-    }
 
-    /**
-     * Returns if the RDBMS server fulfills the required version
-     *
-     * @param string $version version to check against
-     * @return bool returns if the version is fulfilled (true) or no (false)
-     */
-    private function is_min_version($version) {
-        $server = $this->get_server_info();
-        $server = $server['version'];
-        return version_compare($server, $version, '>=');
+        if (isset($this->serverinfo)) {
+            return $this->serverinfo;
+        }
+
+        $this->query_start("--pg_version()", null, SQL_QUERY_AUX);
+        $info = pg_version($this->pgsql);
+        $this->query_end(true);
+
+        if (!$info) {
+            return null;
+        }
+
+        $this->serverinfo = array(
+            'description' => $info['server'],
+            'version' => $info['server'],
+        );
+
+        return $this->serverinfo;
     }
 
     /**
@@ -359,13 +363,19 @@ class pgsql_native_moodle_database extends moodle_database {
 
         if ($result) {
             while ($row = pg_fetch_assoc($result)) {
-                if (!preg_match('/CREATE (|UNIQUE )INDEX ([^\s]+) ON '.$tablename.' USING ([^\s]+) \(([^\)]+)\)/i', $row['indexdef'], $matches)) {
+                if (!preg_match('/CREATE (|UNIQUE )INDEX ([^\s]+) ON ('.$row['schemaname'].'\.)?'.$tablename.' USING ([^\s]+) \(([^\)]+)\)/i', $row['indexdef'], $matches)) {
                     continue;
                 }
-                if ($matches[4] === 'id') {
+                if ($matches[5] === 'id') {
                     continue;
                 }
-                $columns = explode(',', $matches[4]);
+                // Totara: Full text search has a special index format.
+                $fulltextsearch = false;
+                if (strpos($matches[5], 'to_tsvector') === 0) {
+                    $matches[5] = preg_replace('/^to_tsvector\(\'.*\'::regconfig, /', '', $matches[5]);
+                    $fulltextsearch = true;
+                }
+                $columns = explode(',', $matches[5]);
                 foreach ($columns as $k=>$column) {
                     $column = trim($column);
                     if ($pos = strpos($column, ' ')) {
@@ -375,7 +385,7 @@ class pgsql_native_moodle_database extends moodle_database {
                     $columns[$k] = $this->trim_quotes($column);
                 }
                 $indexes[$row['indexname']] = array('unique'=>!empty($matches[1]),
-                                              'columns'=>$columns);
+                                              'columns'=>$columns, 'fulltextsearch'=>$fulltextsearch);
             }
             pg_free_result($result);
         }
@@ -390,10 +400,14 @@ class pgsql_native_moodle_database extends moodle_database {
      */
     public function get_columns($table, $usecache=true) {
         if ($usecache) {
-            $properties = array('dbfamily' => $this->get_dbfamily(), 'settings' => $this->get_settings_hash());
-            $cache = cache::make('core', 'databasemeta', $properties);
-            if ($data = $cache->get($table)) {
-                return $data;
+            if ($this->temptables->is_temptable($table)) {
+                if ($data = $this->get_temp_tables_cache()->get($table)) {
+                    return $data;
+                }
+            } else {
+                if ($data = $this->get_metacache()->get($table)) {
+                    return $data;
+                }
             }
         }
 
@@ -401,7 +415,7 @@ class pgsql_native_moodle_database extends moodle_database {
 
         $tablename = $this->prefix.$table;
 
-        $sql = "SELECT a.attnum, a.attname AS field, t.typname AS type, a.attlen, a.atttypmod, a.attnotnull, a.atthasdef, pg_get_expr(d.adbin, d.adrelid) as adsrc
+        $sql = "SELECT a.attnum, a.attname AS field, t.typname AS type, a.attlen, a.atttypmod, a.attnotnull, a.atthasdef, pg_get_expr(d.adbin, d.adrelid) AS adsrc
                   FROM pg_catalog.pg_class c
                   JOIN pg_catalog.pg_namespace as ns ON ns.oid = c.relnamespace
                   JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid
@@ -596,7 +610,11 @@ class pgsql_native_moodle_database extends moodle_database {
         pg_free_result($result);
 
         if ($usecache) {
-            $cache->set($table, $structure);
+            if ($this->temptables->is_temptable($table)) {
+                $this->get_temp_tables_cache()->set($table, $structure);
+            } else {
+                $this->get_metacache()->set($table, $structure);
+            }
         }
 
         return $structure;
@@ -615,9 +633,11 @@ class pgsql_native_moodle_database extends moodle_database {
         if (is_bool($value)) { // Always, convert boolean to int
             $value = (int)$value;
 
-        } else if ($column->meta_type === 'B') { // BLOB detected, we return 'blob' array instead of raw value to allow
-            if (!is_null($value)) {             // binding/executing code later to know about its nature
-                $value = array('blob' => $value);
+        } else if ($column->meta_type === 'B') {
+            if (!is_null($value)) {
+                // standard_conforming_strings must be enabled, otherwise pg_escape_bytea() will double escape
+                // \ and produce data errors.  This is set on the connection.
+                $value = pg_escape_bytea($this->pgsql, $value);
             }
 
         } else if ($value === '') {
@@ -652,17 +672,23 @@ class pgsql_native_moodle_database extends moodle_database {
     /**
      * Do NOT use in code, to be used by database_manager only!
      * @param string|array $sql query
+     * @param array|null $tablenames an array of xmldb table names affected by this request.
      * @return bool true
      * @throws ddl_change_structure_exception A DDL specific exception is thrown for any errors.
      */
-    public function change_database_structure($sql) {
+    public function change_database_structure($sql, $tablenames = null) {
         $this->get_manager(); // Includes DDL exceptions classes ;-)
         if (is_array($sql)) {
             $sql = implode("\n;\n", $sql);
         }
         if (!$this->is_transaction_started()) {
-            // It is better to do all or nothing, this helps with recovery...
-            $sql = "BEGIN ISOLATION LEVEL SERIALIZABLE;\n$sql\n; COMMIT";
+            if (PHPUNIT_TEST) {
+                // We do not care about recovery on the test sites, we want the best performance!
+                $sql = "BEGIN ISOLATION LEVEL READ COMMITTED;\n$sql\n; COMMIT";
+            } else {
+                // It is better to do all or nothing, this helps with recovery...
+                $sql = "BEGIN ISOLATION LEVEL SERIALIZABLE;\n$sql\n; COMMIT";
+            }
         }
 
         try {
@@ -675,11 +701,11 @@ class pgsql_native_moodle_database extends moodle_database {
                 $result = @pg_query($this->pgsql, "ROLLBACK");
                 @pg_free_result($result);
             }
-            $this->reset_caches();
+            $this->reset_caches($tablenames);
             throw $e;
         }
 
-        $this->reset_caches();
+        $this->reset_caches($tablenames);
         return true;
     }
 
@@ -747,7 +773,7 @@ class pgsql_native_moodle_database extends moodle_database {
     }
 
     protected function create_recordset($result) {
-        return new pgsql_native_moodle_recordset($result, $this->bytea_oid);
+        return new pgsql_native_moodle_recordset($result);
     }
 
     /**
@@ -785,11 +811,11 @@ class pgsql_native_moodle_database extends moodle_database {
         $this->query_end($result);
 
         // find out if there are any blobs
-        $numrows = pg_num_fields($result);
+        $numfields = pg_num_fields($result);
         $blobs = array();
-        for($i=0; $i<$numrows; $i++) {
-            $type_oid = pg_field_type_oid($result, $i);
-            if ($type_oid == $this->bytea_oid) {
+        for ($i = 0; $i < $numfields; $i++) {
+            $type = pg_field_type($result, $i);
+            if ($type == 'bytea') {
                 $blobs[] = pg_field_name($result, $i);
             }
         }
@@ -803,8 +829,7 @@ class pgsql_native_moodle_database extends moodle_database {
                 $id = reset($row);
                 if ($blobs) {
                     foreach ($blobs as $blob) {
-                        // note: in PostgreSQL 9.0 the returned blobs are hexencoded by default - see http://www.postgresql.org/docs/9.0/static/runtime-config-client.html#GUC-BYTEA-OUTPUT
-                        $row[$blob] = $row[$blob] !== null ? pg_unescape_bytea($row[$blob]) : null;
+                        $row[$blob] = ($row[$blob] !== null ? pg_unescape_bytea($row[$blob]) : null);
                     }
                 }
                 if (isset($return[$id])) {
@@ -834,6 +859,13 @@ class pgsql_native_moodle_database extends moodle_database {
         $this->query_end($result);
 
         $return = pg_fetch_all_columns($result, 0);
+
+        if (pg_field_type($result, 0) == 'bytea') {
+            foreach ($return as $key => $value) {
+                $return[$key] = ($value === null ? $value : pg_unescape_bytea($value));
+            }
+        }
+
         pg_free_result($result);
 
         return $return;
@@ -874,7 +906,11 @@ class pgsql_native_moodle_database extends moodle_database {
             throw new coding_exception('moodle_database::insert_record_raw() no fields found.');
         }
 
-        $fields = implode(',', array_keys($params));
+        $fields = array();
+        foreach ($params as $field => $value) {
+            $fields[] = '"' . $field . '"'; // Totara: always quote column names to allow reserved words.
+        }
+        $fields = implode(',', $fields);
         $values = array();
         $i = 1;
         foreach ($params as $value) {
@@ -922,7 +958,6 @@ class pgsql_native_moodle_database extends moodle_database {
         }
 
         $cleaned = array();
-        $blobs   = array();
 
         foreach ($dataobject as $field=>$value) {
             if ($field === 'id') {
@@ -932,33 +967,10 @@ class pgsql_native_moodle_database extends moodle_database {
                 continue;
             }
             $column = $columns[$field];
-            $normalised_value = $this->normalise_value($column, $value);
-            if (is_array($normalised_value) && array_key_exists('blob', $normalised_value)) {
-                $cleaned[$field] = '@#BLOB#@';
-                $blobs[$field] = $normalised_value['blob'];
-            } else {
-                $cleaned[$field] = $normalised_value;
-            }
+            $cleaned[$field] = $this->normalise_value($column, $value);
         }
 
-        if (empty($blobs)) {
-            return $this->insert_record_raw($table, $cleaned, $returnid, $bulk);
-        }
-
-        $id = $this->insert_record_raw($table, $cleaned, true, $bulk);
-
-        foreach ($blobs as $key=>$value) {
-            $value = pg_escape_bytea($this->pgsql, $value);
-            $sql = "UPDATE {$this->prefix}$table SET $key = '$value'::bytea WHERE id = $id";
-            $this->query_start($sql, NULL, SQL_QUERY_UPDATE);
-            $result = pg_query($this->pgsql, $sql);
-            $this->query_end($result);
-            if ($result !== false) {
-                pg_free_result($result);
-            }
-        }
-
-        return ($returnid ? $id : true);
+        return $this->insert_record_raw($table, $cleaned, $returnid, $bulk);
 
     }
 
@@ -993,14 +1005,6 @@ class pgsql_native_moodle_database extends moodle_database {
 
         $columns = $this->get_columns($table, true);
 
-        // Make sure there are no nasty blobs!
-        foreach ($columns as $column) {
-            if ($column->binary) {
-                parent::insert_records($table, $dataobjects);
-                return;
-            }
-        }
-
         $fields = null;
         $count = 0;
         $chunk = array();
@@ -1033,7 +1037,7 @@ class pgsql_native_moodle_database extends moodle_database {
     }
 
     /**
-     * Insert records in chunks, no binary support, strict param types...
+     * Insert records in chunks, strict param types...
      *
      * Note: can be used only from insert_records().
      *
@@ -1078,39 +1082,17 @@ class pgsql_native_moodle_database extends moodle_database {
 
         $columns = $this->get_columns($table);
         $cleaned = array();
-        $blobs   = array();
 
         foreach ($dataobject as $field=>$value) {
             $this->detect_objects($value);
             if (!isset($columns[$field])) {
                 continue;
             }
-            if ($columns[$field]->meta_type === 'B') {
-                if (!is_null($value)) {
-                    $cleaned[$field] = '@#BLOB#@';
-                    $blobs[$field] = $value;
-                    continue;
-                }
-            }
-
-            $cleaned[$field] = $value;
+            $column = $columns[$field];
+            $cleaned[$field] = $this->normalise_value($column, $value);
         }
 
-        $this->insert_record_raw($table, $cleaned, false, true, true);
-        $id = $dataobject['id'];
-
-        foreach ($blobs as $key=>$value) {
-            $value = pg_escape_bytea($this->pgsql, $value);
-            $sql = "UPDATE {$this->prefix}$table SET $key = '$value'::bytea WHERE id = $id";
-            $this->query_start($sql, NULL, SQL_QUERY_UPDATE);
-            $result = pg_query($this->pgsql, $sql);
-            $this->query_end($result);
-            if ($result !== false) {
-                pg_free_result($result);
-            }
-        }
-
-        return true;
+        return $this->insert_record_raw($table, $cleaned, false, true, true);
     }
 
     /**
@@ -1139,7 +1121,7 @@ class pgsql_native_moodle_database extends moodle_database {
         $sets = array();
         foreach ($params as $field=>$value) {
             $this->detect_objects($value);
-            $sets[] = "$field = \$".$i++;
+            $sets[] = '"' . $field .'" = $' . $i++; // Totara: always quote column names to allow reserved words.
         }
 
         $params[] = $id; // last ? in WHERE condition
@@ -1173,39 +1155,16 @@ class pgsql_native_moodle_database extends moodle_database {
 
         $columns = $this->get_columns($table);
         $cleaned = array();
-        $blobs   = array();
 
         foreach ($dataobject as $field=>$value) {
             if (!isset($columns[$field])) {
                 continue;
             }
             $column = $columns[$field];
-            $normalised_value = $this->normalise_value($column, $value);
-            if (is_array($normalised_value) && array_key_exists('blob', $normalised_value)) {
-                $cleaned[$field] = '@#BLOB#@';
-                $blobs[$field] = $normalised_value['blob'];
-            } else {
-                $cleaned[$field] = $normalised_value;
-            }
+            $cleaned[$field] = $this->normalise_value($column, $value);
         }
 
         $this->update_record_raw($table, $cleaned, $bulk);
-
-        if (empty($blobs)) {
-            return true;
-        }
-
-        $id = (int)$dataobject['id'];
-
-        foreach ($blobs as $key=>$value) {
-            $value = pg_escape_bytea($this->pgsql, $value);
-            $sql = "UPDATE {$this->prefix}$table SET $key = '$value'::bytea WHERE id = $id";
-            $this->query_start($sql, NULL, SQL_QUERY_UPDATE);
-            $result = pg_query($this->pgsql, $sql);
-            $this->query_end($result);
-
-            pg_free_result($result);
-        }
 
         return true;
     }
@@ -1236,24 +1195,10 @@ class pgsql_native_moodle_database extends moodle_database {
         $columns = $this->get_columns($table);
         $column = $columns[$newfield];
 
-        $normalised_value = $this->normalise_value($column, $newvalue);
-        if (is_array($normalised_value) && array_key_exists('blob', $normalised_value)) {
-            // Update BYTEA and return
-            $normalised_value = pg_escape_bytea($this->pgsql, $normalised_value['blob']);
-            $sql = "UPDATE {$this->prefix}$table SET $newfield = '$normalised_value'::bytea $select";
-            $this->query_start($sql, NULL, SQL_QUERY_UPDATE);
-            $result = pg_query_params($this->pgsql, $sql, $params);
-            $this->query_end($result);
-            pg_free_result($result);
-            return true;
-        }
+        $normalisedvalue = $this->normalise_value($column, $newvalue);
 
-        if (is_null($normalised_value)) {
-            $newfield = "$newfield = NULL";
-        } else {
-            $newfield = "$newfield = \$".$i;
-            $params[] = $normalised_value;
-        }
+        $newfield = '"' . $newfield . '" = $' . $i;
+        $params[] = $normalisedvalue;
         $sql = "UPDATE {$this->prefix}$table SET $newfield $select";
 
         $this->query_start($sql, $params, SQL_QUERY_UPDATE);
@@ -1266,7 +1211,7 @@ class pgsql_native_moodle_database extends moodle_database {
     }
 
     /**
-     * Delete one or more records from a table which match a particular WHERE clause.
+     * Delete one or more records from a table which match a particular WHERE clause, lobs not supported.
      *
      * @param string $table The database table to be checked against.
      * @param string $select A fragment of SQL to be used in a where clause in the SQL call (used to define the selection criteria).
@@ -1306,19 +1251,18 @@ class pgsql_native_moodle_database extends moodle_database {
         if (strpos($param, '%') !== false) {
             debugging('Potential SQL injection detected, sql_like() expects bound parameters (? or :named)');
         }
-        if ($escapechar === '\\') {
-            // Prevents problems with C-style escapes of enclosing '\',
-            // E'... bellow prevents compatibility warnings.
-            $escapechar = '\\\\';
+
+        if (!$this->is_fts_accent_sensitive() && !$accentsensitive) {
+            $fieldname = "unaccent({$fieldname})";
+            $param = "unaccent({$param})";
         }
 
-        // postgresql does not support accent insensitive text comparisons, sorry
         if ($casesensitive) {
             $LIKE = $notlike ? 'NOT LIKE' : 'LIKE';
         } else {
             $LIKE = $notlike ? 'NOT ILIKE' : 'ILIKE';
         }
-        return "$fieldname $LIKE $param ESCAPE E'$escapechar'";
+        return "$fieldname $LIKE $param ESCAPE '$escapechar'";
     }
 
     public function sql_bitxor($int1, $int2) {
@@ -1334,6 +1278,14 @@ class pgsql_native_moodle_database extends moodle_database {
         return " $fieldname::real ";
     }
 
+    public function sql_cast_char2float($fieldname) {
+        return ' CAST(' . $fieldname . ' AS FLOAT) ';
+    }
+
+    public function sql_cast_2char($fieldname) {
+        return ' CAST(' . $fieldname . ' AS VARCHAR) ';
+    }
+
     public function sql_concat() {
         $arr = func_get_args();
         $s = implode(' || ', $arr);
@@ -1346,22 +1298,44 @@ class pgsql_native_moodle_database extends moodle_database {
     }
 
     /**
-     * TOTARA - Returns database specific SQL code similar to GROUP_CONCAT() behaviour from MySQL.
+     * Returns database specific SQL code similar to GROUP_CONCAT() behaviour from MySQL.
      *
-     * NOTE: NULL values are skipped, use COALESCE if you want to include a replacement
+     * NOTE: NULL values are skipped, use COALESCE if you want to include a replacement.
+     *
+     * @since Totara 2.6.34, 2.7.17, 2.9.9
      *
      * @param string $expr      Expression to get individual values
      * @param string $separator The delimiter to separate the values, a simple string value only
-     * @param string $orderby   ORDER BY clause that determines order of rows with values - required
+     * @param string $orderby   ORDER BY clause that determines order of rows with values,
+     *                          optional since Totara 2.6.44, 2.7.27, 2.9.19, 9.7
      * @return string SQL fragment equivalent to GROUP_CONCAT()
      */
-    public function sql_group_concat($expr, $separator, $orderby) {
-        if ((string)$orderby === '') {
-            throw new coding_exception('sql_group_concat method requires $orderby parameter');
+    public function sql_group_concat($expr, $separator, $orderby = '') {
+        if ($orderby) {
+            $orderby = "ORDER BY {$orderby}";
+        } else {
+            $orderby = "";
         }
         // See: https://www.postgresql.org/docs/9.0/static/functions-aggregate.html
         $separator = $this->get_manager()->generator->addslashes($separator);
-        return " string_agg(CAST({$expr} AS VARCHAR), '{$separator}' ORDER BY {$orderby}) ";
+        return " string_agg(CAST({$expr} AS VARCHAR), '{$separator}' {$orderby}) ";
+    }
+
+    /**
+     * Returns database specific SQL code similar to GROUP_CONCAT() with DISTINCT behaviour from MySQL.
+     *
+     * NOTE: NULL values are skipped, use COALESCE if you want to include a replacement,
+     *       the ordering of results cannot be defined.
+     *
+     * @since Totara 2.6.44, 2.7.27, 2.9.19, 9.7
+     *
+     * @param string $expr      Expression to get individual values
+     * @param string $separator The delimiter to separate the values, a simple string value only
+     * @return string SQL fragment equivalent to GROUP_CONCAT()
+     */
+    public function sql_group_concat_unique($expr, $separator) {
+        $separator = $this->get_manager()->generator->addslashes($separator);
+        return " string_agg(DISTINCT CAST({$expr} AS VARCHAR), '{$separator}') ";
     }
 
     public function sql_concat_join($separator="' '", $elements=array()) {
@@ -1381,6 +1355,26 @@ class pgsql_native_moodle_database extends moodle_database {
 
     public function sql_regex($positivematch=true) {
         return $positivematch ? '~*' : '!~*';
+    }
+
+    /**
+     * Returns the driver specific syntax for the beginning of a word boundary.
+     *
+     * @since Totara 12.4
+     * @return string or empty if not supported
+     */
+    public function sql_regex_word_boundary_start(): string {
+        return '[[:<:]]';
+    }
+
+    /**
+     * Returns the driver specific syntax for the end of a word boundary.
+     *
+     * @since Totara 12.4
+     * @return string or empty if not supported
+     */
+    public function sql_regex_word_boundary_end(): string {
+        return '[[:>:]]';
     }
 
     /**
@@ -1528,5 +1522,130 @@ class pgsql_native_moodle_database extends moodle_database {
      */
     private function trim_quotes($str) {
         return trim(trim($str), "'\"");
+    }
+
+    /**
+     * Do not use.
+     *
+     * @deprecated
+     *
+     * @param string $sql the SQL select query to execute.
+     * @param array $params array of sql parameters (optional)
+     * @param int $limitfrom return a subset of records, starting at this point (optional).
+     * @param int $limitnum return a subset comprising this many records (optional, required if $limitfrom is set).
+     * @param int &$count this variable will be filled with count of rows returned by select without limit statement
+     * @return counted_recordset A moodle_recordset instance.
+     * @throws dml_exception A DML specific exception is thrown for any errors.
+     * @throws coding_exception If an invalid result not containing the count is experienced
+     */
+    public function get_counted_recordset_sql($sql, array $params=null, $limitfrom = 0, $limitnum = 0, &$count = 0) {
+        global $CFG;
+        require_once($CFG->libdir.'/dml/counted_recordset.php');
+
+        if (!preg_match('/^\s*SELECT\s/is', $sql)) {
+            throw new dml_exception('dmlcountedrecordseterror', null, "Counted recordset query must start with SELECT");
+        }
+
+        $countorfield = 'dml_count_recordset_rows';
+        $sqlcnt = preg_replace('/^\s*SELECT\s/is', "SELECT COUNT('x') OVER () AS {$countorfield}, ", $sql);
+
+        $recordset = $this->get_recordset_sql($sqlcnt, $params, $limitfrom, $limitnum);
+        if ($limitfrom > 0 and !$recordset->valid()) {
+            // Bad luck, we are out of range and do not know how many are there, we need to make another query.
+            $rs2 = $this->get_recordset_sql($sqlcnt, $params, 0, 1);
+            if ($rs2->valid()) {
+                $current = $rs2->current();
+                $rs2->close();
+                if (!property_exists($current, $countorfield)) {
+                    throw new dml_exception("Expected column {$countorfield} used for counting records without limit was not found");
+                } else if (!isset($current->{$countorfield})) {
+                    throw new coding_exception("Invalid count result in {$countorfield} used for counting records without limit");
+                }
+                $recordset = new counted_recordset($recordset, (int)$current->{$countorfield});
+                $count = $recordset->get_count_without_limits();
+                return $recordset;
+            }
+            $rs2->close();
+        }
+        $recordset = new counted_recordset($recordset, $countorfield);
+        $count = $recordset->get_count_without_limits();
+
+        return $recordset;
+    }
+
+    /**
+     * Build a natural language search subquery using database specific search functions.
+     *
+     * @since Totara 12
+     *
+     * @param string $table        database table name
+     * @param array  $searchfields ['field_name'=>weight, ...] eg: ['high'=>3, 'medium'=>2, 'low'=>1]
+     * @param string $searchtext   natural language search text
+     * @return array [sql, params[]]
+     */
+    protected function build_fts_subquery(string $table, array $searchfields, string $searchtext): array {
+        $language = $this->get_ftslanguage();
+        $paramname = $this->get_unique_param('fts');
+
+        $accentsensitive = $this->is_fts_accent_sensitive();
+
+        if (preg_match('/^\s*"[^"]+"\s*$/', $searchtext)) {
+            // One exact phrase search.
+            $searchtext = trim($searchtext);
+            $searchtext = trim($searchtext, '"');
+            $serverinfo = $this->get_server_info();
+            if (version_compare($serverinfo['version'], '9.6', '<')) {
+                // Old PostgreSQL version, bad luck, the results will be less accurate.
+                $q = "plainto_tsquery('{$language}',"
+                    . ($accentsensitive ? ":{$paramname}" : "unaccent(:{$paramname})") . ")";
+            } else {
+                $q = "phraseto_tsquery('{$language}',"
+                    . ($accentsensitive ? ":{$paramname}" : "unaccent(:{$paramname})") . ")";
+            }
+        } else if ($this->get_fts_mode($searchtext) === self::SEARCH_MODE_BOOLEAN) {
+            // Using 'simple' here, because sometimes the search text does not mean anything for specific language.
+            $language = 'simple';
+            $q = "to_tsquery('{$language}', "
+                . ($accentsensitive ? ":{$paramname}" : "unaccent(:{$paramname})") . ")";
+            $searchtext = str_replace('*', ':*', $searchtext);
+        } else {
+            $q = "plainto_tsquery('{$language}',"
+                . ($accentsensitive ? ":{$paramname}" : "unaccent(:{$paramname})") . ")";
+        }
+
+        $score = array();
+        $condition = array();
+        foreach ($searchfields as $field => $weight) {
+            if (!$accentsensitive) {
+                $field = "unaccent({$field})";
+            }
+            $score[] = "COALESCE(ts_rank(to_tsvector('{$language}',{$field}),query),0)*{$weight}";
+            $condition[] = "query @@ to_tsvector('{$language}',{$field})";
+        }
+
+        $scoresum = implode(' + ', $score);
+        $where = implode(' OR ', $condition);
+        $sql = "SELECT basesearch.id, {$scoresum} AS score
+                  FROM {{$table}} basesearch, {$q} query
+                 WHERE {$where}";
+
+        return array("({$sql})", array($paramname => $searchtext));
+    }
+
+    /**
+     * Check if accent sensitivity is currently active or not.
+     *
+     * This function's name contains 'fts' which indicates that it is part of FTS functionality although
+     * it is not specifically related to FTS as UNACCENT is a DB wide function. The reason for 'fts' in
+     * the name is because in other databases it is specifically used for FTS queries and only in PGSQL
+     * can UNACCENT be used in normal queries as well to flatten accents.
+     *
+     * @return bool
+     */
+    public function is_fts_accent_sensitive(): bool {
+        $sql = "SELECT COUNT(*) FROM pg_extension WHERE extname = 'unaccent'";
+
+        // If extension is not created then it means accent sensitivity is on.
+        return empty($this->get_field_sql($sql));
     }
 }

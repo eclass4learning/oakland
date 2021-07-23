@@ -45,7 +45,7 @@ class item_edit_form extends moodleform {
         $items     = $hierarchy->get_items();
         $types   = $hierarchy->get_types();
         $type   = $hierarchy->get_type_by_id($item->typeid);
-        $typename = ($type) ? $type->fullname : get_string('unclassified', 'totara_hierarchy');
+        $typename = ($type) ? format_string($type->fullname) : get_string('unclassified', 'totara_hierarchy');
 
         /// Add some extra hidden fields
         $mform->addElement('hidden', 'id');
@@ -61,9 +61,8 @@ class item_edit_form extends moodleform {
         $mform->addElement('hidden', 'page', $page);
         $mform->setType('page', PARAM_INT);
 
-        $mform->addElement('text', 'framework', get_string($prefix.'framework', 'totara_hierarchy'));
-        $mform->hardFreeze('framework');
-        $mform->setType('framework', PARAM_TEXT);
+        $label = get_string($prefix.'framework', 'totara_hierarchy');
+        $mform->addElement('static', 'frameworkname', $label, format_string($framework->fullname));
 
         $parents = $hierarchy->get_parent_list($items, $item->id);
         // If we only have one possible parent, it must be the top level, so hide the
@@ -119,7 +118,7 @@ class item_edit_form extends moodleform {
                 // show type picker if there are choices
                 $select = array('0' => '');
                 foreach ($types as $type) {
-                    $select[$type->id] = $type->fullname;
+                    $select[$type->id] = format_string($type->fullname);
                 }
                 $mform->addElement('select', 'typeid', get_string('type', 'totara_hierarchy'), $select, totara_select_width_limiter());
                 $mform->addHelpButton('typeid', $prefix.'type', 'totara_hierarchy');

@@ -284,6 +284,27 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
         $this->assertEquals($savedata['description'], $retrieveddata->description_editor['text']);
         $this->assertEquals(FORMAT_HTML, $retrieveddata->description_editor['format']);
         $this->assertGreaterThan(0, $retrieveddata->description_editor['itemid']);
+
+        // Test that whitespace job assignment names are handled correctly.
+        $savedata = array(
+            'userid' => $this->users[5]->id,
+            'fullname' => ' ',
+            'shortname' => 'shortname2',
+            'idnumber' => 'id2',
+            'description' => 'description pre-processed',
+            'positionid' => 123,
+            'organisationid' => 234,
+            'startdate' => 1234567,
+            'enddate' => 2345678,
+            'managerjaid' => $managerja->id, // User 2.
+            'tempmanagerjaid' => $tempmanagerja->id, // User 3.
+            'tempmanagerexpirydate' => 3456789,
+            'appraiserid' => $this->users[4]->id,
+        );
+        $jobassignment = \totara_job\job_assignment::create($savedata);
+
+        $retrieveddata = $jobassignment->get_data();
+        $this->assertNotEquals($savedata['fullname'], $retrieveddata->fullname);
     }
 
     /**
@@ -316,7 +337,7 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
         );
 
         $this->setUser($updatinguser); // A different user is doing the update.
-        sleep(1); // Ensure that the time has moved forward.
+        $this->waitForSecond(); // Ensure that the time has moved forward.
         $updatetimebefore = time();
         $jobassignment->update($updatedata);
         $updatetimeafter = time();
@@ -349,7 +370,7 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
 
         // Show that positionassignmentdate does not change if the positionid is specified but does not change.
         $previousposassignmentdate = $jobassignment->positionassignmentdate;
-        sleep(1);
+        $this->waitForSecond();
         $posupdatetimebefore = time();
         $jobassignment->update(array('positionid' => $updatedata['positionid'], 'organisationid' => 777));
         $posupdatetimeafter = time();
@@ -371,7 +392,7 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
         // Make sure that passing no data doesn't fail and doesn't update the timemodified or usermodified.
         $previoustimemodified = $jobassignment->timemodified;
         $previoususermodified = $jobassignment->usermodified;
-        sleep(1);
+        $this->waitForSecond();
         $this->setAdminUser();
         $this->assertNotEquals($previoususermodified, $USER->id);
         $jobassignment->update(array()); // Empty array.
@@ -445,7 +466,7 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
         $this->assertEquals('/' . $jobassignment->id, $jobassignment->managerjapath);
 
         // Check that updating the position to null causes the positionassignmentdate to be updated.
-        sleep(1);
+        $this->waitForSecond();
         $timebefore = time();
         $jobassignment->update(array('positionid' => null));
         $this->assertNull($jobassignment->positionid);
@@ -468,9 +489,100 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
 
     /**
      * Tests update_descendant_manager_paths.
+     *
+     * TL1 > Man1 > Learn1a
+     *            > Learn2
+     *     > Learn1b
+     * TL2 > Man2 > Learn1c
+     *            > Learn3 > Sub1
+     *     > Man3 > Learn4
+     *
+     * Move Man2 to TL1. Man2, Learn1c, Learn3 and Sub1 should be updated - timemodified and managerjapath.
      */
     public function test_update_descendant_manager_paths() {
-        // TODO Writeme.
+        // Set up management hierarchy.
+        $tl1ja = \totara_job\job_assignment::create_default($this->users[1]->id);
+        $tl2ja = \totara_job\job_assignment::create_default($this->users[2]->id);
+        $man1ja = \totara_job\job_assignment::create_default($this->users[3]->id, array('managerjaid' => $tl1ja->id));
+        $man2ja = \totara_job\job_assignment::create_default($this->users[4]->id, array('managerjaid' => $tl2ja->id));
+        $man3ja = \totara_job\job_assignment::create_default($this->users[5]->id, array('managerjaid' => $tl2ja->id));
+        $learn1aja = \totara_job\job_assignment::create_default($this->users[6]->id, array('managerjaid' => $man1ja->id));
+        $learn1bja = \totara_job\job_assignment::create_default($this->users[6]->id, array('managerjaid' => $tl1ja->id));
+        $learn1cja = \totara_job\job_assignment::create_default($this->users[6]->id, array('managerjaid' => $man2ja->id));
+        $learn2ja = \totara_job\job_assignment::create_default($this->users[7]->id, array('managerjaid' => $man1ja->id));
+        $learn3ja = \totara_job\job_assignment::create_default($this->users[8]->id, array('managerjaid' => $man2ja->id));
+        $learn4ja = \totara_job\job_assignment::create_default($this->users[9]->id, array('managerjaid' => $man3ja->id));
+        $sub1ja = \totara_job\job_assignment::create_default($this->users[10]->id, array('managerjaid' => $learn3ja->id));
+
+        // Reload the job assignments, because they might have been modified as the managers were set up.
+        $originaltl1ja = \totara_job\job_assignment::get_with_id($tl1ja->id);
+        $originaltl2ja = \totara_job\job_assignment::get_with_id($tl2ja->id);
+        $originalman1ja = \totara_job\job_assignment::get_with_id($man1ja->id);
+        $originalman2ja = \totara_job\job_assignment::get_with_id($man2ja->id);
+        $originalman3ja = \totara_job\job_assignment::get_with_id($man3ja->id);
+        $originallearn1aja = \totara_job\job_assignment::get_with_id($learn1aja->id);
+        $originallearn1bja = \totara_job\job_assignment::get_with_id($learn1bja->id);
+        $originallearn1cja = \totara_job\job_assignment::get_with_id($learn1cja->id);
+        $originallearn2ja = \totara_job\job_assignment::get_with_id($learn2ja->id);
+        $originallearn3ja = \totara_job\job_assignment::get_with_id($learn3ja->id);
+        $originallearn4ja = \totara_job\job_assignment::get_with_id($learn4ja->id);
+        $originalsub1ja = \totara_job\job_assignment::get_with_id($sub1ja->id);
+
+        // Sleep for one second so that we know the time has changed.
+        sleep(1);
+
+        // Call update_descendant_manager_paths indirectly.
+        $man2ja = \totara_job\job_assignment::get_with_id($man2ja->id);
+        $timebefore = time();
+        $man2ja->update(array('managerjaid' => $tl1ja->id));
+
+        // Reload the data.
+        $resulttl1ja = \totara_job\job_assignment::get_with_id($tl1ja->id);
+        $resulttl2ja = \totara_job\job_assignment::get_with_id($tl2ja->id);
+        $resultman1ja = \totara_job\job_assignment::get_with_id($man1ja->id);
+        $resultman2ja = \totara_job\job_assignment::get_with_id($man2ja->id);
+        $resultman3ja = \totara_job\job_assignment::get_with_id($man3ja->id);
+        $resultlearn1aja = \totara_job\job_assignment::get_with_id($learn1aja->id);
+        $resultlearn1bja = \totara_job\job_assignment::get_with_id($learn1bja->id);
+        $resultlearn1cja = \totara_job\job_assignment::get_with_id($learn1cja->id);
+        $resultlearn2ja = \totara_job\job_assignment::get_with_id($learn2ja->id);
+        $resultlearn3ja = \totara_job\job_assignment::get_with_id($learn3ja->id);
+        $resultlearn4ja = \totara_job\job_assignment::get_with_id($learn4ja->id);
+        $resultsub1ja = \totara_job\job_assignment::get_with_id($sub1ja->id);
+
+        // Check that control data is unchanged.
+        $this->assertEquals($originaltl1ja, $resulttl1ja);
+        $this->assertEquals($originaltl2ja, $resulttl2ja);
+        $this->assertEquals($originalman1ja, $resultman1ja);
+        $this->assertEquals($originalman3ja, $resultman3ja);
+        $this->assertEquals($originallearn1aja, $resultlearn1aja);
+        $this->assertEquals($originallearn1bja, $resultlearn1bja);
+        $this->assertEquals($originallearn2ja, $resultlearn2ja);
+        $this->assertEquals($originallearn4ja, $resultlearn4ja);
+
+        // Check all the timemodifieds.
+        $this->assertLessThan($timebefore, $resulttl1ja->timemodified);
+        $this->assertLessThan($timebefore, $resulttl2ja->timemodified);
+        $this->assertLessThan($timebefore, $resultman1ja->timemodified);
+        $this->assertGreaterThanOrEqual($timebefore, $resultman2ja->timemodified);
+        $this->assertLessThan($timebefore, $resultman3ja->timemodified);
+        $this->assertLessThan($timebefore, $resultlearn1aja->timemodified);
+        $this->assertLessThan($timebefore, $resultlearn1bja->timemodified);
+        $this->assertGreaterThanOrEqual($timebefore, $resultlearn1cja->timemodified);
+        $this->assertLessThan($timebefore, $resultlearn2ja->timemodified);
+        $this->assertGreaterThanOrEqual($timebefore, $resultlearn3ja->timemodified);
+        $this->assertLessThan($timebefore, $resultlearn4ja->timemodified);
+        $this->assertGreaterThanOrEqual($timebefore, $resultsub1ja->timemodified);
+
+        // Check the modified paths.
+        $expectedman2path = $originaltl1ja->managerjapath . '/' . $man2ja->id;
+        $this->assertEquals($expectedman2path, $resultman2ja->managerjapath);
+        $expectedlearn1cpath = $expectedman2path . '/' . $learn1cja->id;
+        $this->assertEquals($expectedlearn1cpath, $resultlearn1cja->managerjapath);
+        $expectedlearn3path = $expectedman2path . '/' . $learn3ja->id;
+        $this->assertEquals($expectedlearn3path, $resultlearn3ja->managerjapath);
+        $expectedsub1path = $expectedlearn3path . '/' . $sub1ja->id;
+        $this->assertEquals($expectedsub1path, $resultsub1ja->managerjapath);
     }
 
     /**
@@ -510,8 +622,133 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
         $this->assertEquals(3, $DB->count_records('job_assignment'));
         $this->assertEmpty($DB->get_records('job_assignment', array('userid' => $this->users[3]->id, 'idnumber' => '1')));
         $this->assertEquals(2, $DB->count_records('job_assignment', array('idnumber' => '1')));
+    }
 
-        // TODO Check that role assignments have been updated.
+    /**
+     * A user has staff associated with one job assignment. When we delete that job assignment, they should
+     * no longer have a staff manager role for those staff.
+     */
+    public function test_delete_updates_role_assignments_when_has_staff() {
+        global $CFG;
+
+        // We'll use user 2 as the user to assign a staff manager to.
+        $u2context = context_user::instance($this->users[2]->id);
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+
+        $u1managerja = \totara_job\job_assignment::create_default($this->users[1]->id);
+        $u2staffja = \totara_job\job_assignment::create_default($this->users[2]->id);
+        $u2staffja->update(['managerjaid' => $u1managerja->id]);
+
+        $this->assertCount(1, get_role_users($CFG->managerroleid, $u2context));
+
+        // Testing when we delete the manager's job assignment.
+        \totara_job\job_assignment::delete($u1managerja);
+
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+    }
+
+    /**
+     * A user has a manager associated with one job assignment. When we delete that job assignment, their manager
+     * should no longer have a staff manager role in the user's context.
+     */
+    public function test_delete_updates_role_assignments_when_has_manager() {
+        global $CFG;
+
+        // We'll use user 2 as the user to assign a staff manager to.
+        $u2context = context_user::instance($this->users[2]->id);
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+
+        $u1managerja = \totara_job\job_assignment::create_default($this->users[1]->id);
+        $u2staffja = \totara_job\job_assignment::create_default($this->users[2]->id);
+        $u2staffja->update(['managerjaid' => $u1managerja->id]);
+
+        $this->assertCount(1, get_role_users($CFG->managerroleid, $u2context));
+
+        // Testing when we delete the staff's job assignment.
+        \totara_job\job_assignment::delete($u2staffja);
+
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+    }
+
+    /**
+     * A user has temporary staff associated with one job assignment (ie they are a temporary manager).
+     * When we delete that job assignment, they should no longer have a staff manager role for those staff.
+     */
+    public function test_delete_updates_role_assignments_when_has_tempstaff() {
+        global $CFG;
+
+        // We'll use user 2 as the user to assign a staff manager to.
+        $u2context = context_user::instance($this->users[2]->id);
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+
+        $u1managerja = \totara_job\job_assignment::create_default($this->users[1]->id);
+        $u2staffja = \totara_job\job_assignment::create_default($this->users[2]->id);
+        $u2staffja->update(['tempmanagerjaid' => $u1managerja->id, 'tempmanagerexpirydate' => time() + DAYSECS]);
+
+        $this->assertCount(1, get_role_users($CFG->managerroleid, $u2context));
+
+        // Delete the temp manager's job assignment.
+        \totara_job\job_assignment::delete($u1managerja);
+
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+    }
+
+    /**
+     * A user has a temporary manager associated with one job assignment.
+     * When we delete that job assignment, their manager should no longer have
+     * a staff manager role in the user's context.
+     */
+    public function test_delete_updates_role_assignments_when_has_tempmanager() {
+        global $CFG;
+
+        // We'll use user 2 as the user to assign a staff manager to.
+        $u2context = context_user::instance($this->users[2]->id);
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+
+        $u1managerja = \totara_job\job_assignment::create_default($this->users[1]->id);
+        $u2staffja = \totara_job\job_assignment::create_default($this->users[2]->id);
+        $u2staffja->update(['tempmanagerjaid' => $u1managerja->id, 'tempmanagerexpirydate' => time() + DAYSECS]);
+
+        $this->assertCount(1, get_role_users($CFG->managerroleid, $u2context));
+
+        // Delete the temp staffs job assignment.
+        \totara_job\job_assignment::delete($u2staffja);
+
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+    }
+
+    /**
+     * A user has a manager and staff associated with a single job assignment.
+     * When we delete that job assignment, there should be no remaining role assignments reflecting those
+     * relationships.
+     */
+    public function test_delete_updates_role_assignments_when_manager_and_staff() {
+        global $CFG;
+
+        // We'll use user 2 as the user to assign a staff manager to.
+        $u2context = context_user::instance($this->users[2]->id);
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+
+        // User 1 will be the middle manager.
+        $u1context = context_user::instance($this->users[1]->id);
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u1context));
+
+        $u1managerja = \totara_job\job_assignment::create_default($this->users[1]->id);
+        $u2staffja = \totara_job\job_assignment::create_default($this->users[2]->id);
+        $u2staffja->update(['managerjaid' => $u1managerja->id]);
+
+        // User 3 is the highest level manager.
+        $u3boss = \totara_job\job_assignment::create_default($this->users[3]->id);
+        $u1managerja->update(['managerjaid' => $u3boss->id]);
+
+        $this->assertCount(1, get_role_users($CFG->managerroleid, $u2context));
+        $this->assertCount(1, get_role_users($CFG->managerroleid, $u1context));
+
+        // Testing when we delete the middle manager's job assignment.
+        \totara_job\job_assignment::delete($u1managerja);
+
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u2context));
+        $this->assertEmpty(get_role_users($CFG->managerroleid, $u1context));
     }
 
     /**
@@ -1304,7 +1541,7 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
 
         // Check that they are swapped.
         $previoustimemodified = max(array($u2ja1->timemodified, $u2ja2->timemodified, $u2ja3->timemodified));
-        sleep(1);
+        $this->waitForSecond();
         $this->assertEquals(1, $u2ja1->sortorder);
         $this->assertEquals(2, $u2ja2->sortorder);
         $this->assertEquals(3, $u2ja3->sortorder);
@@ -1367,7 +1604,7 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
 
         // Check that it is moved up.
         $previoustimemodified = max(array($u2ja1->timemodified, $u2ja2->timemodified, $u2ja3->timemodified));
-        sleep(1);
+        $this->waitForSecond();
         $this->assertEquals(1, $u2ja1->sortorder);
         $this->assertEquals(2, $u2ja2->sortorder);
         $this->assertEquals(3, $u2ja3->sortorder);
@@ -1430,7 +1667,7 @@ class totara_job_job_assignment_testcase extends advanced_testcase {
 
         // Check that it is moved down.
         $previoustimemodified = max(array($u2ja1->timemodified, $u2ja2->timemodified, $u2ja3->timemodified));
-        sleep(1);
+        $this->waitForSecond();
         $this->assertEquals(1, $u2ja1->sortorder);
         $this->assertEquals(2, $u2ja2->sortorder);
         $this->assertEquals(3, $u2ja3->sortorder);

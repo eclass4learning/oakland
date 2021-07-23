@@ -29,6 +29,13 @@ class customfield_textarea extends customfield_base {
         $cols = $this->field->param1;
         $rows = $this->field->param2;
         $context = context_system::instance();
+
+        $isexport = false;
+        if ($mform->elementExists('export')) {
+            // The export element is used by appraisals snapshots, if set the output should be static.
+            $isexport = $mform->getElement('export')->getValue();
+        }
+
         // Create the form field.
         if ($this->itemid == 0) { // If its new record.
             $mform->addElement('editor', $this->inputname, format_string($this->field->fullname), array('cols' => $cols, 'rows' => $rows), $TEXTAREA_OPTIONS);
@@ -38,9 +45,19 @@ class customfield_textarea extends customfield_base {
             }
             $mform->setType($this->inputname, PARAM_CLEANHTML);
         } else { // If its existing record.
-            if ($this->is_locked()) {
+            if ($this->is_locked() || $isexport) {
                 $data = file_rewrite_pluginfile_urls($this->data, 'pluginfile.php', $context->id, 'totara_customfield', $this->prefix, $this->dataid);
-                $mform->addElement('static', 'freezedisplay', format_string($this->field->fullname), format_text($data, FORMAT_MOODLE));
+                // Display the field using a hyphen if there's no content.
+                $mform->addElement(
+                    'static',
+                    'freezedisplay',
+                    format_string($this->field->fullname),
+                    html_writer::div(
+                        !empty($data) ? format_text($data, FORMAT_MOODLE) : get_string('readonlyemptyfield', 'totara_customfield'),
+                        null,
+                        ['id' => 'id_customfield_' . $this->field->shortname]
+                    )
+                );
             } else {
                 $mform->addElement('editor', $this->inputname, format_string($this->field->fullname), array('cols' => $cols, 'rows' => $rows), $TEXTAREA_OPTIONS);
                 $data = file_rewrite_pluginfile_urls($this->data, 'pluginfile.php', $context->id, 'totara_customfield', 'textarea', $this->fieldid);
@@ -144,26 +161,42 @@ class customfield_textarea extends customfield_base {
             $item->{$shortinputname} = $this->data;
         }
     }
+
     /**
-    * Display the data for this field
+     * Display the data for the textarea custom field.
+     *
+     * $data mixed The data to display.
+     * $extradata array Data that identifies the source of the data.
      */
     static function display_item_data($data, $extradata=array()) {
-        if (empty($data)) {
+
+        // Export - return raw data
+        if (!empty($extradata['isexport'])) {
             return $data;
         }
-        if (isset($extradata['altprefix']) && $extradata['altprefix']) {
+
+        if (!empty($extradata['altprefix'])) {
             $extradata['prefix'] = $extradata['altprefix'];
         }
-        if (!isset($extradata['prefix']) || empty($extradata['prefix']) || !isset($extradata['itemid']) || empty($extradata['itemid'])) {
-            return $data;
+        if (empty($extradata['prefix']) || empty($extradata['itemid'])) {
+            if (empty($data)) {
+                return get_string('readonlyemptyfield', 'totara_customfield');
+            } else {
+                return $data;
+            }
         }
+
         $context = context_system::instance();
         $data = file_rewrite_pluginfile_urls($data, 'pluginfile.php', $context->id, 'totara_customfield', $extradata['prefix'], $extradata['itemid']);
 
-        if (isset($extradata['isexport']) && $extradata['isexport']) {
+        if (!empty($extradata['isexport'])) {
             return format_string($data);
         } else {
-            return $data;
+            if (empty($data)) {
+                return get_string('readonlyemptyfield', 'totara_customfield');
+            } else {
+                return $data;
+            }
         }
     }
 

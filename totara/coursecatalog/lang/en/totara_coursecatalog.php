@@ -33,9 +33,6 @@ $string['backtocourselisting'] = 'Back to course listing';
 $string['backtoparent'] = '&laquo; Back to parent';
 $string['browsebycategory'] = 'Browse by category';
 $string['businessdays'] = 'Business days';
-$string['catalogcertifications'] = 'Enhanced catalog: certifications';
-$string['catalogcourses'] = 'Enhanced catalog: courses';
-$string['catalogprograms'] = 'Enhanced catalog: programs';
 $string['certifications'] = 'Certifications';
 $string['completiontotrack'] = 'Completion to track';
 $string['coursecatalog:manageaudiencevisibility'] = 'Manage audience-based visibility';
@@ -61,20 +58,20 @@ As you maybe aware your involvement with your staff member around this training 
 There are no further reminders of this but please be aware that the return rates are noted and reported at the business unit & business group level.';
 $string['escalationsubjectdefault'] = 'Outstanding Course evaluation from [firstname] [lastname]';
 $string['findlearning'] = 'Find Learning';
+$string['findlearningdisabled'] = 'Find Learning (Legacy catalogues)';
 $string['invitation'] = 'Invitation';
 $string['invitationmessage'] = 'Message';
 $string['invitationmessage_help'] = 'This is the message for the invitation email.
 
 The message can include a number of placeholders:
 
-* [firstname] - Users firstname
-* [lastname] - Users lastname
-* [coursepageurl] - A clickable link to the course homepage
-* [coursename] - Name of the course
-* [managername] - Name of users manager
-* [days counter up] - Number of days since completion
-* [days count down] - Number of days until deadline
-';
+* [firstname] : Users firstname.
+* [lastname] : Users lastname.
+* [coursepageurl] : A clickable link to the course homepage.
+* [coursename] : Name of the course.
+* [managername] : Name of users manager.
+* [days counter up] : Number of days since completion.
+* [days count down] : Number of days until deadline.';
 $string['invitationmessagedefault'] = 'Dear [firstname]
 
 Congratulations on completing [coursename].
@@ -89,21 +86,19 @@ Please action this within three days.
 
 Should this still be outstanding in [days count down] days time we will escalate this to your Team Leader.';
 $string['invitationperiod'] = 'Period';
-$string['invitationperiod_help'] = 'The period before the invitation is sent in days.
-';
+$string['invitationperiod_help'] = 'The period before the invitation is sent in days.';
 $string['invitationsubject'] = 'Invitiation Reminder Subject';
 $string['invitationsubject_help'] = 'This is the subject of the invitation email that is sent.
 
 The subject can include a number of placeholders:
 
-* [firstname] - Users firstname
-* [lastname] - Users lastname
-* [coursepageurl] - A clickable link to the course homepage
-* [coursename] - Name of the course
-* [managername] - Name of users manager
-* [days counter up] - Number of days since completion
-* [days count down] - Number of days until deadline
-';
+* [firstname] : Users firstname.
+* [lastname] : Users lastname.
+* [coursepageurl] : A clickable link to the course homepage.
+* [coursename] : Name of the course.
+* [managername] : Name of users manager.
+* [days counter up] : Number of days since completion.
+* [days count down] : Number of days until deadline.';
 $string['invitationsubjectdefault'] = 'Please evaluate [coursename]';
 $string['message'] = 'Message';
 $string['missingtitle'] = 'Missing title';
@@ -130,14 +125,13 @@ $string['remindermessage_help'] = 'This is the message for the reminder email.
 
 The message can include a number of placeholders:
 
-* [firstname] - Users firstname
-* [lastname] - Users lastname
-* [coursepageurl] - A clickable link to the course homepage
-* [coursename] - Name of the course
-* [managername] - Name of users manager
-* [days counter up] - Number of days since completion
-* [days count down] - Number of days until deadline
-';
+* [firstname] : Users firstname.
+* [lastname] : Users lastname.
+* [coursepageurl] : A clickable link to the course homepage.
+* [coursename] : Name of the course.
+* [managername] : Name of users manager.
+* [days counter up] : Number of days since completion.
+* [days count down] : Number of days until deadline.';
 $string['remindermessagedefault'] = 'Dear [firstname]
 
 This is a reminder to complete your course evaluation of [coursename].
@@ -150,26 +144,26 @@ Please visit the course page link below to access the evaluation:
 
 Should this remain outstanding we will escalate that this to your team leader.';
 $string['reminderperiod'] = 'Period';
-$string['reminderperiod_help'] = 'The period before the reminder is sent in days.
-';
+$string['reminderperiod_help'] = 'The period before the reminder is sent in days.';
 $string['remindersmenuitem'] = 'Reminders';
 $string['remindersubject'] = 'Subject';
 $string['remindersubject_help'] = 'This is the subject for the reminder email.
 
 The subject can include a number of placeholders:
 
-* [firstname] - Users firstname
-* [lastname] - Users lastname
-* [coursepageurl] - A clickable link to the course homepage
-* [coursename] - Name of the course
-* [managername] - Name of users manager
-* [days counter up] - Number of days since completion
-* [days count down] - Number of days until deadline
-';
+* [firstname] : Users firstname.
+* [lastname] : Users lastname.
+* [coursepageurl] : A clickable link to the course homepage.
+* [coursename] : Name of the course.
+* [managername] : Name of users manager.
+* [days counter up] : Number of days since completion.
+* [days count down] : Number of days until deadline.';
 $string['remindersubjectdefault'] = 'Reminder to evaluate [coursename]';
+$string['reportbasedcertifications'] = 'Report-based catalogue: certifications';
+$string['reportbasedcourses'] = 'Report-based catalogue: courses';
+$string['reportbasedprograms'] = 'Report-based catalogue: programs';
 $string['requirement'] = 'Requirement';
-$string['requirement_help'] = 'The Required feedback activity that needs to be completed.
-';
+$string['requirement_help'] = 'The Required feedback activity that needs to be completed.';
 $string['sameday'] = 'Same day';
 $string['search'] = 'Search';
 $string['searchagain'] = 'Search again';
@@ -207,6 +201,9 @@ $string['viewallcertifications'] = 'View all certifications';
 $string['viewallcourses'] = 'View all courses';
 
 # Deprecated
+$string['catalogcertifications'] = 'Enhanced catalog: certifications';
+$string['catalogcourses'] = 'Enhanced catalog: courses';
+$string['catalogprograms'] = 'Enhanced catalog: programs';
 $string['placeholder:coursename'] = '[coursename]';
 $string['placeholder:coursepageurl'] = '[coursepageurl]';
 $string['placeholder:dayssincecompletion'] = '[days counter up]';

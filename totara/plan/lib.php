@@ -181,43 +181,45 @@ function totara_plan_pluginfile($course, $cm, $context, $filearea, $args, $force
     send_stored_file($file, 86400, 0, true, $options); // Download MUST be forced - security!
 }
 
-
 /**
  * Can logged in user view specified user's plans.
  * This only checks capabilities, it does not check plan permissions.
  *
  * @access  public
- * @param   int     $ownerid   Plan user
+ *
+ * @param   int $ownerid Plan user
+ * @param   int $viewerid ID of a user trying to view the plan
+ *
  * @return  boolean
  */
-function dp_can_view_users_plans($ownerid) {
+function dp_can_view_users_plans($ownerid, int $viewerid = null) {
     global $USER;
 
-    if (!isloggedin()) {
-        return false;
+    if (empty($viewerid)) {
+        $viewerid = $USER->id;
     }
 
     $systemcontext = context_system::instance();
 
     // If the user can access all plans on the site. Implicitly includes site admins.
-    if (has_capability('totara/plan:accessanyplan', $systemcontext) ||
-        has_capability('totara/plan:manageanyplan', $systemcontext)) {
+    if (has_capability('totara/plan:accessanyplan', $systemcontext, $viewerid) ||
+        has_capability('totara/plan:manageanyplan', $systemcontext, $viewerid)) {
         // The current user has manager's capability (whether or not they are the actual manager, includes site admin).
         return true;
     }
 
     // If the user can access their own plans or the plans of their staff.
-    if (!has_capability('totara/plan:accessplan', $systemcontext)) {
+    if (!has_capability('totara/plan:accessplan', $systemcontext, $viewerid)) {
         // The user has no capability to access either their own plans or those of their staff.
         return false;
     }
 
-    if ($ownerid == $USER->id) {
+    if ($ownerid == $viewerid) {
         // This is the current user's own plan.
         return true;
     }
 
-    if (\totara_job\job_assignment::is_managing($USER->id, $ownerid)) {
+    if (\totara_job\job_assignment::is_managing($viewerid, $ownerid)) {
         // The current user is the actual manager.
         return true;
     }
@@ -273,7 +275,10 @@ function dp_can_manage_users_plans($ownerid) {
 
 
 /**
- * Check if there is a template which allows the given role to perform the given action.
+ * Check if any of the templates allows the given role to perform the specified action.
+ *
+ * NOTE: do not use this for permissions checks for a specific plan. Instead use
+ * development_plan::role_is_allowed_action
  *
  * @param string $role from $DP_AVAILABLE_ROLES
  * @param string/array $action
@@ -322,17 +327,30 @@ function dp_role_is_allowed_action($role, $action, $permission = 'allow') {
  * Return plans for a user with a specific status
  *
  * @access  public
- * @param   int     $userid     Owner of plans
- * @param   array   $statuses   Plan statuses
+ * @param   int     $userid         Owner of plans
+ * @param   array   $statuses       Plan statuses
+ * @param   bool    $checkcanview   Check if user can view the plan. Since Totara 12.9
  * @return  array
  */
-function dp_get_plans($userid, $statuses=array(DP_PLAN_STATUS_APPROVED)) {
+function dp_get_plans($userid, $statuses = array(DP_PLAN_STATUS_APPROVED), $checkcanview = false) {
     global $DB;
     list($insql, $inparams) = $DB->get_in_or_equal($statuses);
     $sql = "userid = ? AND status $insql";
     $params = array($userid);
     $params = array_merge($params, $inparams);
-    return $DB->get_records_select('dp_plan', $sql, $params);
+    $plans = $DB->get_records_select('dp_plan', $sql, $params, 'name');
+
+    // Remove any plans that can not be viewed.
+    if ($checkcanview) {
+        foreach ($plans as $key => $item) {
+            $plan = new development_plan($item->id);
+            if (!$plan->can_view()) {
+                unset($plans[$key]);
+            }
+        }
+    }
+
+    return $plans;
 }
 
 /**
@@ -598,14 +616,14 @@ function dp_print_workflow_diff($diff_array) {
     $headers[] = get_string('before', 'totara_plan');
     $columns[] = 'after';
     $headers[] = get_string('after', 'totara_plan');
+    ob_start();
 
     $baseurl = new moodle_url( '/totara/plan/template/workflow.php');
     $table = new flexible_table('Templates');
     $table->define_columns($columns);
     $table->define_headers($headers);
     $table->define_baseurl($baseurl);
-    $return = html_writer::start_tag('p');
-    $return .= $OUTPUT->heading(get_string('changes', 'totara_plan'), 3);
+    $return = $OUTPUT->heading(get_string('changes', 'totara_plan'), 3);
 
     $table->setup();
 
@@ -696,9 +714,7 @@ function dp_print_workflow_diff($diff_array) {
         $table->add_data($tablerow);
     }
 
-    ob_start();
     $table->finish_html();
-    echo html_writer::empty_tag('br');
     $return = ob_get_contents();
     ob_end_clean();
 
@@ -810,34 +826,41 @@ function dp_display_plans($userid, $statuses=array(DP_PLAN_STATUSAPPROVED), $col
     $sort = $table->get_sql_sort();
     $sort = empty($sort) ? '' : ' ORDER BY '.$sort;
 
-    // Add table data
-    $plans = $DB->get_records_sql($select.$from.$where.$sort, $params, $table->get_page_start(), $table->get_page_size());
+    // Get the plan records.
+    $plansrecords = $DB->get_records_sql($select.$from.$where.$sort, $params, $table->get_page_start(), $table->get_page_size());
+    $plans = array();
+    foreach ($plansrecords as $plansrecord) {
+        $plan = new development_plan($plansrecord->id);
+        if ($plan->can_view()) {
+            $plans[] = $plan;
+        }
+    }
+
     if (empty($plans)) {
         return '';
     }
+
+    // Add table data.
     $rownumber = 0;
-    foreach ($plans as $p) {
-        $plan = new development_plan($p->id);
-        if ($plan->get_setting('view') == DP_PERMISSION_ALLOW) {
-            $row = array();
-            $row[] = $plan->display_summary_widget();
-            if (in_array('enddate', $cols)) {
-                $row[] = $plan->display_enddate();
-            }
-            if (in_array('status', $cols)) {
-                $row[] = $plan->display_progress();
-            }
-            if (in_array('completed', $cols)) {
-                $row[] = $plan->display_completeddate();
-            }
-            if ($can_manage && $can_update) {
-                $row[] = $plan->display_actions();
-            }
-            if (++$rownumber >= $count) {
-                $table->add_data($row, 'last');
-            } else {
-                $table->add_data($row);
-            }
+    foreach ($plans as $plan) {
+        $row = array();
+        $row[] = $plan->display_summary_widget();
+        if (in_array('enddate', $cols)) {
+            $row[] = $plan->display_enddate();
+        }
+        if (in_array('status', $cols)) {
+            $row[] = $plan->display_progress();
+        }
+        if (in_array('completed', $cols)) {
+            $row[] = $plan->display_completeddate();
+        }
+        if ($can_manage && $can_update) {
+            $row[] = $plan->display_actions();
+        }
+        if (++$rownumber >= $count) {
+            $table->add_data($row, 'last');
+        } else {
+            $table->add_data($row);
         }
     }
     unset($plans);
@@ -896,7 +919,7 @@ function dp_display_plans_menu($userid, $selectedid=0, $role='learner', $rolpage
     }
 
     // Display active plans
-    if ($enableplans && $plans = dp_get_plans($userid, array(DP_PLAN_STATUS_APPROVED))) {
+    if ($enableplans && $plans = dp_get_plans($userid, array(DP_PLAN_STATUS_APPROVED), true)) {
         if ($role == 'manager') {
             $out .= $OUTPUT->container_start(null, 'dp-plans-menu-section');
             $out .= $OUTPUT->heading(get_string('activeplans', 'totara_plan'), 5);
@@ -916,7 +939,7 @@ function dp_display_plans_menu($userid, $selectedid=0, $role='learner', $rolpage
     }
 
     // Display unapproved plans
-    if ($enableplans && $plans = dp_get_plans($userid, array(DP_PLAN_STATUS_UNAPPROVED, DP_PLAN_STATUS_PENDING))) {
+    if ($enableplans && $plans = dp_get_plans($userid, array(DP_PLAN_STATUS_UNAPPROVED, DP_PLAN_STATUS_PENDING), true)) {
         if ($role == 'manager') {
             $out .= $OUTPUT->container_start(null, 'dp-plans-menu-section');
             $out .= $OUTPUT->heading(get_string('unapprovedplans', 'totara_plan'), 5);
@@ -937,7 +960,7 @@ function dp_display_plans_menu($userid, $selectedid=0, $role='learner', $rolpage
     }
 
     // Display completed plans
-    if ($enableplans && $plans = dp_get_plans($userid, DP_PLAN_STATUS_COMPLETE)) {
+    if ($enableplans && $plans = dp_get_plans($userid, DP_PLAN_STATUS_COMPLETE, true)) {
         if ($role == 'manager') {
             $out .= $OUTPUT->container_start(null, 'dp-plans-menu-section');
             $out .= $OUTPUT->heading(get_string('completedplans', 'totara_plan'), 5);
@@ -1006,7 +1029,7 @@ function dp_display_plans_menu($userid, $selectedid=0, $role='learner', $rolpage
     $out .= $OUTPUT->container_end();
 
     $fake_block = new block_contents();
-    $fake_block->title = get_string('learningplans', 'totara_plan');;
+    $fake_block->title = get_string('learning', 'totara_plan');
     $fake_block->content = $out;
     $PAGE->blocks->add_fake_block($fake_block, '');
 }
@@ -1026,7 +1049,7 @@ function dp_display_plans_menu_required($programs, $extraparams, $progcount=0) {
             continue;
         }
         $urlparams['id'] = $p->id;
-        $list[] = $OUTPUT->action_link(new moodle_url('/totara/program/required.php', $urlparams), $p->fullname);
+        $list[] = $OUTPUT->action_link(new moodle_url('/totara/program/required.php', $urlparams), format_string($p->fullname));
     }
     return($list);
 }
@@ -1121,13 +1144,21 @@ function dp_get_template_permission($templateid, $component, $action, $role) {
  * @param  string $action     the action to perform
  * @param  string $role       the user role
  * @param  int $permission    the permission value
- * @return array $templates an array if template ids
+ * @return array $templates an array of template ids
  */
 function dp_template_has_permission($component, $action, $role, $permission) {
     global $DB;
 
-    $sql = 'role = ? AND component = ? AND action = ? AND value = ?';
-    $params = array($role, $component, $action, $permission);
+    $sql = 'role = ? AND component = ? AND action = ?';
+    $params = array($role, $component, $action);
+
+    $canmanageanyplan = has_capability('totara/plan:manageanyplan', context_system::instance());
+
+    if (!$canmanageanyplan) {
+        $sql .= ' AND value = ?';
+        $params[] = $permission;
+    }
+
     $templates = $DB->get_records_select('dp_permissions', $sql, $params, 'id', 'templateid');
 
     return array_keys($templates);
@@ -1387,7 +1418,6 @@ function dp_plan_check_plan_complete($plans) {
 function totara_plan_comment_permissions($details) {
     global $DB;
 
-
     $validareas = array('plan_overview', 'plan_course_item', 'plan_competency_item', 'plan_objective_item', 'plan_program_item');
     if (!in_array($details->commentarea, $validareas)) {
         throw new comment_exception('invalidcommentarea');
@@ -1419,7 +1449,7 @@ function totara_plan_comment_permissions($details) {
     }
 
     $plan = new development_plan($planid);
-    if (!has_capability('totara/plan:accessanyplan', $details->context) && ($plan->get_setting('view') < DP_PERMISSION_ALLOW)) {
+    if (!has_capability('totara/plan:accessanyplan', $details->context) && !$plan->can_view()) {
         return array('post' => false, 'view' => false);
     } else {
         return array('post' => true, 'view' => true);
@@ -1593,8 +1623,12 @@ function totara_plan_comment_add($comment) {
     $subscribers = $DB->get_records_select('comments', $sql, $params, '', 'DISTINCT userid');
     $subscribers = !empty($subscribers) ? array_keys($subscribers) : array();
     $subscriberkeys = array();
-    foreach ($subscribers as $s) {
-        $subscriberkeys[$s] = $s;
+    foreach ($subscribers as $subscriber) {
+        // Only users that can see the plan should be in the list of subscribers.
+        if (!dp_can_view_users_plans($plan->userid, $subscriber)) {
+            continue;
+        }
+        $subscriberkeys[$subscriber] = $subscriber;
     }
     $subscribers = $subscriberkeys;
     unset($subscriberkeys);
@@ -1632,6 +1666,22 @@ function totara_plan_comment_add($comment) {
         $event->icon = $icon;
 
         if ($comment->commentarea == 'plan_overview') {
+            $helper = new \totara_plan\add_comment_helper($userto);
+            $loggedoffref = \totara_plan\add_comment_helper::COMPETENCY_PLAN_COMMENT_LOGGEDOFF;
+            $helper->add_user_preference($loggedoffref, get_user_preferences($loggedoffref, null, $userto));
+
+            $loggedinref = \totara_plan\add_comment_helper::COMPETENCY_PLAN_COMMENT_LOGGEDIN;
+            $helper->add_user_preference($loggedinref, get_user_preferences($loggedinref, null, $userto));
+
+            // ONLY Check for plan_overview comment area
+            // if the user has the preference saying that
+            // not sending email on event of new comment added,
+            // either when they are loggedin or loggedoff
+            // then it will make the method to skip the part of sending email
+            if (!$helper->is_sending_email_notification(time())) {
+                continue;
+            }
+
             $subject = $stringmanager->get_string('commentmsg:planoverview', 'totara_plan', $msgobj, $userto->lang);
             $fullmsg = $stringmanager->get_string('commentmsg:planoverviewdetail', 'totara_plan', $msgobj, $userto->lang);
         } else {

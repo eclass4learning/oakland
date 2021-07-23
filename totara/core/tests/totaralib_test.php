@@ -18,8 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * @author Yuliya Bozhko <yuliya.bozhko@totaralms.com>
- * @package totara
- * @subpackage totaracore
+ * @package totara_core
  */
 if (!defined('MOODLE_INTERNAL')) {
     die('Direct access to this script is forbidden.'); // It must be included from a Moodle page.
@@ -30,11 +29,15 @@ require_once($CFG->dirroot . '/totara/hierarchy/prefix/position/lib.php');
 require_once($CFG->dirroot . '/totara/core/lib.php');
 require_once($CFG->dirroot . '/completion/cron.php');
 
-class totaralib_test extends advanced_testcase {
+class totara_core_totaralib_testcase extends advanced_testcase {
     protected $user, $manager, $teamleader, $appraiser, $invaliduserid = 9999;
 
     protected function tearDown() {
         $this->user = null;
+        $this->manager = null;
+        $this->teamleader = null;
+        $this->appraiser = null;
+
         parent::tearDown();
     }
 
@@ -51,76 +54,6 @@ class totaralib_test extends advanced_testcase {
             array('managerjaid' => $teamleaderja->id));
         \totara_job\job_assignment::create_default($this->user->id,
             array('managerjaid' => $managerja->id, 'appraiserid' => $this->appraiser->id));
-    }
-
-    public function test_totara_is_manager() {
-        $this->resetAfterTest();
-
-        // Totara_is_manager should return true when there is a role assignment for managerid at the user context for userid.
-        $this->assertTrue(totara_is_manager($this->user->id, $this->manager->id));
-        $this->assertDebuggingCalled('The function totara_is_manager has been deprecated since 9.0. Please use \totara_job\job_assignment::is_managing instead.');
-
-        // Totara_is_manager should return false when there is not role assignment record for managerid on userid's user context.
-        $this->assertFalse(totara_is_manager($this->user->id, $this->invaliduserid));
-        $this->assertDebuggingCalled('The function totara_is_manager has been deprecated since 9.0. Please use \totara_job\job_assignment::is_managing instead.');
-        $this->assertFalse(totara_is_manager($this->user->id, $this->appraiser->id));
-        $this->assertDebuggingCalled('The function totara_is_manager has been deprecated since 9.0. Please use \totara_job\job_assignment::is_managing instead.');
-        $this->assertFalse(totara_is_manager($this->user->id, $this->teamleader->id));
-        $this->assertDebuggingCalled('The function totara_is_manager has been deprecated since 9.0. Please use \totara_job\job_assignment::is_managing instead.');
-    }
-
-    public function test_totara_get_manager() {
-        $this->resetAfterTest();
-
-        // Return value should be user object.
-        $this->assertEquals(totara_get_manager($this->user->id)->id, $this->manager->id);
-        $this->assertDebuggingCalled('totara_get_manager has been deprecated since 9.0. You will need to use methods from \totara_job\job_assignment instead.');
-
-        // Totara_get_manager returns get_record_sql. expecting false here.
-        $this->assertFalse(totara_get_manager($this->teamleader->id));
-        $this->assertDebuggingCalled('totara_get_manager has been deprecated since 9.0. You will need to use methods from \totara_job\job_assignment instead.');
-    }
-
-    public function test_totara_get_teamleader() {
-        $this->resetAfterTest();
-
-        // Return value should be user object.
-        $this->assertEquals($this->teamleader->id, totara_get_teamleader($this->user->id)->id);
-        // debugging called more than once so can't use assertDebuggingCalled.
-        $debugging = $this->getDebuggingMessages();
-        $this->assertCount(3, $debugging);
-        $this->resetDebugging();
-
-
-        // Totara_get_manager returns get_record_sql. expecting false here.
-        $this->assertFalse(totara_get_teamleader($this->manager->id));
-        $debugging = $this->getDebuggingMessages();
-        $this->assertCount(3, $debugging);
-        $this->resetDebugging();
-    }
-
-    public function test_totara_get_appraiser() {
-        $this->resetAfterTest();
-
-        // Return value should be user object.
-        $this->assertEquals($this->appraiser->id, totara_get_appraiser($this->user->id)->id);
-        $this->assertDebuggingCalled('totara_get_appraiser is deprecated. Use \totara_job\job_assignment methods instead.');
-
-        // Totara_get_manager returns get_record_sql. expecting false here.
-        $this->assertFalse(totara_get_appraiser($this->manager->id));
-        $this->assertDebuggingCalled('totara_get_appraiser is deprecated. Use \totara_job\job_assignment methods instead.');
-    }
-
-    public function test_totara_get_staff() {
-        $this->resetAfterTest();
-
-        // Expect array of id numbers.
-        $this->assertEquals(array($this->user->id), totara_get_staff($this->manager->id));
-        $this->assertDebuggingCalled('totara_get_staff has been deprecated since 9.0. Use \totara_job\job_assignment::get_staff_userids instead.');
-
-        // Expect false when the 'managerid' being inspected has no staff.
-        $this->assertFalse(totara_get_staff($this->user->id));
-        $this->assertDebuggingCalled('totara_get_staff has been deprecated since 9.0. Use \totara_job\job_assignment::get_staff_userids instead.');
     }
 
     public function test_totara_create_icon_picker() {
@@ -172,7 +105,7 @@ class totaralib_test extends advanced_testcase {
         $this->assertEquals('admin', totara_get_sender_from_user_by_id('')->username);
 
         $this->assertEquals('noreply', totara_get_sender_from_user_by_id(core_user::NOREPLY_USER)->username);
-        $this->assertEquals('facetoface', totara_get_sender_from_user_by_id(\mod_facetoface\facetoface_user::FACETOFACE_USER)->username);
+        $this->assertEquals('noreply', totara_get_sender_from_user_by_id(\mod_facetoface\facetoface_user::FACETOFACE_USER)->username);
 
         $user1 = $this->getDataGenerator()->create_user(array('username' => 'testuser1'));
         $user2 = $this->getDataGenerator()->create_user(array('email' => 'testuser2@test.com'));
@@ -234,14 +167,30 @@ class totaralib_test extends advanced_testcase {
         $moduleinfo->completionunlocked = 1;
         $moduleinfo->completionunlockednoreset = 0;
 
+        // Clear out any logs that might have been created earlier.
+        $DB->delete_records('course_completion_log');
+
         totara_core_update_module_completion_data($cminfo, $moduleinfo, $course, $completion);
+
+        // Check that some logs were created.
+        $this->assertEquals(1, $DB->count_records('course_completion_log'));
+        $this->assertEquals(1, $DB->count_records('course_completion_log',
+            array('courseid' => $course->id, 'userid' => $learner->id)));
 
         // With unlock and delete, all activity completions should be set to incomplete.
         $this->assertEquals(true, $DB->record_exists('course_modules_completion',
             array('coursemoduleid' => $cminfo->id, 'userid' => $learner->id, 'completionstate' => COMPLETION_INCOMPLETE)));
 
-        sleep(1);
+        // Clear out any logs that might have been created earlier.
+        $DB->delete_records('course_completion_log');
+
+        $this->waitForSecond();
         totara_core_reaggregate_course_modules_completion();
+
+        // Check that some logs were created.
+        $this->assertEquals(1, $DB->count_records('course_completion_log'));
+        $this->assertEquals(1, $DB->count_records('course_completion_log',
+            array('courseid' => $course->id, 'userid' => $learner->id)));
 
         // MANUAL COMPLETIONS - Cron will not update to complete again.
         $this->assertEquals(true, $DB->record_exists('course_modules_completion',
@@ -294,14 +243,30 @@ class totaralib_test extends advanced_testcase {
         $moduleinfo->completionunlocked = 1;
         $moduleinfo->completionunlockednoreset = 0;
 
+        // Clear out any logs that might have been created earlier.
+        $DB->delete_records('course_completion_log');
+
         totara_core_update_module_completion_data($cminfo, $moduleinfo, $course, $completion);
+
+        // Check that some logs were created.
+        $this->assertEquals(1, $DB->count_records('course_completion_log'));
+        $this->assertEquals(1, $DB->count_records('course_completion_log',
+            array('courseid' => $course->id, 'userid' => $learner->id)));
 
         // With unlock and delete, all activity completions should be set to incomplete.
         $this->assertEquals(true, $DB->record_exists('course_modules_completion',
             array('coursemoduleid' => $cminfo->id, 'userid' => $learner->id, 'completionstate' => COMPLETION_INCOMPLETE)));
 
-        sleep(1);
+        // Clear out any logs that might have been created earlier.
+        $DB->delete_records('course_completion_log');
+
+        $this->waitForSecond();
         totara_core_reaggregate_course_modules_completion();
+
+        // Check that some logs were created.
+        $this->assertEquals(1, $DB->count_records('course_completion_log'));
+        $this->assertEquals(1, $DB->count_records('course_completion_log',
+            array('courseid' => $course->id, 'userid' => $learner->id)));
 
         // VIEWED COMPLETIONS - should be reaggregated to complete again.
         $this->assertEquals(true, $DB->record_exists('course_modules_completion',
@@ -588,9 +553,20 @@ class totaralib_test extends advanced_testcase {
         // We'll test the course module with id = 1.
         $cm = new stdClass();
         $cm->id = 1;
+        $cm->course = $this->getDataGenerator()->create_course()->id;
+
+        // Clear out any logs that might have been created earlier.
+        $DB->delete_records('course_completion_log');
 
         $now = time();
         totara_core_uncomplete_course_modules_completion($cm, $completion, $now);
+
+        // Check that some logs were created.
+        $this->assertEquals(2, $DB->count_records('course_completion_log'));
+        $this->assertEquals(1, $DB->count_records('course_completion_log',
+            array('courseid' => $cm->course, 'userid' => 1)));
+        $this->assertEquals(1, $DB->count_records('course_completion_log',
+            array('courseid' => $cm->course, 'userid' => 2)));
 
         // Updating the initial arrays to what we expect the records to be.
 

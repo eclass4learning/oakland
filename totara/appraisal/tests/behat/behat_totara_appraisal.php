@@ -25,6 +25,8 @@
 
 require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
 
+use Behat\Gherkin\Node\PyStringNode as PyStringNode;
+
 class behat_totara_appraisal extends behat_base {
 
     /**
@@ -35,7 +37,8 @@ class behat_totara_appraisal extends behat_base {
      * @param string    $numberofquestions number of questions
      * @param string    $page page number
      */
-    public function create_appraisal_questions_on_page($numberofquestions, $page) {
+    public function create_appraisal_questions_on_page($numberofquestions, $page, $questiondata = null) {
+        \behat_hooks::set_step_readonly(false);
         global $DB;
 
         /** @var totara_appraisal_generator $datagenerator */
@@ -43,12 +46,57 @@ class behat_totara_appraisal extends behat_base {
 
         $page = $DB->get_record('appraisal_stage_page', array('name' => $page));
 
-        // NOTE: MySQL has relatively low limits on number of varchar table columns, we cannot use 'text' here.
-        $data = array('datatype' => 'datepicker', 'startyear' => 1975, 'stopyear' => 2020, 'withtime' => 0);
+        if (!$questiondata) {
+            // NOTE: MySQL has relatively low limits on number of varchar table columns, so we don't use 'text' as default here.
+            $stopyear = (new \DateTime('+2 years'))->format('Y');
+            $questiondata = ['datatype' => 'datepicker', 'startyear' => 1975, 'stopyear' => $stopyear, 'withtime' => 0];
+        }
         for ($i = 1; $i <= $numberofquestions; $i++) {
-            $datagenerator->create_complex_question($page->id, $data);
+            $datagenerator->create_complex_question($page->id, $questiondata);
         }
     }
 
+    /**
+     * Creates number of questions of given type on an appraisal page.
+     *
+     * @Given /^I create "([0-9]*)" "([^"]*)" appraisal questions on the page "([^"]*)"$/
+     *
+     * @param string    $numberofquestions number of questions
+     * @param string    $type question type
+     * @param string    $page page number
+     */
+    public function create_appraisal_questions_on_page_for_type($numberofquestions, $type, $page) {
+        \behat_hooks::set_step_readonly(false);
 
+        switch($type) {
+            case 'datepicker':
+                $stopyear = (new \DateTime('+2 years'))->format('Y');
+                $questiondata = ['datatype' => 'datepicker', 'startyear' => 1975, 'stopyear' => $stopyear, 'withtime' => 0];
+                break;
+            case 'text':
+                $questiondata = ['datatype' => 'text'];
+                break;
+            default:
+                throw new Exception('Creating appraisal questions for type "' . $type . "' is not implemented yet.");
+        }
+
+        $this->create_appraisal_questions_on_page($numberofquestions, $page, $questiondata);
+    }
+
+    /**
+     * Add all appraisal message placholders to the given field.
+     *
+     * @Given /^I add all appraisal message placeholders in the "([^"]*)" field$/
+     *
+     * @param string    $fieldname the field name
+     */
+    public function i_add_all_appraisal_message_placeholders_to_fieldname($fieldname) {
+        \behat_hooks::set_step_readonly(false);
+
+        $placholdertext = '';
+        foreach (appraisal_message::$placeholders as $placeholder) {
+            $placholdertext .=  $placeholder . ': ['. $placeholder . ']' . PHP_EOL;
+        }
+        $this->execute("behat_forms::i_set_the_field_to_multiline", array($fieldname, new PyStringNode([$placholdertext], 0)));
+    }
 }

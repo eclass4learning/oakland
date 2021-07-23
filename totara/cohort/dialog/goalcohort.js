@@ -96,8 +96,7 @@ M.totara_goalcohort = M.totara_goalcohort || {
             },
             url + 'cohort_goal.php?selected=' + this.config.selected
                     + '&instancetype=' + this.config.instancetype
-                    + '&instanceid=' + this.config.instanceid
-                    + '&sesskey=' + this.config.sesskey,
+                    + '&instanceid=' + this.config.instanceid,
             ehandler
         );
     }

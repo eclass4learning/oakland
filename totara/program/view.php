@@ -26,7 +26,7 @@
  * Program progress view page
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once('lib.php');
 require_once($CFG->dirroot . '/totara/core/js/lib/setup.php');
 
@@ -54,7 +54,7 @@ if ($program->certifid) {
     $component = 'totara_program';
 }
 
-$PAGE->set_context(context_program::instance($program->id));
+$PAGE->set_program($program);
 $PAGE->set_url('/totara/program/view.php', array('id' => $id, 'viewtype' => $viewtype));
 $PAGE->set_pagelayout('noblocks');
 
@@ -63,10 +63,7 @@ $data = array('id' => $program->id, 'other' => array('section' => 'general'));
 $event = \totara_program\event\program_viewed::create_from_data($data)->trigger();
 
 //Javascript include
-local_js(array(
-    TOTARA_JS_DIALOG,
-    TOTARA_JS_PLACEHOLDER
-));
+local_js(array(TOTARA_JS_DIALOG));
 
 // Get extension dialog content
 $PAGE->requires->strings_for_js(array('pleaseentervaliddate', 'pleaseentervalidreason', 'extensionrequest', 'cancel', 'ok'), 'totara_program');
@@ -90,7 +87,7 @@ $isadmin = has_capability('moodle/category:manage', context_coursecat::instance(
 $category_breadcrumbs = prog_get_category_breadcrumbs($program->category, $viewtype);
 
 $heading = $program->fullname;
-$pagetitle = format_string(get_string('program', 'totara_program').': '.$heading);
+$pagetitle = get_string('program', 'totara_program') . ': ' . $heading;
 if ($isadmin) {
     $PAGE->navbar->add(get_string('manageprograms', 'admin'), new moodle_url('/totara/program/manage.php', array('viewtype' => $viewtype)));
 } else {
@@ -104,7 +101,7 @@ foreach ($category_breadcrumbs as $crumb) {
 $PAGE->navbar->add($heading);
 
 $PAGE->set_title($pagetitle);
-$PAGE->set_heading(format_string($SITE->fullname));
+$PAGE->set_heading($SITE->fullname);
 echo $OUTPUT->header();
 
 if ($program->has_capability_for_overview_page()) {
@@ -115,7 +112,7 @@ if ($program->has_capability_for_overview_page()) {
 // Program page content.
 echo $OUTPUT->container_start('', 'view-program-content');
 
-echo $OUTPUT->heading($heading);
+echo $OUTPUT->heading(format_string($heading));
 
 // A user assigned this program should always see their progress.
 if (!empty($CFG->audiencevisibility)) {

@@ -36,7 +36,7 @@ $repeats = optional_param('repeats', false, PARAM_BOOL);
 $courseid = optional_param('course', 0, PARAM_INT);
 
 $PAGE->set_url('/calendar/delete.php', array('id'=>$eventid));
-$PAGE->set_totara_menu_selected('calendar');
+$PAGE->set_totara_menu_selected('\totara_core\totara\menu\calendar');
 
 if(!$site = get_site()) {
     redirect(new moodle_url('/admin/index.php'));
@@ -59,9 +59,11 @@ if (!$course) {
     $PAGE->set_context(context_system::instance()); //TODO: wrong
 }
 
+$title = get_string('deleteevent', 'calendar');
+
 // Check the user has the required capabilities to edit an event
-if (!calendar_edit_event_allowed($event)) {
-    print_error('nopermissions');
+if (!calendar_edit_event_allowed($event) || !empty($event->modulename)) {
+    print_error('nopermissions', 'error', $PAGE->url, $title);
 }
 
 // Count the repeats, do we need to consider the possibility of deleting repeats
@@ -89,7 +91,6 @@ if ($confirm) {
 }
 
 // Prepare the page to show the confirmation form
-$title = get_string('deleteevent', 'calendar');
 $strcalendar = get_string('calendar', 'calendar');
 
 $PAGE->navbar->add($strcalendar, $viewcalendarurl);

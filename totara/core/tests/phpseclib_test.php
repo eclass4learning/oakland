@@ -36,7 +36,8 @@ class totara_core_phpseclib_testcase extends advanced_testcase {
      * Test totara encryption.
      */
     public function test_encrypt_data() {
-        // NOTE: do not include the RSA directly here!
+        global $CFG;
+        require_once($CFG->dirroot . '/totara/core/lib/phpseclib/Crypt/RSA.php');
 
         // Encrypt using public Totara key.
         $ciphertext = encrypt_data('secret');
@@ -48,10 +49,12 @@ class totara_core_phpseclib_testcase extends advanced_testcase {
 
     /**
      * Test key creation, encryption and decryption
-     * @depends test_encrypt_data
      */
     public function test_rsa() {
-        // Do not include any files here, we rely on previous test to load all libs.
+        global $CFG;
+        require_once($CFG->dirroot . '/totara/core/lib/phpseclib/Crypt/RSA.php');
+        require_once($CFG->dirroot . '/totara/core/lib/phpseclib/Math/BigInteger.php');
+        require_once($CFG->dirroot . '/totara/core/lib/phpseclib/Crypt/Hash.php');
 
         $rsa = new \phpseclib\Crypt\RSA();
         $keys = $rsa->createKey();

@@ -22,7 +22,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot.'/totara/core/dialogs/dialog_content_hierarchy.class.php');
 require_once($CFG->dirroot.'/totara/plan/lib.php');
 
@@ -64,10 +64,7 @@ $plan = new development_plan($id);
 $component = $plan->get_component('competency');
 
 // Access control check
-$can_manage = dp_can_manage_users_plans($plan->userid);
-$can_update = dp_role_is_allowed_action($plan->role, 'update');
-
-if (!$can_manage || !$can_update) {
+if (!$plan->can_update() && !$plan->can_request_approval()) {
     print_error('error:cannotupdateitems', 'totara_plan');
 }
 

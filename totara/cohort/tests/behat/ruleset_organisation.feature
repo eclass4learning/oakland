@@ -38,9 +38,9 @@ Feature: Test organisation and position rulesets within framework display
       | Audience 12966OP | AUD12966OP | 2          |
 
   @javascript
-  Scenario: Test organisations within the framewortk in dynamic audience with equals rule.
+  Scenario: Test organisations within the framework in dynamic audience with equals rule.
     Given I log in as "admin"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Audience 12966O"
     And I switch to "Rule sets" tab
     And I set the field "addrulesetmenu" to "Organisations"
@@ -70,9 +70,9 @@ Feature: Test organisation and position rulesets within framework display
     And I should see "within the \"Org framework 12966B\" framework"
 
   @javascript
-  Scenario: Test positions within the framewortk in dynamic audience with equals rule.
+  Scenario: Test positions within the framework in dynamic audience with equals rule.
     Given I log in as "admin"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Audience 12966P"
     And I switch to "Rule sets" tab
     And I set the field "addrulesetmenu" to "Positions"
@@ -102,9 +102,9 @@ Feature: Test organisation and position rulesets within framework display
     And I should see "within the \"Pos framework 12966B\" framework"
 
   @javascript
-  Scenario: Test organisations and positions within the framewortk in dynamic audience with equals rule.
+  Scenario: Test organisations and positions within the framework in dynamic audience with equals rule.
     Given I log in as "admin"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Audience 12966OP"
     And I switch to "Rule sets" tab
 
@@ -134,3 +134,27 @@ Feature: Test organisation and position rulesets within framework display
     And I should see "Position 12966C"
     And I should see "within the \"Pos framework 12966A\" framework"
 
+  @javascript
+  Scenario: Test organisations from multiple frameworks in dynamic audience with equals rule.
+    Given I log in as "admin"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
+    And I follow "Audience 12966O"
+    And I switch to "Rule sets" tab
+    And I set the field "addrulesetmenu" to "Organisations"
+    And I set the field "equal" to "Equal to"
+    And I click on "Organisation 12966A" "link"
+    And I click on "Organisation 12966B" "link"
+    And I set the field "menu" to "Org framework 12966B"
+    And I click on "Organisation 12966E" "link"
+    And I click on "Organisation 12966F" "link"
+
+    When I click on "Save" "button" in the "Add rule" "totaradialogue"
+    Then I should see "Audience rules changed"
+    And I should see "User's organisation in any of their job assignments is equal to"
+    And I should see "Organisation 12966A"
+    And I should see "Organisation 12966B"
+    And I should see "within the \"Org framework 12966A\" framework"
+    And I should see "Organisation 12966E"
+    And I should see "Organisation 12966F"
+    And I should see "within the \"Org framework 12966B\" framework"
+    And I should not see "Deleted (ID:"

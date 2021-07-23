@@ -68,95 +68,68 @@ $string['advancedsettingscompetencypermissions_help'] = '**Competency permission
 
 There are four permission levels available:
 
-*   **Allow** allows the user to perform the action
-*   **Deny** prevents the user from performing the action
-*   **Request** allows the user to request that this action is performed
-*   **Approve** allows the user to approve a requested action.';
+*   **Allow**: Lets the user to perform the action.
+*   **Deny**: Prevents the user from performing the action.
+*   **Request**: Allows the user to request that this action is performed.
+*   **Approve**: Allows the user to approve a requested action.';
 $string['advancedsettingscompetencysettings'] = 'Competency settings';
-$string['advancedsettingscompetencysettings_help'] = '**Competency settings** allow you to define which settings are available for competencies within the plan.
+$string['advancedsettingscompetencysettings_help'] = '**Competency settings** allow you to define which settings are available for competencies within the plan. Select the **Due dates** setting. When **Due dates** is set to **None** the column does not appear on the learning plan. Select the **Priorities** setting. When you are using **Priorities** you need a **Priority Scale**. Click the dropdown menu to select the priority scale. Note that the option to set up such a scale is in *Learning Plans > Priority Scales*.
 
-Select the **‘Due dates’** setting. When **‘Due dates’** is set to ‘None’ the column does not appear on the learning plan.
+**Automatic assignment** enables you to automatically display competencies in a learning plan which have previously been assigned to a user\'s position or organisation.
 
-Select the **‘Priorities’** setting. When you are using **‘Priorities’** you need a **‘Priority Scale’**. Click the dropdown menu to select the priority scale.
-
-**Note:** The option to set up such a scale is in Learning Plans>Priority Scales.
-**Automatic assignment** enables you to automatically display competencies in a learning plan which have previously been assigned to a user’s position or organisation.
-
-**Default status** determines the status of a competency when it is is first approved within a plan. If \'Assign newly approved competencies their default status\' is checked, all competencies will be given the default status for that competency\'s scale at the moment the competency is approved. If left unchecked no initial status will be set.';
+**Default status** determines the status of a competency when it is is first approved within a plan. If **Assign newly approved competencies their default status** is checked, all competencies will be given the default status for that competency\'s scale at the moment the competency is approved. If left unchecked no initial status will be set.';
 $string['advancedsettingscoursepermissions'] = 'Course permissions';
 $string['advancedsettingscoursepermissions_help'] = '**Course permissions** allow you to define which course settings are available and the types of actions that can be performed by the Learner and Manager in the learning plan.
 
 There are four available permission levels:
 
-*   **Allow** allows the user to perform the action
-*   **Deny** prevents the user from performing the action
-*   **Request** allows the user to request that this action
-*   **Approve** allows the user to approve a action.';
+*   **Allow**: Lets the user to perform the action.
+*   **Deny**: Prevents the user from performing the action.
+*   **Request**: Allows the user to request that this action.
+*   **Approve**: Allows the user to approve a action.';
 $string['advancedsettingscoursesettings'] = 'Course settings';
-$string['advancedsettingscoursesettings_help'] = '**Course settings** allow you to define the settings available for courses within the plan.
+$string['advancedsettingscoursesettings_help'] = '**Course settings** allow you to define the settings available for courses within the plan. Select the **Due dates** setting. When **Due dates** is set to **None** the column does not appear on the learning plan. Select the **Priorities** setting. When **Priorities** is set to **None** the column does not appear on the learning plan. When you are using **Priorities** you need a **Priority Scale**. Click the dropdown menu to select the priority scale.
 
-Select the **‘Due dates’** setting. When **‘Due dates’** is set to ‘None’ the column does not appear on the learning plan.
-
-Select the **‘Priorities’** setting. When **‘Priorities’** is set to ‘None’ the column does not appear on the learning plan.
-
-When you are using **‘Priorities’** you need a **‘Priority Scale’**. Click the dropdown menu to select the priority scale.
-
-**Note:** The option to set up such a scale is in Learning Plans>Priority Scales.';
+Note that the option to set up such a scale is in *Learning Plans > Priority Scales*.';
 $string['advancedsettingsobjectivepermissions'] = 'Objective permissions';
 $string['advancedsettingsobjectivepermissions_help'] = '**Objective permissions** allow you to define the actions that can be performed by the Learner and Manager in the learning plan when setting up objectives.
 
 There are four available permission levels:
 
-*   **Allow** allows the user to perform the action
-*   **Deny** prevents the user from performing the action
-*   **Request** allows the user to request that this action
-*   **Approve** allows the user to approve the action.';
+*   **Allow**: Lets the user to perform the action.
+*   **Deny**: Prevents the user from performing the action.
+*   **Request**: Allows the user to request that this action.
+*   **Approve**: Allows the user to approve the action.';
 $string['advancedsettingsobjectivesettings'] = 'Objective settings';
-$string['advancedsettingsobjectivesettings_help'] = '**Objective settings** allow you define the settings available for objectives within the plan.
-
-Select the **‘Due dates’** setting. When **‘Due dates’** is set to ‘None’ the column does not appear on the learning plan.
-
-Select the **‘Priorities’** setting. When **‘Priorities’** is set to ‘None’ the column does not appear on the learning plan.
-
-When you are using **‘Priorities’** you need a **‘Priority Scale’**. Click the dropdown menu to select the priority scale.
-
-**Note:** The option to set up such a scale is in Learning Plans>Priority Scales.
-
-**Objective scale** is used to measure a learners’ progress towards their objectives. Set up objective scales using the menu option under Site Administration>Learning Plans.';
+$string['advancedsettingsobjectivesettings_help'] = '**Objective settings** allow you define the settings available for objectives within the plan.Select the **Due dates** setting. When **Due dates** is set to **None** the column does not appear on the learning plan.Select the **Priorities** setting. When **Priorities** is set to **None** the column does not appear on the learning plan.When you are using **Priorities** you need a **Priority Scale**. Click the dropdown menu to select the priority scale.Note that the option to set up such a scale is in *Learning Plans > Priority Scales*.**Objective scale** is used to measure a learners\' progress towards their objectives. Set up objective scales using the menu option under *Site Administration > Learning Plans*.';
 $string['advancedsettingsplanpermissions'] = 'Plan permissions';
 $string['advancedsettingsplanpermissions_help'] = 'The advanced workflow settings allows you to define the type of actions which can be performed by learners and managers. For each type of action there are four permission levels available:
 
-*   **Allow** allows the user to perform the action.
-*   **Deny** prevents the user from performing the action.
-*   **Request** allows the user to request that this action is performed.
-*   **Approve** allows the user to approve an action.';
+*   **Allow**: Lets the user to perform the action.
+*   **Deny**: Prevents the user from performing the action.
+*   **Request**: Allows the user to request that this action is performed.
+*   **Approve**: Allows the user to approve an action.';
 $string['advancedsettingsplansettings'] = 'Plan settings';
 $string['advancedsettingsplansettings_help'] = '**Plan settings** allow you to define general settings for the plan.
 
 The Learning Plan is able to be marked as complete based on the following choices:
 
-*   **Manually, by a user with \'complete\' permission.**
-    The learning plan is able to be marked as complete by a Learner or Manager who has Allow selected in the Approve row of the Plan Permissions.
-*   **Automatically, when all items have been completed.**
-    The learning plan is marked as completed when all of the courses, competencies, Objectives or programs that are included in the learning plan have been marked as completed
-*   **Automatically, when the plan completion date has passed.**
-    The learning plan is marked as complete when the Completion Date that has been saved with the Learning Plan has passed';
+*   **Manually, by a user with \'complete\' permission**: The learning plan is able to be marked as complete by a Learner or Manager who has **Allow** selected in the **Approve** row of the **Plan Permissions**.
+*   **Automatically, when all items have been completed**: The learning plan is marked as completed when all of the courses, competencies, Objectives or programs that are included in the learning plan have been marked as completed.
+*   **Automatically, when the plan completion date has passed**: The learning plan is marked as complete when the **Completion Date** that has been saved with the Learning Plan has passed.';
 $string['advancedsettingsprogrampermissions'] = 'Program permissions';
 $string['advancedsettingsprogrampermissions_help'] = 'The advanced workflow settings allows you to define the type of actions which can be performed by learners and managers. For each type of action there are four permission levels available:
 
-*   **Allow** allows the user to perform the action.
-*   **Deny** prevents the user from performing the action.
-*   **Request** allows the user to request that this action is performed.
-*   **Approve** allows the user to approve an action.';
+*   **Allow**: Lets the user to perform the action.
+*   **Deny**: Prevents the user from performing the action.
+*   **Request**: Allows the user to request that this action is performed.
+*   **Approve**: Allows the user to approve an action.';
 $string['advancedsettingsprogramsettings'] = 'Program settings';
 $string['advancedsettingsprogramsettings_help'] = 'The Learning Plan is able to be marked as complete based on the following choices:
 
-*   **Manually, by a user with \'complete\' permission.**
-    The learning plan is able to be marked as complete by a Learner or Manager who has Allow selected in the Approve row of the Plan Permissions.
-*   **Automatically, when all items have been completed.**
-    The learning plan is marked as completed when all of the courses, competencies, Objectives or programs that are included in the learning plan have been marked as completed
-*   **Automatically, when the plan completion date has passed.**
-    The learning plan is marked as complete when the Completion Date that has been saved with the Learning Plan has passed';
+*   **Manually, by a user with \'complete\' permission**: The learning plan is able to be marked as complete by a Learner or Manager who has **Allow** selected in the **Approve** row of the **Plan Permissions**.
+*   **Automatically, when all items have been completed**: The learning plan is marked as completed when all of the courses, competencies, Objectives or programs that are included in the learning plan have been marked as completed.
+*   **Automatically, when the plan completion date has passed**: The learning plan is marked as complete when the **Completion Date** that has been saved with the Learning Plan has passed.';
 $string['advancedworkflow'] = 'Advanced workflow settings';
 $string['after'] = 'After';
 $string['allcertifications'] = 'Certifications';
@@ -181,6 +154,8 @@ $string['alreadyassignedtoplan'] = 'Already assigned to this plan';
 $string['approval'] = 'Approval';
 $string['approvalrequested'] = '(Approval Requested)';
 $string['approvalrequestsent'] = 'Approval request sent for plan "{$a}"';
+$string['approvalstatus'] = 'Approval status';
+$string['approvalstatusof'] = 'Approval status of {$a}';
 $string['approve'] = 'Approve';
 $string['approved'] = 'Approved';
 $string['approveitemstext'] = 'Please review and approve the changes to the attached plan';
@@ -355,6 +330,8 @@ $string['customworkflowdesc'] = 'Fine-grained control over individual permission
 $string['customworkflowname'] = 'Custom workflow';
 $string['datecompleted'] = 'Date completed';
 $string['datecreated'] = 'Date created';
+$string['timeproficient'] = 'Proficiency achieved';
+$string['timeproficient_help'] = 'Allows you to record the date the user achieved proficiency. This field is entirely optional, but will default to the current date when a proficient status is selected.';
 $string['datestarted'] = 'Date started';
 $string['decline'] = 'Decline';
 $string['declined'] = 'Declined';
@@ -404,6 +381,7 @@ $string['deleteplan'] = 'Delete plan';
 $string['deny'] = 'Deny';
 $string['draft'] = 'Draft';
 $string['duedate'] = 'Due date';
+$string['duedatefor'] = 'Due date for {$a}';
 $string['duedatemode'] = 'Due dates';
 $string['duedates'] = 'Due dates';
 $string['dueinxdays'] = 'Due in {$a} day(s)';
@@ -439,18 +417,18 @@ $string['error:couldnotassignnewitem'] = 'Could not assign new item to plan';
 $string['error:couldnotfindassigneditem'] = 'Could not find assigned item';
 $string['error:couldnotunassigneditem'] = 'Could not unassign item';
 $string['error:coursecompletionpermission'] = 'You do not have permission to update completion status';
-$string['error:createcomponents'] = 'An error occured while creating components for a new plan template';
-$string['error:createnewevidencetype'] = 'An error occured while creating new Evidence type';
-$string['error:createnewobjectivescale'] = 'An error occured while creating new objective scale';
-$string['error:createnewpriorityscale'] = 'An error occured while creating new priority scale';
-$string['error:createobjectivescale'] = 'An error occured while creating an objective scale';
+$string['error:createcomponents'] = 'An error occurred while creating components for a new plan template';
+$string['error:createnewevidencetype'] = 'An error occurred while creating new Evidence type';
+$string['error:createnewobjectivescale'] = 'An error occurred while creating new objective scale';
+$string['error:createnewpriorityscale'] = 'An error occurred while creating new priority scale';
+$string['error:createobjectivescale'] = 'An error occurred while creating an objective scale';
 $string['error:createobjectivevalue'] = 'Error creating objective scale value record';
 $string['error:createpriorityvalue'] = 'Error creating priority scale value record';
-$string['error:creatingobjectivescalevalues'] = 'An error occured when creating objective scale values';
+$string['error:creatingobjectivescalevalues'] = 'An error occurred when creating objective scale values';
 $string['error:creationaftercompletion'] = 'Completion Date must not be before Date Created';
 $string['error:dateformat'] = 'Please enter a date in the format {$a}.';
-$string['error:deletedobjectivescalevalue'] = 'An error occured when deleting objective scale value';
-$string['error:deletedp'] = 'An error occured while deleting learning plan template';
+$string['error:deletedobjectivescalevalue'] = 'An error occurred when deleting objective scale value';
+$string['error:deletedp'] = 'An error occurred while deleting learning plan template';
 $string['error:deletedpriorityscalevalue'] = 'Could not delete priority scale value.';
 $string['error:evidencedeleted'] = 'Evidence not deleted';
 $string['error:evidenceidincorrect'] = 'Evidence ID incorrect';
@@ -466,15 +444,15 @@ $string['error:missingcoursesettings'] = 'Missing Course settings';
 $string['error:missingobjectivesettings'] = 'Missing Objective settings';
 $string['error:missingpermissionsetting'] = 'Missing permission setting';
 $string['error:missingprogramsettings'] = 'Missing Program settings';
-$string['error:newdptemplate'] = 'An error occured while creating a new learning plan template';
+$string['error:newdptemplate'] = 'An error occurred while creating a new learning plan template';
 $string['error:nodeleteobjectivescaleassigned'] = 'You cannot delete that objective scale because it is already assigned in one or more plan templates';
 $string['error:nodeleteobjectivescaleinuse'] = 'You cannot delete that objective scale because it is in use';
 $string['error:nodeleteobjectivescalevaluedefault'] = 'You cannot delete that objective scale value because it is the default value';
-$string['error:nodeleteobjectivescalevalueinuse'] = 'You cannot delete that scale value because it\'s scale is in use';
+$string['error:nodeleteobjectivescalevalueinuse'] = 'You cannot delete that scale value because its scale is in use';
 $string['error:nodeletepriorityscaleassigned'] = 'You cannot delete that priority scale because it is already assigned in one or more plan templates';
 $string['error:nodeletepriorityscaleinuse'] = 'You cannot delete that priority scale because it is in use';
 $string['error:nodeletepriorityscalevaluedefault'] = 'You cannot delete that priority scale value because it is the default value';
-$string['error:nodeletepriorityscalevalueinuse'] = 'You cannot delete that scale value because it\'s scale is in use';
+$string['error:nodeletepriorityscalevalueinuse'] = 'You cannot delete that scale value because its scale is in use';
 $string['error:nopermissiondeletemandatorycomp'] = 'You do not have permission to delete a mandatory competency';
 $string['error:nopermissiondeletemandatorycourse'] = 'You do not have permission to delete a mandatory course';
 $string['error:nopermissions'] = 'You do not have the necessary permissions to perform this action';
@@ -501,26 +479,26 @@ $string['error:recordoflearningdisabled'] = 'Record of Learning is not enabled o
 $string['error:settingdoesnotexist'] = 'Setting {$a->action} does not exist in the component {$a->component}';
 $string['error:templateid'] = 'Invalid plan template ID';
 $string['error:unknownbuttonclicked'] = 'Unknown button clicked.';
-$string['error:update_competency_settings'] = 'An error occured while updating the Competency settings';
-$string['error:update_components_enabled'] = 'An error occured while enabling/disabling a Component';
-$string['error:update_components_settings'] = 'An error occured while updating the Component settings';
-$string['error:update_components_sortorder'] = 'An error occured which changing order of Components';
-$string['error:update_course_settings'] = 'An error occured while updating the Course settings';
-$string['error:update_general_settings'] = 'An error occured while updating the General settings';
-$string['error:update_objective_settings'] = 'An error occured while updating the Objective settings';
-$string['error:update_plan_settings'] = 'An error occured while updating the Plan settings';
-$string['error:update_program_settings'] = 'An error occured while updating the program settings';
-$string['error:update_workflow_settings'] = 'An error occured while updating the Workflow settings';
-$string['error:updateevidencetype'] = 'An error occured while updating Evidence type';
+$string['error:update_competency_settings'] = 'An error occurred while updating the Competency settings';
+$string['error:update_components_enabled'] = 'An error occurred while enabling/disabling a Component';
+$string['error:update_components_settings'] = 'An error occurred while updating the Component settings';
+$string['error:update_components_sortorder'] = 'An error occurred which changing order of Components';
+$string['error:update_course_settings'] = 'An error occurred while updating the Course settings';
+$string['error:update_general_settings'] = 'An error occurred while updating the General settings';
+$string['error:update_objective_settings'] = 'An error occurred while updating the Objective settings';
+$string['error:update_plan_settings'] = 'An error occurred while updating the Plan settings';
+$string['error:update_program_settings'] = 'An error occurred while updating the program settings';
+$string['error:update_workflow_settings'] = 'An error occurred while updating the Workflow settings';
+$string['error:updateevidencetype'] = 'An error occurred while updating Evidence type';
 $string['error:updateingrecord'] = 'Error, no such link type';
-$string['error:updateobjectivescale'] = 'An error occured while updating objective scale';
+$string['error:updateobjectivescale'] = 'An error occurred while updating objective scale';
 $string['error:updateobjectivescaleordering'] = 'Could not update objective scale ordering';
 $string['error:updateobjectivescalevalue'] = 'Could not update objective scale value';
 $string['error:updatepriorityscaleordering'] = 'Could not update priority scale ordering';
 $string['error:updatepriorityscalevalue'] = 'Could not update priority scale value.';
 $string['error:updatetemplateordering'] = 'Could not update plan template ordering';
 $string['error:updatinglinktype'] = 'Error: could not update link type';
-$string['error:updatingpriorityscale'] = 'An error occured while updating priority scale';
+$string['error:updatingpriorityscale'] = 'An error occurred while updating priority scale';
 $string['error:usernotfound'] = 'User not found';
 $string['eventapprovalapproved'] = 'Plan Approval approved';
 $string['eventapprovaldeclined'] = 'Plan Approval declined';
@@ -754,9 +732,9 @@ $string['objectivescalevaluenumeric_help'] = '**Objective scale value numerical 
 $string['objectivescalevalues'] = 'Objective scale values';
 $string['objectivescalevalues_help'] = 'Enter a list of values for the new objective scale (one value per line), in order from highest to lowest. For example:
 
-<p class="indent">
-  <em> High<br /> Medium<br /> Low </em>
-</p>';
+* High
+* Medium
+* Low';
 $string['objectivescalevalueupdated'] = 'Objective scale value "{$a}" updated';
 $string['objectivescalex'] = 'Objective scale "{$a}"';
 $string['objectivesettings'] = 'Objective settings';
@@ -813,6 +791,12 @@ $string['plan-request-learner-long'] = 'Requested approval for new learning plan
 $string['plan-request-learner-short'] = 'New plan approval request';
 $string['plan-request-manager-long'] = '{$a->learner} has requested approval for a new learning plan "{$a->plan}"';
 $string['plan-request-manager-short'] = 'New plan approval request by {$a->learner}';
+$string['plan-request-manager-long-no-view-no-approve'] = '{$a->learner} has requested approval for a new learning plan "{$a->plan}". This is a notification and no action is required as you do not have the necessary permissions to view or approve.';
+$string['plan-request-manager-short-no-view-no-approve'] = 'New plan approval request by {$a->learner}';
+$string['plan-request-manager-long-view-no-approve'] = '{$a->learner} has requested approval for a new learning plan "{$a->plan}". No action is required as you do not have the necessary permissions to approve.';
+$string['plan-request-manager-short-view-no-approve'] = 'New plan approval request by {$a->learner}';
+$string['plan-request-manager-long-approve-no-view'] = '{$a->learner} has requested approval for a new learning plan "{$a->plan}" and this requires action. Please either approve or deny the request.';
+$string['plan-request-manager-short-approve-no-view'] = 'New plan approval request by {$a->learner}';
 $string['plan:accessanyplan'] = 'Access any user\'s plan';
 $string['plan:accessplan'] = 'Access plan';
 $string['plan:add'] = 'Add plans';
@@ -827,7 +811,7 @@ $string['plan:manageevidencetypes'] = 'Manage evidence types';
 $string['plan:manageobjectivescales'] = 'Manage objective scales';
 $string['plan:managepriorityscales'] = 'Manage priority scales';
 $string['plan_instructions_delete'] = 'You can delete this learning plan by clicking the "Deleting plan" button.';
-$string['plan_instructions_edit'] = 'You can click the "Edit details" button to ammend the learning plan title, short description or completion date.';
+$string['plan_instructions_edit'] = 'You can click the "Edit details" button to amend the learning plan title, short description or completion date.';
 $string['plan_instructions_learner'] = 'Below is a short summary of your learning plan.';
 $string['plan_instructions_manager'] = 'Below is a short summary of your team member\'s learning plan.';
 $string['planapproved'] = 'Plan "{$a}" has been approved';
@@ -873,6 +857,7 @@ $string['planupdatesuccess'] = 'Plan update successful';
 $string['pluginname'] = 'Learning Plans';
 $string['priorities'] = 'Priorities';
 $string['priority'] = 'Priority';
+$string['priorityof'] = 'Priority of {$a}';
 $string['prioritymode'] = 'Priorities';
 $string['priorityscale'] = 'Priority scale';
 $string['priorityscaleadded'] = 'Priority scale "{$a}" added';
@@ -900,9 +885,9 @@ $string['priorityscalevaluenumeric_help'] = '**Priority scale value numerical va
 $string['priorityscalevalues'] = 'Priority scale values';
 $string['priorityscalevalues_help'] = 'Enter a list of values for the new priority scale (one priority per line), in order from highest priority to lowest. For example:
 
-<p class="indent">
-  <em> High<br /> Medium<br /> Low </em>
-</p>';
+* High
+* Medium
+* Low';
 $string['priorityscalevalueupdated'] = 'Priority scale value "{$a}" updated';
 $string['priorityscalex'] = 'Priority scale "{$a}"';
 $string['priorityvalues'] = 'Priority values';
@@ -927,6 +912,7 @@ $string['reactivate'] = 'Reactivate';
 $string['reactivateplantext'] = 'If you want to make changes or continue using this plan, it must first be reactivated.<br /><a href="{$a}">Reactivate</a> this plan.';
 $string['reasonapprovedplanrequest'] = 'The reason given for approving the plan was: {$a}';
 $string['reasondeclinedplanrequest'] = 'The reason given for declining the plan was: {$a}';
+$string['reasonforapprovedecline'] = 'Reason for approving/declining {$a}';
 $string['reasongivenfordecision'] = 'The reason given for this decision was: {$a}';
 $string['recordoflearning'] = 'Record of Learning';
 $string['recordoflearningcertifications'] = 'Record of Learning: Certifications';
@@ -961,6 +947,7 @@ $string['save'] = 'Save';
 $string['scales'] = 'Priority Scales';
 $string['scaleslocked'] = 'This template is in use and changing the scales will impact data integrity. Therefore Priority and Objective scales are locked and will not be updated when the workflow is changed.';
 $string['selectanevidencetype'] = 'Select an evidence type';
+$string['selectasdefault'] = 'Select {$a} as default';
 $string['selectedlinkedcompetenciesremovedfromcourse'] = 'The selected linked competencies have been removed from this course';
 $string['selectedlinkedcoursesremovedfromcompetency'] = 'The selected linked courses have been removed from this competency';
 $string['selectedlinkedcoursesremovedfromobjective'] = 'The selected linked courses have been removed from this objective';
@@ -968,6 +955,7 @@ $string['selectedlinkedevidenceremovedfromcompetency'] = 'The selected linked ev
 $string['selectedlinkedevidenceremovedfromcourse'] = 'The selected linked evidence have been removed from this course';
 $string['selectedlinkedevidenceremovedfromobjective'] = 'The selected linked evidence have been removed from this objective';
 $string['selectedlinkedevidenceremovedfromprogram'] = 'The selected linked evidence have been removed from this program';
+$string['selectlinked'] = 'Select linked {$a->name} {$a->component}';
 $string['sendapprovalrequest'] = 'Send approval request';
 $string['set'] = 'Set';
 $string['setcompetencystatus'] = 'Set competency status';
@@ -982,6 +970,7 @@ $string['signoff'] = 'Sign-off';
 $string['simpleworkflow'] = 'Simple workflow settings';
 $string['startdate'] = 'Start date';
 $string['status'] = 'Status';
+$string['statusof'] = 'Status of {$a}';
 $string['teammembers'] = 'Team Members';
 $string['templatecomponentsettings'] = 'Component Settings';
 $string['templatecomponentsettings_help'] = 'The **Component Settings** allows you to show/hide components in the learning plan and define the order in which they appear.
@@ -1029,6 +1018,8 @@ $string['updateprograms'] = 'Update programs';
 $string['updaterequestedcompetency'] = 'Update requested competencies';
 $string['updatesettings'] = 'Update Settings';
 $string['usepriority'] = 'Use priority';
+$string['userdataitemevidence'] = 'Evidence';
+$string['userdataitemplan'] = 'Learning Plan';
 $string['userdrivenworkflowdesc'] = 'The user has control over their learning plan and can perform most actions themselves. The manager can view the plan but not make changes.';
 $string['userdrivenworkflowname'] = 'User driven workflow';
 $string['view'] = 'View';

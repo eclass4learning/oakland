@@ -409,21 +409,8 @@ class qtype_essay_format_editorfilepicker_renderer extends qtype_essay_format_ed
     }
 
     protected function filepicker_html($inputname, $draftitemid) {
-        $nonjspickerurl = new moodle_url('/repository/draftfiles_manager.php', array(
-            'action' => 'browse',
-            'env' => 'editor',
-            'itemid' => $draftitemid,
-            'subdirs' => false,
-            'maxfiles' => -1,
-            'sesskey' => sesskey(),
-        ));
-
         return html_writer::empty_tag('input', array('type' => 'hidden',
-                'name' => $inputname . ':itemid', 'value' => $draftitemid)) .
-                html_writer::tag('noscript', html_writer::tag('div',
-                    html_writer::tag('object', '', array('type' => 'text/html',
-                        'data' => $nonjspickerurl, 'height' => 160, 'width' => 600,
-                        'style' => 'border: 1px solid #000;'))));
+            'name' => $inputname . ':itemid', 'value' => $draftitemid));
     }
 }
 

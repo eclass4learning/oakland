@@ -27,28 +27,27 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/blocks/edit_form.php');
 
 class block_totara_report_table_edit_form extends block_edit_form {
+
     /**
      * Form definition for this specific block.
      *
      * @param MoodleQuickForm $mform
      */
     protected function specific_definition($mform) {
-        global $USER, $DB, $CFG;
+        global $USER, $DB, $CFG, $PAGE;
 
         require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
         require_once($CFG->dirroot . '/blocks/moodleblock.class.php');
 
         // Include the required JavaScript.
-        $this->page->requires->string_for_js('allavailabledata', 'block_totara_report_table');
-        $this->page->requires->js_call_amd('block_totara_report_table/module', 'populatelist', array());
+        $PAGE->requires->string_for_js('allavailabledata', 'block_totara_report_table');
+        $PAGE->requires->js_call_amd('block_totara_report_table/module', 'populatelist', array());
 
         // Output the form.
-        $mform->addElement('header', 'configheader', get_string('blocksettings', 'block'));
+        $mform->addElement('header', 'configheader', get_string('customblocksettings', 'block'));
 
-        // Block title.
-        $mform->addElement('text', 'config_title', get_string('blocktitle', 'block_totara_report_table'));
-        $mform->addHelpButton('config_title', 'blocktitle', 'block_totara_report_table');
-        $mform->setType('config_title', PARAM_TEXT);
+        // Generate any missing embedded reports when we load this form.
+        reportbuilder::generate_embedded_reports();
 
         // Report selection.
         $reportoptions = array('' => get_string('choosedots', 'core'));

@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+defined('MOODLE_INTERNAL') || die();
+
 /**
  * Form for editing HTML block instances.
  *
@@ -33,6 +35,11 @@
  */
 function block_html_pluginfile($course, $birecord_or_cm, $context, $filearea, $args, $forcedownload, array $options=array()) {
     global $DB, $CFG, $USER;
+
+    $block_html = block_instance('html', $birecord_or_cm);
+    if (!$block_html || !$block_html->user_can_view()) {
+        send_file_not_found();
+    }
 
     if ($context->contextlevel != CONTEXT_BLOCK) {
         send_file_not_found();

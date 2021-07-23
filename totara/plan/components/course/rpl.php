@@ -23,7 +23,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot . '/totara/plan/lib.php');
 require_once($CFG->dirroot . '/totara/plan/components/course/rpl_form.php');
 
@@ -40,8 +40,8 @@ $plan = new development_plan($id);
 $systemcontext = context_system::instance();
 $PAGE->set_context($systemcontext);
 $PAGE->set_url(new moodle_url('/totara/plan/components/course/rpl.php', array('id' => $id, 'courseid' => $courseid)));
-if (!has_capability('totara/plan:accessanyplan', $systemcontext) && ($plan->get_setting('view') < DP_PERMISSION_ALLOW)) {
-        print_error('error:nopermissions', 'totara_plan');
+if (!has_capability('totara/plan:accessanyplan', $systemcontext) && !$plan->can_view()) {
+    print_error('error:nopermissions', 'totara_plan');
 }
 
 $userid = $plan->userid;

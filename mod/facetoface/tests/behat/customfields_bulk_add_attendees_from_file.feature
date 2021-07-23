@@ -1,4 +1,4 @@
-@mod @mod_facetoface @totara @javascript
+@mod @mod_facetoface @mod_facetoface_attendees_add @totara @javascript @totara_customfield @_file_upload
 Feature: Add seminar attendess from csv file with custom fields
   In order to test the bulk add attendees from file
   As a site manager
@@ -34,14 +34,13 @@ Feature: Add seminar attendess from csv file with custom fields
     And I press "Save changes"
 
 
-  @_file_upload
   Scenario: Login as manager, upload csv file with custom fields using bulk add attendees from file and check the result.
 
     And I click on "Menu of choices" "option"
     And I set the following fields to these values:
       | Full name                   | Event menu of choices |
       | Short name (must be unique) | menuofchoices         |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       Apple
       Orange
@@ -76,20 +75,19 @@ Feature: Add seminar attendess from csv file with custom fields
       | Short name (must be unique) | url           |
     And I press "Save changes"
 
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "View all events"
     And I follow "Add a new event"
     And I press "Save changes"
 
     And I click on "Attendees" "link"
     And I click on "Add users via file upload" "option" in the "#menuf2f-actions" "css_element"
-    And I upload "mod/facetoface/tests/fixtures/f2f_attendees_customfields.csv" file to "Text file" filemanager
+    And I upload "mod/facetoface/tests/fixtures/f2f_attendees_customfields.csv" file to "CSV file" filemanager
     And I press "Continue"
     When I press "Confirm"
     Then I should see "Uploaded via csv file" in the "John1 Smith1" "table_row"
     And I should see "Yes" in the "John1 Smith1" "table_row"
-    And I should see "2 Mar 2020" in the "John1 Smith1" "table_row"
+    And I should see "2 Mar 2035" in the "John1 Smith1" "table_row"
     And I should see "Apple" in the "John1 Smith1" "table_row"
     And I should see "Tui, Moa" in the "John1 Smith1" "table_row"
     And I should see "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua." in the "John1 Smith1" "table_row"
@@ -98,7 +96,7 @@ Feature: Add seminar attendess from csv file with custom fields
 
     And I should see "Also uploaded via csv file" in the "John2 Smith2" "table_row"
     And I should see "Yes" in the "John2 Smith2" "table_row"
-    And I should see "3 Apr 2021" in the "John2 Smith2" "table_row"
+    And I should see "3 Apr 2036" in the "John2 Smith2" "table_row"
     And I should see "Orange" in the "John2 Smith2" "table_row"
     And I should see "Moa, Tuatara" in the "John2 Smith2" "table_row"
     And I should see "Consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua." in the "John2 Smith2" "table_row"
@@ -107,39 +105,54 @@ Feature: Add seminar attendess from csv file with custom fields
 
     And I should see "More uploaded via csv file" in the "John3 Smith3" "table_row"
     And I should see "No" in the "John3 Smith3" "table_row"
-    And I should see "4 May 2022" in the "John3 Smith3" "table_row"
+    And I should see "4 May 2037" in the "John3 Smith3" "table_row"
     And I should see "Banana" in the "John3 Smith3" "table_row"
     And I should see "Tuatara" in the "John3 Smith3" "table_row"
     And I should see "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua." in the "John3 Smith3" "table_row"
     And I should see "Sed do eiusmod tempor incididunt" in the "John3 Smith3" "table_row"
     And I should see "/mod/facetoface/view.php?id=1" in the "John3 Smith3" "table_row"
 
-  @_file_upload
-  Scenario: Invalid CSV format, where header and colums are missed
+  Scenario: Invalid CSV format, where header and columns are missed
 
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "View all events"
     And I follow "Add a new event"
     And I press "Save changes"
 
     And I click on "Attendees" "link"
     And I click on "Add users via file upload" "option" in the "#menuf2f-actions" "css_element"
-    And I upload "mod/facetoface/tests/fixtures/f2f_attendees_customfields_invalid_columns.csv" file to "Text file" filemanager
+    And I upload "mod/facetoface/tests/fixtures/f2f_attendees_customfields_invalid_columns.csv" file to "CSV file" filemanager
     When I press "Continue"
     Then I should see "Invalid CSV file format - \"checkbox\" custom field does not exist"
 
-  @_file_upload
   Scenario: Invalid CSV format, one of the custom field values is missed
 
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "View all events"
     And I follow "Add a new event"
     And I press "Save changes"
 
     And I click on "Attendees" "link"
     And I click on "Add users via file upload" "option" in the "#menuf2f-actions" "css_element"
-    And I upload "mod/facetoface/tests/fixtures/f2f_attendees_customfields_invalid_columns2.csv" file to "Text file" filemanager
+    And I upload "mod/facetoface/tests/fixtures/f2f_attendees_customfields_invalid_columns2.csv" file to "CSV file" filemanager
     When I press "Continue"
     Then I should see "Invalid CSV file format - number of columns is not constant!"
+
+  Scenario: Add users via file upload with customfield hidden
+
+    And I click on "Hide" "link" in the "Requests for session organiser" "table_row"
+    And I click on "Hide" "link" in the "Event date/time" "table_row"
+
+    And I am on "Course 1" course homepage
+    And I follow "View all events"
+    And I follow "Add a new event"
+    And I press "Save changes"
+
+    And I click on "Attendees" "link"
+    And I click on "Add users via file upload" "option" in the "#menuf2f-actions" "css_element"
+    And I upload "mod/facetoface/tests/fixtures/f2f_attendees_customfields_hidden.csv" file to "CSV file" filemanager
+    And I press "Continue"
+    When I press "Confirm"
+    Then I should see "John1 Smith1"
+    And I should see "John2 Smith2"
+    And I should see "John3 Smith3"

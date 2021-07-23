@@ -22,7 +22,7 @@
  * @subpackage totara_hierarchy
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(dirname(__FILE__)))))) . '/config.php');
+require_once(__DIR__ . '/../../../../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot.'/totara/hierarchy/lib.php');
 require_once($CFG->dirroot.'/totara/hierarchy/prefix/competency/lib.php');
@@ -188,7 +188,7 @@ echo $OUTPUT->action_link(new moodle_url('/totara/hierarchy/framework/index.php'
 // Display info about scale
 echo $OUTPUT->heading(get_string('scalex', 'totara_hierarchy', format_string($scale->name)), 1);
 $scale->description = file_rewrite_pluginfile_urls($scale->description, 'pluginfile.php', $sitecontext->id, 'totara_hierarchy', 'comp_scale', $scale->id);
-echo html_writer::tag('p', $scale->description);
+echo html_writer::tag('p', format_text($scale->description));
 
 // Display warning if scale is in use
 if ($canupdatescales && $scale_used) {
@@ -197,10 +197,10 @@ if ($canupdatescales && $scale_used) {
 
 
 // Display warning if proficient values don't make sense
-$maxprof = $DB->get_field('comp_scale_values', 'MAX(sortorder)', array('proficient' => 1, 'scaleid' => $scale->id));
-$minnoneprof = $DB->get_field('comp_scale_values', 'MIN(sortorder)', array('proficient' => 0, 'scaleid' => $scale->id));
-if (isset($maxprof) && isset($minnoneprof) && $maxprof > $minnoneprof) {
-    echo $OUTPUT->container(get_string('nonsensicalproficientvalues', 'totara_hierarchy'), 'notifyproblem');
+if (totara_competency_scale_proficient_not_in_order($id)) {
+    echo html_writer::empty_tag('br');
+    $warning_icon = $OUTPUT->render(new \core\output\flex_icon('warning'));
+    echo html_writer::div($warning_icon . ' ' . get_string('competenctscaleoutoforderthis', 'totara_hierarchy'));
 }
 
 // Display scale values

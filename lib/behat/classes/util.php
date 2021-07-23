@@ -48,11 +48,6 @@ class behat_util extends testing_util {
     const BEHATSITENAME = "Acceptance test site";
 
     /**
-     * @var array Files to skip when resetting dataroot folder
-     */
-    protected static $datarootskiponreset = array('.', '..', 'behat', 'behattestdir.txt');
-
-    /**
      * @var array Files to skip when dropping dataroot folder
      */
     protected static $datarootskipondrop = array('.', '..', 'lock');
@@ -74,7 +69,9 @@ class behat_util extends testing_util {
             behat_error(BEHAT_EXITCODE_INSTALLED);
         }
 
-        // New dataroot.
+        // Torara: Empty dataroot and initialise it.
+        self::drop_dataroot();
+        testing_initdataroot($CFG->dataroot, 'behat');
         self::reset_dataroot();
 
         $options = array();
@@ -86,13 +83,12 @@ class behat_util extends testing_util {
         install_cli_database($options, false);
 
         // Undo Totara changed defaults to allow upstream testing without hacks.
-        set_config('enablecompletion', 0);
         set_config('forcelogin', 0);
         set_config('guestloginbutton', 1);
-        set_config('enablecompletion', 0, 'moodlecourse');
+        // NOTE: completion is automatically enabled since Moodle 3.1
         set_config('completionstartonenrol', 0, 'moodlecourse');
         set_config('enrol_plugins_enabled', 'manual,guest,self,cohort');
-        set_config('enhancedcatalog', 0);
+        set_config('catalogtype', 'moodle');
         set_config('preventexecpath', 0);
         set_config('enableblogs', 1);
         $DB->set_field('role', 'name', 'Manager', array('shortname' => 'manager'));
@@ -100,14 +96,11 @@ class behat_util extends testing_util {
         $DB->set_field('role', 'name', 'Non-editing teacher',array('shortname' => 'teacher'));
         $DB->set_field('role', 'name', 'Student', array('shortname' => 'student'));
         $DB->set_field('modules', 'visible', 1, array('name'=>'workshop'));
-        $DB->set_field('modules', 'visible', 0, array('name'=>'feedback'));
 
         // Some more Totara tricks.
         $DB->set_field('task_scheduled', 'disabled', 1, array('component' => 'tool_langimport')); // No cron lang updates in behat.
 
-        // We need to keep the installed dataroot filedir files.
-        // So each time we reset the dataroot before running a test, the default files are still installed.
-        self::save_original_data_files();
+        // Totara: there is no need to save filedir files, we do not delete them in tests!
 
         $frontpagesummary = new admin_setting_special_frontpagedesc();
         $frontpagesummary->write_setting(self::BEHATSITENAME);
@@ -140,7 +133,6 @@ class behat_util extends testing_util {
         // Totara: Add behat filesystem repository to eliminate problematic file uploads in behat.
         // NOTE: Repository API is a total mess, let's just insert the records directly here
         //       and allow all registered users to access the repo.
-        mkdir("$CFG->dataroot/repository/behat", 02777, true);
         $maxorder = $DB->get_field('repository', 'MAX(sortorder)', array());
         $typeid = $DB->insert_record('repository', (object)array('type' => 'filesystem', 'sortorder' => $maxorder + 1, 'visible' => 1));
         $instanceid = $DB->insert_record('repository_instances',
@@ -150,8 +142,32 @@ class behat_util extends testing_util {
         $userrole = $DB->get_record('role', array('shortname' => 'user'));
         assign_capability('repository/filesystem:view', CAP_ALLOW, $userrole->id, SYSCONTEXTID, true);
 
+        // Set editor autosave to high value, so as to avoid unwanted ajax.
+        set_config('autosavefrequency', '604800', 'editor_atto');
+
+        // Set noreplyaddress to an example domain, as it should be valid email address and test site can be a localhost.
+        set_config('noreplyaddress', 'noreply@example.com');
+
+        // Disable Totara registrations.
+        set_config('registrationenabled', 0);
+        set_config('sitetype', 'development');
+        set_config('registrationcode', '');
+
+        // Totara: purge log tables to speed up DB resets.
+        $DB->delete_records('config_log');
+        $DB->delete_records('log_display');
+        $DB->delete_records('upgrade_log');
+
+        // Totara: Renable site legacy site administration menu
+        set_config('legacyadminsettingsmenu', 1);
+
+        // Totara: there is no need to save filedir files, we do not delete them in tests!
+
         // Keeps the current version of database and dataroot.
         self::store_versions_hash();
+
+        // Unfortunately we cannot randomise the new id numbers yet, there are still some sloppy totara tests that rely on hardcoded ids!
+        $DB->get_manager()->reset_all_sequences(0, 0);
 
         // Stores the database contents for fast reset.
         self::store_database_state();
@@ -168,9 +184,23 @@ class behat_util extends testing_util {
             throw new coding_exception('This method can be only used by Behat CLI tool');
         }
 
-        self::reset_dataroot();
-        self::drop_dataroot();
         self::drop_database(true);
+        self::drop_dataroot();
+    }
+
+    /**
+     * Delete files and directories under dataroot.
+     */
+    public static function drop_dataroot() {
+        global $CFG;
+
+        if ($CFG->behat_dataroot === $CFG->behat_dataroot_parent) {
+            // It should never come here.
+            throw new moodle_exception("Behat dataroot should not be same as parent behat data root.");
+        }
+
+        // As behat directory is now created under default $CFG->behat_dataroot_parent, so remove the whole dir.
+        remove_dir($CFG->dataroot, false);
     }
 
     /**
@@ -186,6 +216,7 @@ class behat_util extends testing_util {
         // Get web versions used by behat site.
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_COOKIE, 'BEHAT=1');
         $result = curl_exec($ch);
         $statuscode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -209,6 +240,7 @@ class behat_util extends testing_util {
                 }
             }
             echo $output;
+            ob_flush();
         }
     }
 
@@ -250,10 +282,14 @@ class behat_util extends testing_util {
      *
      * Stores a file in dataroot/behat to allow Moodle to switch
      * to the test environment when using cli-server.
+     * @param bool $themesuitewithallfeatures List themes to include core features.
+     * @param string $tags comma separated tag, which will be given preference while distributing features in parallel run.
+     * @param int $parallelruns number of parallel runs.
+     * @param int $run current run.
      * @throws coding_exception
      * @return void
      */
-    public static function start_test_mode() {
+    public static function start_test_mode($themesuitewithallfeatures = false, $tags = '', $parallelruns = 0, $run = 0) {
         global $CFG;
 
         if (!defined('BEHAT_UTIL')) {
@@ -269,7 +305,7 @@ class behat_util extends testing_util {
         self::test_environment_problem();
 
         // Updates all the Moodle features and steps definitions.
-        behat_config_manager::update_config_file();
+        behat_config_manager::update_config_file('', true, $tags, $themesuitewithallfeatures, $parallelruns, $run);
 
         if (self::is_test_mode_enabled()) {
             return;
@@ -315,6 +351,7 @@ class behat_util extends testing_util {
         }
 
         $testenvfile = self::get_test_file_path();
+        behat_config_manager::set_behat_run_config_value('behatsiteenabled', 0);
 
         if (!self::is_test_mode_enabled()) {
             echo "Test environment was already disabled\n";
@@ -347,8 +384,25 @@ class behat_util extends testing_util {
      * Returns the path to the file which specifies if test environment is enabled
      * @return string
      */
-    protected final static function get_test_file_path() {
-        return behat_command::get_behat_dir() . '/test_environment_enabled.txt';
+    public final static function get_test_file_path() {
+        return behat_command::get_parent_behat_dir() . '/test_environment_enabled.txt';
+    }
+
+    /**
+     * Purge dataroot directory
+     * @static
+     * @return void
+     */
+    public static function reset_dataroot() {
+        global $CFG;
+
+        // Totara: Clear file status cache to make sure we know about all files.
+        clearstatcache();
+
+        parent::reset_dataroot();
+
+        // Totara: Add behat filesystem repository to eliminate problematic file uploads in behat.
+        mkdir("$CFG->dataroot/repository/behat", 02777, true);
     }
 
     /**
@@ -360,6 +414,14 @@ class behat_util extends testing_util {
 
         // Purge dataroot directory.
         self::reset_dataroot();
+
+        // Purge all data from the caches. This is required for consistency between tests.
+        // Any file caches that happened to be within the data root will have already been clearer (because we just deleted cache)
+        // and now we will purge any other caches as well.  This must be done before the cache_factory::reset() as that
+        // removes all definitions of caches and purge does not have valid caches to operate on.
+        cache_helper::purge_all();
+        // Reset the cache API so that it recreates it's required directories as well.
+        cache_factory::reset();
 
         // Reset all static caches.
         accesslib_clear_all_caches(true);
@@ -381,5 +443,11 @@ class behat_util extends testing_util {
         // Initialise $CFG with default values. This is needed for behat cli process, so we don't have modified
         // $CFG values from the old run. @see set_config.
         initialise_cfg();
+
+        // Totara: make sure all browser caches are invalidated too.
+        js_reset_all_caches();
+        theme_reset_all_caches();
+
+        \totara_catalog\cache_handler::reset_all_caches();
     }
 }

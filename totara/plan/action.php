@@ -61,11 +61,15 @@ $referer = optional_param('referer', get_local_referer(false), PARAM_URL);
 //in case passed param is invalid or even HTTP_REFERER is bogus
 $referer = clean_param($referer, PARAM_LOCALURL);
 
+if (!$referer) {
+    $referer = $CFG->wwwroot . '/totara/plan/view.php?id=' . $id;
+}
+
 if (!confirm_sesskey()) {
     if (empty($ajax)) {
         redirect($referer);
     } else {
-        return;
+        exit;
     }
 }
 
@@ -92,11 +96,7 @@ $PAGE->set_heading(format_string($SITE->fullname));
 ///
 /// Permissions check
 ///
-if (!dp_can_view_users_plans($plan->userid)) {
-    print_error('error:nopermissions', 'totara_plan');
-}
-
-if (!dp_can_manage_users_plans($plan->userid)) {
+if (!$plan->can_manage()) {
     print_error('error:nopermissions', 'totara_plan');
 }
 // @todo: handle action failure alerts
@@ -104,7 +104,7 @@ if (!dp_can_manage_users_plans($plan->userid)) {
 /// Approve
 ///
 if (!empty($approve)) {
-    if (in_array($plan->get_setting('approve'), array(DP_PERMISSION_ALLOW, DP_PERMISSION_APPROVE))) {
+    if ($plan->can_approve_plan()) {
         $plan->set_status(DP_PLAN_STATUS_APPROVED, DP_PLAN_REASON_MANUAL_APPROVE, $reasonfordecision);
         \totara_plan\event\approval_approved::create_from_plan($plan)->trigger();
         $plan->send_approved_alert($reasonfordecision);
@@ -124,7 +124,7 @@ if (!empty($approve)) {
 /// Decline
 ///
 if (!empty($decline)) {
-    if (in_array($plan->get_setting('approve'), array(DP_PERMISSION_ALLOW, DP_PERMISSION_APPROVE))) {
+    if ($plan->can_approve_plan()) {
         $plan->set_status(DP_PLAN_STATUS_UNAPPROVED, DP_PLAN_REASON_MANUAL_DECLINE, $reasonfordecision);
         \totara_plan\event\approval_declined::create_from_plan($plan)->trigger();
         $plan->send_declined_alert($reasonfordecision);
@@ -142,7 +142,7 @@ if (!empty($decline)) {
 
 // Learner activates their own learning plan.
 if (!empty($activate)) {
-    if (in_array($plan->get_setting('approve'), array(DP_PERMISSION_ALLOW, DP_PERMISSION_APPROVE))) {
+    if ($plan->can_approve_plan()) {
         $plan->set_status(DP_PLAN_STATUS_APPROVED, DP_PLAN_REASON_MANUAL_APPROVE, null);
         \totara_plan\event\approval_approved::create_from_plan($plan)->trigger();
         $plan->send_activated_alert();
@@ -162,7 +162,7 @@ if (!empty($approvalrequest)) {
 
     // If plan is a draft, must be asking for plan approval
     if ($plan->status == DP_PLAN_STATUS_UNAPPROVED) {
-        if ($plan->get_setting('approve') == DP_PERMISSION_REQUEST) {
+        if ($plan->can_request_approval()) {
             // If a learner is updating their plan and now needs approval, notify manager
             if ($USER->id == $plan->userid) {
                 if (!empty($managers)) {
@@ -229,7 +229,7 @@ if (!empty($approvalrequest)) {
 /// Delete
 ///
 if (!empty($delete)) {
-    if ($plan->get_setting('delete') == DP_PERMISSION_ALLOW) {
+    if ($plan->can_delete_plan()) {
         $confirm = optional_param('confirm', 0, PARAM_BOOL);
 
         if (!$confirm && empty($ajax)) {
@@ -283,7 +283,7 @@ if (!empty($delete)) {
 /// Complete
 ///
 if (!empty($complete)) {
-    if ($plan->get_setting('completereactivate') >= DP_PERMISSION_ALLOW) {
+    if ($plan->can_mark_plan_complete()) {
         $confirm = optional_param('confirm', 0, PARAM_BOOL);
 
         if (!$confirm && empty($ajax)) {
@@ -320,7 +320,7 @@ if (!empty($reactivate)) {
     require_once($CFG->dirroot . '/totara/plan/reactivate_form.php');
     require_once($CFG->dirroot . '/totara/core/js/lib/setup.php');
 
-    if ($plan->get_setting('completereactivate') >= DP_PERMISSION_ALLOW) {
+    if ($plan->can_mark_plan_complete()) {
         $form = new plan_reactivate_form(null, compact('id','referer'));
 
         if ($form->is_cancelled()) {

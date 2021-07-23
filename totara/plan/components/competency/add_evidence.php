@@ -23,7 +23,7 @@
  * @subpackage plan
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot.'/totara/hierarchy/prefix/position/lib.php');
 require_once($CFG->dirroot.'/totara/hierarchy/prefix/competency/lib.php');
 require_once($CFG->dirroot.'/totara/core/js/lib/setup.php');
@@ -89,8 +89,18 @@ if (!$returnurl) {
     $returnurl = $component->get_url();
 }
 
-$mform = new totara_competency_evidence_form(null, compact('id','evidenceid','competencyid','positionid',
-    'organisationid','userid','user','s','nojs','returnurl'));
+$customdata = [
+    'id' => $id,
+    'evidenceid' => $evidenceid,
+    'competencyid' => $competencyid,
+    'positionid' => $positionid,
+    'organisationid' => $organisationid,
+    'userid' => $userid,
+    'nojs' => $nojs,
+    'returnurl' => $returnurl
+];
+
+$mform = new totara_competency_evidence_form(null, $customdata);
 $mform->set_data($competency_record);
 
 if ($mform->is_cancelled()) {
@@ -106,6 +116,10 @@ if ($fromform = $mform->get_data()) { // Form submitted
 
     $details->positionid = $fromform->positionid;
     $details->organisationid = $fromform->organisationid;
+
+    if (!empty($fromform->timeproficient)) {
+        $details->timeproficient = $fromform->timeproficient;
+    }
 
     if ($fromform->assessorid != 0) {
         $details->assessorid = $fromform->assessorid;

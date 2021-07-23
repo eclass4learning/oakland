@@ -27,19 +27,30 @@
 global $CFG;
 require_once($CFG->dirroot.'/totara/appraisal/tests/appraisal_testcase.php');
 
-class appraisal_test extends appraisal_testcase {
+class totara_appraisal_appraisal_testcase extends appraisal_testcase {
 
-    public function skip_test_set_status() {
+    public function test_set_status() {
+        $this->resetAfterTest();
         $appraisal = new appraisal();
 
-        $this->setExpectedException('appraisal_exception');
+        $this->expectException('appraisal_exception');
         $appraisal->set_status($appraisal::STATUS_CLOSED);
+    }
+
+    public function test_set_status2() {
+        $this->resetAfterTest();
+        $appraisal = new appraisal();
 
         $appraisal->set_status($appraisal::STATUS_ACTIVE);
         $this->assertNull($appraisal->timefinished);
+    }
 
+    public function test_set_status3() {
+        $this->resetAfterTest();
+        $appraisal = new appraisal();
+
+        $this->expectException('appraisal_exception');
         $appraisal->set_status($appraisal::STATUS_COMPLETED);
-        $this->assertNotNull($appraisal->timefinished);
     }
 
     public function test_appraisal_create() {
@@ -310,6 +321,246 @@ class appraisal_test extends appraisal_testcase {
         $this->assertEmpty($user4appr);
     }
 
+    public function test_appraisal_get_user_appraisal_sort_order() {
+        global $DB, $CFG;
+
+        // Set up users.
+        $manager = $this->getDataGenerator()->create_user();
+        $this->setUser($manager);
+
+        $user1 = $this->getDataGenerator()->create_user((object)[
+            'lastname' => 'Aardvark',
+            'firstname' => 'Yannis',
+        ]);
+        $user2 = $this->getDataGenerator()->create_user((object)[
+            'lastname' => 'Borg',
+            'firstname' => 'Walt',
+        ]);
+        $user3 = $this->getDataGenerator()->create_user((object)[
+            'lastname' => 'Chandler',
+            'firstname' => 'Walt',
+        ]);
+        $user4 = $this->getDataGenerator()->create_user((object)[
+            'lastname' => 'Doyley',
+            'firstname' => 'Zacharias',
+        ]);
+
+        // Set up job assignments.
+        $all_users = [$user1, $user2, $user3, $user4];
+        $manager_ja = \totara_job\job_assignment::create_default($manager->id);
+        $user_ja = [];
+        foreach ($all_users as $user) {
+            $user_ja[$user->id] = \totara_job\job_assignment::create_default($user->id, ['managerjaid' => $manager_ja->id]);
+        }
+
+        $def = [
+            'name' => 'Appraisal 1', 'stages' => [
+                [
+                    'name' => 'Stage 1', 'timedue' => time() + 86400, 'pages' => [
+                        [
+                            'name' => 'Page 1', 'questions' => [
+                                ['name' => 'Question text 1', 'type' => 'text', 'roles' =>
+                                    [
+                                        \appraisal::ROLE_LEARNER => \appraisal::ACCESS_CANANSWER,
+                                        \appraisal::ROLE_MANAGER => \appraisal::ACCESS_CANANSWER
+                                    ],
+                                ],
+                            ]
+                        ],
+                    ]
+                ],
+            ]
+        ];
+        list($appraisal1) = $this->prepare_appraisal_with_users($def, $all_users);
+        $def['name'] = 'Appraisal 2';
+        list($appraisal2) = $this->prepare_appraisal_with_users($def, $all_users);
+        $def['name'] = 'Appraisal 3';
+        list($appraisal3) = $this->prepare_appraisal_with_users($def, $all_users);
+
+        $all_appraisals = [$appraisal1, $appraisal2, $appraisal3];
+
+        $now = time();
+
+        foreach ($all_appraisals as $index => $appr) {
+            $appr->validate();
+            $appr->activate();
+            $DB->update_record('appraisal', ['id' => $appr->id, 'timestarted' => $now + $index]);
+
+            // Trigger job assignment allocation.
+            foreach ($all_users as $user) {
+                $appraisal_user_assignment = appraisal_user_assignment::get_user($appr->id, $user->id);
+                $appraisal_user_assignment->with_job_assignment($user_ja[$user->id]->id);
+            }
+        }
+
+        // Sorting should be by timestarted descending, then by user name fields configured for display.
+        $oldconfig = $CFG->fullnamedisplay;
+        $CFG->fullnamedisplay = 'firstname lastname';
+        $appraisals = array_values(appraisal::get_user_appraisals($manager->id, appraisal::ROLE_MANAGER));
+        $this->assertCount(12, $appraisals);
+        $this->assertEquals('Appraisal 3', $appraisals[0]->name);
+        $this->assertEquals($user2->id, $appraisals[0]->userid);
+        $this->assertEquals('Appraisal 3', $appraisals[1]->name);
+        $this->assertEquals($user3->id, $appraisals[1]->userid);
+        $this->assertEquals('Appraisal 3', $appraisals[2]->name);
+        $this->assertEquals($user1->id, $appraisals[2]->userid);
+        $this->assertEquals('Appraisal 3', $appraisals[3]->name);
+        $this->assertEquals($user4->id, $appraisals[3]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[4]->name);
+        $this->assertEquals($user2->id, $appraisals[4]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[5]->name);
+        $this->assertEquals($user3->id, $appraisals[5]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[6]->name);
+        $this->assertEquals($user1->id, $appraisals[6]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[7]->name);
+        $this->assertEquals($user4->id, $appraisals[7]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[8]->name);
+        $this->assertEquals($user2->id, $appraisals[8]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[9]->name);
+        $this->assertEquals($user3->id, $appraisals[9]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[10]->name);
+        $this->assertEquals($user1->id, $appraisals[10]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[11]->name);
+        $this->assertEquals($user4->id, $appraisals[11]->userid);
+
+        // Change configuration for user name fields and make sure sorting changes accordingly.
+        $CFG->fullnamedisplay = 'lastname firstname';
+        $appraisals = array_values(appraisal::get_user_appraisals($manager->id, appraisal::ROLE_MANAGER));
+        $this->assertCount(12, $appraisals);
+        $this->assertEquals('Appraisal 3', $appraisals[0]->name);
+        $this->assertEquals($user1->id, $appraisals[0]->userid);
+        $this->assertEquals('Appraisal 3', $appraisals[1]->name);
+        $this->assertEquals($user2->id, $appraisals[1]->userid);
+        $this->assertEquals('Appraisal 3', $appraisals[2]->name);
+        $this->assertEquals($user3->id, $appraisals[2]->userid);
+        $this->assertEquals('Appraisal 3', $appraisals[3]->name);
+        $this->assertEquals($user4->id, $appraisals[3]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[4]->name);
+        $this->assertEquals($user1->id, $appraisals[4]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[5]->name);
+        $this->assertEquals($user2->id, $appraisals[5]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[6]->name);
+        $this->assertEquals($user3->id, $appraisals[6]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[7]->name);
+        $this->assertEquals($user4->id, $appraisals[7]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[8]->name);
+        $this->assertEquals($user1->id, $appraisals[8]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[9]->name);
+        $this->assertEquals($user2->id, $appraisals[9]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[10]->name);
+        $this->assertEquals($user3->id, $appraisals[10]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[11]->name);
+        $this->assertEquals($user4->id, $appraisals[11]->userid);
+
+        // As manager, get appraisals for one user.
+        $appraisals = array_values(appraisal::get_user_appraisals($user1->id, appraisal::ROLE_MANAGER));
+        $this->assertCount(3, $appraisals);
+        $this->assertEquals('Appraisal 3', $appraisals[0]->name);
+        $this->assertEquals($user1->id, $appraisals[0]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[1]->name);
+        $this->assertEquals($user1->id, $appraisals[1]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[2]->name);
+        $this->assertEquals($user1->id, $appraisals[2]->userid);
+
+        // Should be empty because current user (manager) doesn't have learner role anywhere.
+        $appraisals = array_values(appraisal::get_user_appraisals($manager->id, appraisal::ROLE_LEARNER));
+        $this->assertCount(0, $appraisals);
+        $appraisals = array_values(appraisal::get_user_appraisals($user1->id, appraisal::ROLE_LEARNER));
+        $this->assertCount(0, $appraisals);
+
+        // As user, get own appraisals.
+        $this->setUser($user1);
+        $appraisals = array_values(appraisal::get_user_appraisals($user1->id, appraisal::ROLE_LEARNER));
+        $this->assertCount(3, $appraisals);
+        $this->assertEquals('Appraisal 3', $appraisals[0]->name);
+        $this->assertEquals($user1->id, $appraisals[0]->userid);
+        $this->assertEquals('Appraisal 2', $appraisals[1]->name);
+        $this->assertEquals($user1->id, $appraisals[1]->userid);
+        $this->assertEquals('Appraisal 1', $appraisals[2]->name);
+        $this->assertEquals($user1->id, $appraisals[2]->userid);
+
+        // As user, call with role manager. Shouldn't return anything.
+        $appraisals = array_values(appraisal::get_user_appraisals($user1->id, appraisal::ROLE_MANAGER));
+        $this->assertCount(0, $appraisals);
+
+        $CFG->fullnamedisplay = $oldconfig;
+    }
+
+    public function test_is_synced() {
+        global $DB;
+
+        self::setAdminUser();
+
+        /** @var appraisal $appraisal */
+        [$appraisal, [$user1, $user2]] = $this->prepare_appraisal_with_users();
+
+        // Get cohort id and make sure both users are in there.
+        $cohort_id = $DB->get_field('cohort_members', 'cohortid', ['userid' => $user1->id], MUST_EXIST);
+        self::assertTrue($DB->record_exists('cohort_members', ['userid' => $user2->id, 'cohortid' => $cohort_id]));
+
+        // Not in sync before activation.
+        $assign = new totara_assign_appraisal('appraisal', $appraisal);
+        self::assertFalse($assign->is_synced());
+
+        // In sync after activation
+        $appraisal->activate();
+        $this->update_job_assignments($appraisal);
+        $count = $DB->count_records('appraisal_user_assignment', ['appraisalid' => $appraisal->id]);
+        self::assertEquals(2, $count);
+        self::assertTrue($assign->is_synced());
+
+        // Remove one user from cohort.
+        cohort_remove_member($cohort_id, $user1->id);
+        self::assertFalse($assign->is_synced());
+        // is_synced() should always return true after updating user assignments.
+        $appraisal->check_assignment_changes();
+        self::assertTrue($assign->is_synced());
+
+        // Re-add user to cohort.
+        cohort_add_member($cohort_id, $user1->id);
+        self::assertFalse($assign->is_synced());
+        // is_synced() should always return true after updating user assignments.
+        $appraisal->check_assignment_changes();
+        self::assertTrue($assign->is_synced());
+
+        // Add another user to cohort.
+        $generator = self::getDataGenerator();
+        $user3 = $generator->create_user();
+        cohort_add_member($cohort_id, $user3->id);
+        self::assertFalse($assign->is_synced());
+        // is_synced() should always return true after updating user assignments.
+        $appraisal->check_assignment_changes();
+        self::assertTrue($assign->is_synced());
+
+        // Complete the appraisal for user1 by anwering the question. This sets the user assignment status to complete
+        // and it should still count as synced (It used to be a bug that it did not count as synced).
+        $role_assignment = appraisal_role_assignment::get_role($appraisal->id, $user1->id, $user1->id, appraisal::ROLE_LEARNER);
+        $this->answer_question($appraisal, $role_assignment, '', 'completestage');
+        self::assertEquals(
+            appraisal::STATUS_COMPLETED,
+            $DB->get_field('appraisal_user_assignment', 'status', ['appraisalid' => $appraisal->id, 'userid' => $user1->id])
+        );
+        self::assertTrue($assign->is_synced());
+        $appraisal->check_assignment_changes();
+        self::assertTrue($assign->is_synced());
+
+        // Remove the user with completed appraisal from the cohort. This also leads to an out-of-sync state
+        // because the user assignment is due to be updated to "closed" status (It also used to be a bug that is_synced()
+        // returned true here).
+        cohort_remove_member($cohort_id, $user1->id);
+        self::assertFalse($assign->is_synced());
+        // is_synced() should always return true after updating user assignments.
+        $appraisal->check_assignment_changes();
+        self::assertTrue($assign->is_synced());
+
+        // Re-add the user with completed appraisal.
+        cohort_add_member($cohort_id, $user1->id);
+        self::assertFalse($assign->is_synced());
+        // is_synced() should always return true after updating user assignments.
+        $appraisal->check_assignment_changes();
+        self::assertTrue($assign->is_synced());
+    }
+
     public function test_active_appraisal_add_group () {
         global $DB;
 
@@ -317,6 +568,7 @@ class appraisal_test extends appraisal_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
 
+        /** @var appraisal $appraisal */
         list($appraisal) = $this->prepare_appraisal_with_users();
         list($errors, $warnings) = $appraisal->validate();
         $this->assertEmpty($errors);
@@ -333,32 +585,333 @@ class appraisal_test extends appraisal_testcase {
         $count = $DB->count_records('appraisal_user_assignment', array('appraisalid' => $appraisal->id));
         $this->assertEquals(2, $count);
 
-        // Set up group.
+        // Set up groups.
         $user1 = $this->getDataGenerator()->create_user();
         $user2 = $this->getDataGenerator()->create_user();
+        $user3 = $this->getDataGenerator()->create_user();
+        $user4 = $this->getDataGenerator()->create_user();
 
-        $cohort = $this->getDataGenerator()->create_cohort();
+        $data_generator = $this->getDataGenerator();
+        $cohort = $data_generator->create_cohort();
         cohort_add_member($cohort->id, $user1->id);
         cohort_add_member($cohort->id, $user2->id);
 
-        // Add group.
+        $hierarchy_generator = $data_generator->get_plugin_generator('totara_hierarchy');
+        $org_fw = $hierarchy_generator->create_framework('organisation', ['fullname' => 'test organisation']);
+        $org_ids = $hierarchy_generator->create_hierarchies($org_fw->id, 'organisation', 1);
+        \totara_job\job_assignment::create_default($user3->id, ['organisationid' => reset($org_ids)]);
+
+        $pos_fw = $hierarchy_generator->create_framework('position', ['fullname' => 'test position']);
+        $pos_ids = $hierarchy_generator->create_hierarchies($pos_fw->id, 'position', 1);
+        \totara_job\job_assignment::create_default($user4->id, ['positionid' => reset($pos_ids)]);
+
+        // Add groups.
         $urlparams = array('includechildren' => false, 'listofvalues' => array($cohort->id));
         $assign = new totara_assign_appraisal('appraisal', $appraisal);
         $grouptypeobj = $assign->load_grouptype('cohort');
+        $grouptypeobj->handle_item_selector($urlparams);
+
+        $urlparams = array('includechildren' => false, 'listofvalues' => $org_ids);
+        $grouptypeobj = $assign->load_grouptype('org');
+        $grouptypeobj->handle_item_selector($urlparams);
+
+        $urlparams = array('includechildren' => false, 'listofvalues' => $pos_ids);
+        $grouptypeobj = $assign->load_grouptype('pos');
         $grouptypeobj->handle_item_selector($urlparams);
 
         // There should still only be 2 user assignments.
         $this->assertEquals(appraisal::STATUS_ACTIVE, $appraisal->status);
         $count = $DB->count_records('appraisal_user_assignment', array('appraisalid' => $appraisal->id));
         $this->assertEquals(2, $count);
+        $this->assertFalse($assign->is_synced(), 'assignment already synced');
 
         // Force user assignments update.
         $appraisal->check_assignment_changes();
 
-        // Check users have now gone up to 4.
+        // Check users have now gone up to 6.
         $this->assertEquals(appraisal::STATUS_ACTIVE, $appraisal->status);
         $count = $DB->count_records('appraisal_user_assignment', array('appraisalid' => $appraisal->id));
-        $this->assertEquals(4, $count);
+        $this->assertEquals(6, $count);
+        $this->assertTrue($assign->is_synced(), 'assignment not synced');
+
+        // Check there were no job assignments auto-linked for the added users, because with default configuration this shouldn't happen.
+        $this->assertCount(1, $DB->get_records('appraisal_user_assignment', ['userid' => $user1->id]));
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user1->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+        $this->assertCount(1, $DB->get_records('appraisal_user_assignment', ['userid' => $user2->id]));
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user2->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+    }
+
+    /**
+     * Test auto-linking of job assignments works as expected when activating appraisal.
+     */
+    public function test_auto_link_job_assignment_on_activate() {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $user1 = $this->getDataGenerator()->create_user();
+        $user2 = $this->getDataGenerator()->create_user();
+        $user3 = $this->getDataGenerator()->create_user();
+
+        // Create one job assignment for user1.
+        $user1ja = \totara_job\job_assignment::create_default($user1->id);
+
+        // Create two job assignments for user2.
+        \totara_job\job_assignment::create_default($user2->id);
+        \totara_job\job_assignment::create_default($user2->id);
+
+        // Switch allowmultiplejobs off.
+        set_config('totara_job_allowmultiplejobs', 0);
+
+        // Set up appraisal for all 3 users and activate.
+        /** @var appraisal $appraisal */
+        list($appraisal) = $this->prepare_appraisal_with_users([], [$user1, $user2, $user3]);
+        list($errors, $warnings) = $appraisal->validate();
+        $this->assertEmpty($errors);
+        $this->assertEmpty($warnings);
+        $this->assertEquals(appraisal::STATUS_DRAFT, $appraisal->status);
+        $count = $DB->count_records('appraisal_user_assignment', ['appraisalid' => $appraisal->id]);
+        $this->assertEquals(0, $count);
+        $appraisal->activate();
+
+        // For user1 the existing job assignment should have been linked.
+        $jobassignments = $DB->get_records('job_assignment', ['userid' => $user1->id]);
+        $this->assertCount(1, $jobassignments);
+        $jobassignment = reset($jobassignments);
+        $this->assertEquals($user1ja->id, $jobassignment->id);
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user1->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => $user1ja->id,
+        ]));
+
+        // For user2 nothing should have been linked because he had more than 1 job assignment.
+        $this->assertCount(1, $DB->get_records('appraisal_user_assignment', ['userid' => $user2->id]));
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user2->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+
+        // For user3 an empty job assignment should have been created and linked.
+        $jobassignments = $DB->get_records('job_assignment', ['userid' => $user3->id]);
+        $this->assertCount(1, $jobassignments);
+        $user3ja = reset($jobassignments);
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user3->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => $user3ja->id,
+        ]));
+    }
+
+    /**
+     * Test auto-linking of job assignments works as expected when users are added to an active appraisal.
+     */
+    public function test_auto_link_job_assignment_on_dynamic_assignment() {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $user1 = $this->getDataGenerator()->create_user();
+        $user2 = $this->getDataGenerator()->create_user();
+        $user3 = $this->getDataGenerator()->create_user();
+
+        // Create one job assignment for user1.
+        $user1ja = \totara_job\job_assignment::create_default($user1->id);
+
+        // Create two job assignments for user2.
+        \totara_job\job_assignment::create_default($user2->id);
+        \totara_job\job_assignment::create_default($user2->id);
+
+        // Switch allowmultiplejobs off.
+        set_config('totara_job_allowmultiplejobs', 0);
+
+        // Set up appraisal and activate.
+        /** @var appraisal $appraisal */
+        list($appraisal) = $this->prepare_appraisal_with_users();
+        list($errors, $warnings) = $appraisal->validate();
+        $this->assertEmpty($errors);
+        $this->assertEmpty($warnings);
+        $this->assertEquals(appraisal::STATUS_DRAFT, $appraisal->status);
+        $count = $DB->count_records('appraisal_user_assignment', ['appraisalid' => $appraisal->id]);
+        $this->assertEquals(0, $count);
+        $appraisal->activate();
+
+        // Create audience and add to appraisal.
+        $cohort = $this->getDataGenerator()->create_cohort();
+        cohort_add_member($cohort->id, $user1->id);
+        cohort_add_member($cohort->id, $user2->id);
+        cohort_add_member($cohort->id, $user3->id);
+        $urlparams = array('includechildren' => false, 'listofvalues' => array($cohort->id));
+        $assign = new totara_assign_appraisal('appraisal', $appraisal);
+        $grouptypeobj = $assign->load_grouptype('cohort');
+        $grouptypeobj->handle_item_selector($urlparams);
+
+        // Our 3 users should not be assigned to the appraisal yet.
+        $this->assertFalse($DB->record_exists('appraisal_user_assignment', ['userid' => $user1->id]));
+        $this->assertFalse($DB->record_exists('appraisal_user_assignment', ['userid' => $user2->id]));
+        $this->assertFalse($DB->record_exists('appraisal_user_assignment', ['userid' => $user3->id]));
+
+        // Force user assignments update.
+        $appraisal->check_assignment_changes();
+
+        // For user1 the existing job assignment should have been linked.
+        $jobassignments = $DB->get_records('job_assignment', ['userid' => $user1->id]);
+        $this->assertCount(1, $jobassignments);
+        $jobassignment = reset($jobassignments);
+        $this->assertEquals($user1ja->id, $jobassignment->id);
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user1->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => $user1ja->id,
+        ]));
+
+        // For user2 nothing should have been linked because he had more than 1 job assignment.
+        $this->assertCount(1, $DB->get_records('appraisal_user_assignment', ['userid' => $user2->id]));
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user2->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+
+        // For user3 an empty job assignment should have been created and linked.
+        $jobassignments = $DB->get_records('job_assignment', ['userid' => $user3->id]);
+        $this->assertCount(1, $jobassignments);
+        $user3ja = reset($jobassignments);
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user3->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => $user3ja->id,
+        ]));
+    }
+
+    public function test_store_job_assignments() {
+        global $DB;
+
+        // Make sure allowmultiplejobs is ON, so no auto-linking of job assignments should happen to begin with.
+        set_config('totara_job_allowmultiplejobs', 1);
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $user1 = $this->getDataGenerator()->create_user();
+        $user2 = $this->getDataGenerator()->create_user();
+        $user3 = $this->getDataGenerator()->create_user();
+
+        // Set up appraisal.
+        /** @var appraisal $appraisal */
+        list($appraisal) = $this->prepare_appraisal_with_users();
+        list($errors, $warnings) = $appraisal->validate();
+        $this->assertEmpty($errors);
+        $this->assertEmpty($warnings);
+        $this->assertEquals(appraisal::STATUS_DRAFT, $appraisal->status);
+        $count = $DB->count_records('appraisal_user_assignment', ['appraisalid' => $appraisal->id]);
+        $this->assertEquals(0, $count);
+
+        // Create audience and add to appraisal - only for user1 & user2.
+        $cohort = $this->getDataGenerator()->create_cohort();
+        cohort_add_member($cohort->id, $user1->id);
+        cohort_add_member($cohort->id, $user2->id);
+        $urlparams = array('includechildren' => false, 'listofvalues' => array($cohort->id));
+        $assign = new totara_assign_appraisal('appraisal', $appraisal);
+        $grouptypeobj = $assign->load_grouptype('cohort');
+        $grouptypeobj->handle_item_selector($urlparams);
+
+        $appraisal->activate();
+
+        // Only user1 & user2 should be assigned to the appraisal.
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user1->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user2->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+        $this->assertFalse($DB->record_exists('appraisal_user_assignment', ['userid' => $user3->id]));
+
+        // No job assignments should exist for our users.
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user1->id]));
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user2->id]));
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user3->id]));
+
+        // Nothing should happen when calling store_job_assignments() because setting totara_job_allowmultiplejobs is ON.
+        $assign = new totara_assign_appraisal('appraisal', $appraisal);
+        $assign->store_job_assignments([$user1->id, $user2->id, $user3->id]);
+
+        // No changes to data expected.
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user1->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user2->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+        $this->assertFalse($DB->record_exists('appraisal_user_assignment', ['userid' => $user3->id]));
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user1->id]));
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user2->id]));
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user3->id]));
+
+        // Switch allowmultiplejobs to OFF, so auto-linking of job assignments should happen now.
+        set_config('totara_job_allowmultiplejobs', 0);
+
+        // User3 is not assigned to the appraisal and should be ignored without error.
+        $assign->store_job_assignments([$user1->id, $user3->id]);
+
+        // User1 should have an appraisal assignment with job assignment linked.
+        $jobassignments = $DB->get_records('job_assignment', ['userid' => $user1->id]);
+        $this->assertCount(1, $jobassignments);
+        $user1ja = reset($jobassignments);
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user1->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => $user1ja->id,
+        ]));
+
+        // User2's & User3's data is unchanged.
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user2->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => null,
+        ]));
+        $this->assertFalse($DB->record_exists('appraisal_user_assignment', ['userid' => $user3->id]));
+
+        // User2 should not have a job assignment added (was left out in parameter array) and neither user3 (is not assigned to the appraisal).
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user2->id]));
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user3->id]));
+
+        // Call without parameter should also take care of user2 that we left out so far.
+        $assign->store_job_assignments();
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user1->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => $user1ja->id,
+        ]));
+        $jobassignments = $DB->get_records('job_assignment', ['userid' => $user2->id]);
+        $this->assertCount(1, $jobassignments);
+        $user2ja = reset($jobassignments);
+        $this->assertTrue($DB->record_exists('appraisal_user_assignment', [
+            'userid' => $user2->id,
+            'appraisalid' => $appraisal->id,
+            'jobassignmentid' => $user2ja->id,
+        ]));
+        $this->assertFalse($DB->record_exists('appraisal_user_assignment', ['userid' => $user3->id]));
+        $this->assertFalse($DB->record_exists('job_assignment', ['userid' => $user3->id]));
     }
 
     public function test_active_appraisal_remove_group () {
@@ -476,6 +1029,12 @@ class appraisal_test extends appraisal_testcase {
         $this->assertEquals(0, $count);
 
         $appraisal->activate();
+
+        // Check for missing job assignment warning.
+        $warnings = $appraisal->validate_roles();
+        $this->assertEquals(1, count($warnings));
+        $this->assertContains('has not selected a job assignment yet', reset($warnings));
+
         $this->update_job_assignments($appraisal);
 
         $this->assertEquals(appraisal::STATUS_ACTIVE, $appraisal->status);
@@ -485,6 +1044,7 @@ class appraisal_test extends appraisal_testcase {
         // Now we check for missing role warnings!
         $warnings = $appraisal->validate_roles();
         $this->assertEquals(1, count($warnings));
+        $this->assertContains('is missing their', reset($warnings));
     }
 
     /**
@@ -591,7 +1151,7 @@ class appraisal_test extends appraisal_testcase {
         // and occasionally, PHPUnit runs so fast that the timestamp is updated
         // in the same second it was created. Thus, there is a sleep() here to
         // stop the test from failing further down.
-        sleep(1);
+        $this->waitForSecond();
         $user1ja->update($jobroleupdates);
 
         // User1 should now be missing roles except learner and team lead. Note
@@ -775,7 +1335,7 @@ class appraisal_test extends appraisal_testcase {
         // and occasionally, PHPUnit runs so fast that the timestamp is updated
         // in the same second it was created. Thus, there is a sleep() here to
         // stop the test from failing further down.
-        sleep(1);
+        $this->waitForSecond();
         $user1ja->update(array('managerjaid' => $manager2ja->id, 'appraiserid' => $appraiser2->id));
 
         // There should be no missing roles.
@@ -1076,7 +1636,7 @@ class appraisal_test extends appraisal_testcase {
         // and occasionally, PHPUnit runs so fast that the timestamp is updated
         // in the same second it was created. Thus, there is a sleep() here to
         // stop the test from failing further down.
-        sleep(1);
+        $this->waitForSecond();
         $user1ja->update($jobroleupdates);
 
         // Simulate a cron run.
@@ -1198,7 +1758,7 @@ class appraisal_test extends appraisal_testcase {
         // and occasionally, PHPUnit runs so fast that the timestamp is updated
         // in the same second it was created. Thus, there is a sleep() here to
         // stop the test from failing further down.
-        sleep(1);
+        $this->waitForSecond();
         $user1ja->update($jobroleupdates);
 
         // Simulate a cron run.
@@ -1316,7 +1876,7 @@ class appraisal_test extends appraisal_testcase {
         // and occasionally, PHPUnit runs so fast that the timestamp is updated
         // in the same second it was created. Thus, there is a sleep() here to
         // stop the test from failing further down.
-        sleep(1);
+        $this->waitForSecond();
         $user1ja->update($jobroleupdates);
 
         // Simulate a cron run.
@@ -1447,7 +2007,7 @@ class appraisal_test extends appraisal_testcase {
         // and occasionally, PHPUnit runs so fast that the timestamp is updated
         // in the same second it was created. Thus, there is a sleep() here to
         // stop the test from failing further down.
-        sleep(1);
+        $this->waitForSecond();
         $user1ja->update($jobroleupdates);
 
         // Simulate a cron run.
@@ -1508,5 +2068,184 @@ class appraisal_test extends appraisal_testcase {
             $this->assertFalse($DB->record_exists('appraisal_user_assignment', $params));
             $this->assertFalse($DB->record_exists('appraisal_role_assignment', $paramsrole));
         }
+    }
+
+    public function test_get_mandatory_completion() {
+        // Create appraisal and activate it.
+        $user1 = $this->getDataGenerator()->create_user();
+
+        $def = array('name' => 'Appraisal', 'stages' => array(
+            array('name' => 'Stage1', 'timedue' => time() + 86400, 'pages' => array(
+                array('name' => 'Page', 'questions' => array(
+                    array('name' => 'Text', 'type' => 'text', 'roles' => array(
+                        appraisal::ROLE_LEARNER => appraisal::ACCESS_MUSTANSWER,
+                        appraisal::ROLE_MANAGER => appraisal::ACCESS_MUSTANSWER
+                    ))
+                ))
+            )),
+            array('name' => 'Stage2', 'timedue' => time() + 86400, 'pages' => array(
+                array('name' => 'Page', 'questions' => array(
+                    array('name' => 'Text', 'type' => 'text', 'roles' => array(
+                        appraisal::ROLE_LEARNER => appraisal::ACCESS_CANANSWER,
+                        appraisal::ROLE_MANAGER => appraisal::ACCESS_CANANSWER
+                    ))
+                ))
+            ))
+        ));
+
+        /** @var appraisal $appraisal */
+        list($appraisal, $users) = $this->prepare_appraisal_with_users($def, array($user1));
+        $appraisal->activate();
+        $this->update_job_assignments($appraisal);
+
+        $map = $this->map($appraisal);
+
+        $stage = new appraisal_stage($map['stages']['Stage1']);
+
+        // Enable dynamic appraisals, disable auto-progress. Mandatory roles should be all roles involved
+        // in the stage.
+        set_config('dynamicappraisals', true);
+        set_config('dynamicappraisalsautoprogress', false);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER, appraisal::ROLE_MANAGER), array_keys($mandatory_roles));
+
+        // Enable dynamic appraisals, enable auto-progress. Unfilled roles are not mandatory.
+        set_config('dynamicappraisals', true);
+        set_config('dynamicappraisalsautoprogress', true);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER), array_keys($mandatory_roles));
+
+        // Disable dynamic appraisals, disbale auto-progress. Unfilled roles are not mandatory.
+        set_config('dynamicappraisals', false);
+        set_config('dynamicappraisalsautoprogress', false);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER), array_keys($mandatory_roles));
+
+        // Disable dynamic appraisals, enable auto-progress. Unfilled roles are not mandatory.
+        set_config('dynamicappraisals', false);
+        set_config('dynamicappraisalsautoprogress', true);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER), array_keys($mandatory_roles));
+
+        // Repeat with CANANSWER - no difference.
+        $stage = new appraisal_stage($map['stages']['Stage2']);
+
+        // Enable dynamic appraisals, disable auto-progress. Mandatory roles should be all roles involved
+        // in the stage.
+        set_config('dynamicappraisals', true);
+        set_config('dynamicappraisalsautoprogress', false);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER, appraisal::ROLE_MANAGER), array_keys($mandatory_roles));
+
+        // Enable dynamic appraisals, enable auto-progress. Unfilled roles are not mandatory.
+        set_config('dynamicappraisals', true);
+        set_config('dynamicappraisalsautoprogress', true);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER), array_keys($mandatory_roles));
+
+        // Disable dynamic appraisals, disbale auto-progress. Unfilled roles are not mandatory.
+        set_config('dynamicappraisals', false);
+        set_config('dynamicappraisalsautoprogress', false);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER), array_keys($mandatory_roles));
+
+        // Disable dynamic appraisals, enable auto-progress. Unfilled roles are not mandatory.
+        set_config('dynamicappraisals', false);
+        set_config('dynamicappraisalsautoprogress', true);
+
+        $mandatory_roles = $stage->get_mandatory_completion($user1->id);
+        $this->assertEquals(array(appraisal::ROLE_LEARNER), array_keys($mandatory_roles));
+    }
+
+    /**
+     * Tests the statistics returned by totara_assign_appraisal::missing_role_assignments()
+     */
+    public function test_missing_role_assignments() {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        // Set up appraisal.
+        $roles = [
+            appraisal::ROLE_LEARNER => 6,
+            appraisal::ROLE_MANAGER => 6,
+            appraisal::ROLE_TEAM_LEAD => 6,
+            appraisal::ROLE_APPRAISER => 6
+        ];
+
+        $def = array('name' => 'Appraisal', 'stages' => array(
+            array('name' => 'Stage', 'timedue' => time() + 86400, 'pages' => array(
+                array('name' => 'Page', 'questions' => array(
+                    array('name' => 'Text', 'type' => 'text', 'roles' => $roles)
+                ))
+            ))
+        ));
+        $appraisal = appraisal::build($def);
+
+        // Set up group.
+        $teamlead = $this->getDataGenerator()->create_user();
+        $manager = $this->getDataGenerator()->create_user();
+        $appraiser = $this->getDataGenerator()->create_user();
+        $user1 = $this->getDataGenerator()->create_user();
+        $user2 = $this->getDataGenerator()->create_user();
+        $user3 = $this->getDataGenerator()->create_user();
+
+        $teamleadja = \totara_job\job_assignment::create_default($teamlead->id);
+        $managerja = \totara_job\job_assignment::create_default(
+            $manager->id,
+            [
+                'managerjaid' => $teamleadja->id
+            ]
+        );
+
+        $jobassignmentmanagers = [
+            'managerjaid' => $managerja->id,
+            'appraiserid' => $appraiser->id
+        ];
+        \totara_job\job_assignment::create_default($user1->id, $jobassignmentmanagers);
+
+        $cohort = $this->getDataGenerator()->create_cohort();
+        cohort_add_member($cohort->id, $user1->id);
+        cohort_add_member($cohort->id, $user2->id);
+        cohort_add_member($cohort->id, $user3->id);
+
+        // Assign group and activate.
+        $urlparams = array('includechildren' => false, 'listofvalues' => array($cohort->id));
+        $assign = new totara_assign_appraisal('appraisal', $appraisal);
+        $grouptypeobj = $assign->load_grouptype('cohort');
+        $grouptypeobj->handle_item_selector($urlparams);
+
+        $appraisal->activate();
+        $this->update_job_assignments($appraisal);
+
+        $userassignments = $DB->get_records('appraisal_user_assignment', array('appraisalid' => $appraisal->id));
+        $this->assertEquals(3, count($userassignments));
+        foreach ($userassignments as $aua) {
+            $countrole = $DB->count_records('appraisal_role_assignment', array('appraisaluserassignmentid' => $aua->id));
+            $this->assertEquals(4, $countrole);
+        }
+
+        $missing = $assign->missing_role_assignments();
+        $this->assertEquals(count($userassignments), $missing->appraiseecount);
+        $this->assertEquals(1, $missing->validappraiseecount);
+
+        $this->assertTrue(array_key_exists($user2->id, $missing->roles));
+        $this->assertEquals(3, count($missing->roles[$user2->id]));
+        $this->assertTrue(array_key_exists($user3->id, $missing->roles));
+        $this->assertEquals(3, count($missing->roles[$user3->id]));
+
+        $limit = 1;
+        $missing = $assign->missing_role_assignments($limit);
+        $this->assertEquals(count($userassignments), $missing->appraiseecount);
+        $this->assertEquals(1, $missing->validappraiseecount);
+        $this->assertEquals($limit, count($missing->roles));
     }
 }

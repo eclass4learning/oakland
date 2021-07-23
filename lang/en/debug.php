@@ -49,6 +49,7 @@ $string['noreports'] = 'No reports accessible';
 $string['notables'] = 'No tables!';
 $string['phpvaroff'] = 'The PHP server variable \'{$a->name}\' should be Off - {$a->link}';
 $string['phpvaron'] = 'The PHP server variable \'{$a->name}\' is not turned On - {$a->link}';
+$string['serviceerror'] = 'An error has occurred while processing your request.';
 $string['sessionmissing'] = '{$a} object missing from session';
 $string['sqlrelyonobsoletetable'] = 'This SQL relies on obsolete table(s): {$a}!  Your code must be fixed by a developer.';
 $string['withoutversion'] = 'Main version.php file is missing, not readable or broken.';

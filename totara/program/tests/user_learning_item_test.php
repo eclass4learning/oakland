@@ -29,16 +29,28 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
 
     private $generator;
     private $program_generator, $completion_generator;
-    private $course1, $course2, $course3, $course4, $course5, $course6;
+    private $course1, $course2, $course3, $course4, $course5, $course6, $course7, $course8;
     private $program1, $program2, $program3, $program4;
     private $user1;
 
     protected function tearDown() {
         $this->generator = null;
         $this->program_generator = null;
+        $this->completion_generator = null;
         $this->course1 = null;
+        $this->course2 = null;
+        $this->course3 = null;
+        $this->course4 = null;
+        $this->course5 = null;
+        $this->course6 = null;
+        $this->course7 = null;
+        $this->course8 = null;
         $this->program1 = null;
+        $this->program2 = null;
+        $this->program3 = null;
+        $this->program4 = null;
         $this->user1 = null;
+
         parent::tearDown();
     }
 
@@ -60,6 +72,7 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
         $this->course5 = $this->generator->create_course();
         $this->course6 = $this->generator->create_course();
         $this->course7 = $this->generator->create_course();
+        $this->course8 = $this->generator->create_course(array('audiencevisible'=>COHORT_VISIBLE_ENROLLED));
 
         // Create some programs.
         $this->program1 = $this->program_generator->create_program(array('fullname' => 'Program 1'));
@@ -350,6 +363,9 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
 
     public function test_ensure_completion_loaded() {
         global $CFG;
+
+        set_config('enablecompletion', 0);
+
         // Assign user to the program.
         $this->program_generator->assign_program($this->program1->id, array($this->user1->id));
 
@@ -362,13 +378,9 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
         $progress_percentage = new ReflectionProperty('totara_program\user_learning\item', 'progress_percentage');
         $progress_percentage->setAccessible(true);
 
-        $progress_summary = new ReflectionProperty('totara_program\user_learning\item', 'progress_summary');
-        $progress_summary->setAccessible(true);
-
         // Check they are all empty.
         $this->assertEmpty($progress_canbecompleted->getValue($program_item));
         $this->assertEmpty($progress_percentage->getValue($program_item));
-        $this->assertEmpty($progress_summary->getValue($program_item));
 
         $rm = new ReflectionMethod('totara_program\user_learning\item', 'ensure_completion_loaded');
         $rm->setAccessible(true);
@@ -378,10 +390,9 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
         // Completion is turned off by default so this should not get set.
         $this->assertFalse($progress_canbecompleted->getValue($program_item));
         $this->assertEmpty($progress_percentage->getValue($program_item));
-        $this->assertEmpty($progress_summary->getValue($program_item));
 
         // Lets turn on completion and try again.
-        $CFG->enablecompletion = true;
+        set_config('enablecompletion', 1);
         $rm = new ReflectionMethod('totara_program\user_learning\item', 'ensure_completion_loaded');
         $rm->setAccessible(true);
 
@@ -390,8 +401,6 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
         // We should have some values this time (even if there is no progress).
         $this->assertTrue($progress_canbecompleted->getValue($program_item));
         $this->assertEquals(0, $progress_percentage->getValue($program_item));
-        $this->assertEquals('Not yet started', $progress_summary->getValue($program_item));
-
     }
 
     public function test_ensure_duedate_loaded() {
@@ -506,8 +515,7 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
         $program_item = \totara_program\user_learning\item::one($this->user1->id, $this->program1->id);
         $progress_info = $program_item->export_progress_for_template();
 
-        $this->assertEquals('Not yet started', $progress_info->summary);
-        $this->assertEquals('0', $progress_info->percentage);
+        $this->assertEquals('0', $progress_info->pbar['progress']);
 
         // Next we make some progress and make sure it changes.
         $this->completion_generator->complete_course($this->course1, $this->user1);
@@ -523,8 +531,7 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
         $program_item = \totara_program\user_learning\item::one($this->user1->id, $this->program1->id);
         $progress_info = $program_item->export_progress_for_template();
 
-        $this->assertEquals('50% complete', $progress_info->summary);
-        $this->assertEquals('50', $progress_info->percentage);
+        $this->assertEquals('50', $progress_info->pbar['progress']);
     }
 
     public function test_export_dueinfo_for_template() {
@@ -619,6 +626,49 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
         $this->assertCount(2, $info->coursesets[1]->courses);
         $this->assertEquals($this->course2->fullname, $coursesets[1]->courses[0]->fullname);
         $this->assertEquals($this->course3->fullname, $coursesets[1]->courses[1]->fullname);
+    }
+
+    public function test_export_for_template_with_enabled_audience_visibility() {
+        global $CFG;
+        $CFG->audiencevisibility = 1 ;
+
+        $progcontent = new prog_content($this->program1->id);
+        $progcontent->add_set(CONTENTTYPE_MULTICOURSE);
+
+        $coursesets = $progcontent->get_course_sets();
+        $coursedata = new stdClass();
+        $coursedata->{$coursesets[0]->get_set_prefix() . 'courseid'} = $this->course8->id;
+        $progcontent->add_course(1, $coursedata);
+        $progcontent->save_content();
+
+        // Assign user to the program.
+        $this->program_generator->assign_program($this->program1->id, array($this->user1->id));
+        $program_item = \totara_program\user_learning\item::one($this->user1->id, $this->program1->id);
+
+        $info = $program_item->export_for_template();
+        $this->assertEquals($this->program1->id, $info->id);
+        $this->assertEquals($this->program1->fullname, $info->fullname);
+        $this->assertContains('totara/program/required.php', $info->coursesets[0]->courses[0]->url_view);
+    }
+
+    public function test_export_for_template_with_disabled_audience_visibility() {
+        $progcontent = new prog_content($this->program1->id);
+        $progcontent->add_set(CONTENTTYPE_MULTICOURSE);
+
+        $coursesets = $progcontent->get_course_sets();
+        $coursedata = new stdClass();
+        $coursedata->{$coursesets[0]->get_set_prefix() . 'courseid'} = $this->course8->id;
+        $progcontent->add_course(1, $coursedata);
+        $progcontent->save_content();
+
+        // Assign user to the program.
+        $this->program_generator->assign_program($this->program1->id, array($this->user1->id));
+        $program_item = \totara_program\user_learning\item::one($this->user1->id, $this->program1->id);
+
+        $info = $program_item->export_for_template();
+        $this->assertEquals($this->program1->id, $info->id);
+        $this->assertEquals($this->program1->fullname, $info->fullname);
+        $this->assertContains('course/view.php', $info->coursesets[0]->courses[0]->url_view);
     }
 
     function test_process_coursesets_1() {
@@ -1166,5 +1216,76 @@ class totara_program_user_learning_item_testcase extends advanced_testcase {
 
         $this->assertEquals(1, $resultset->completecount);
         $this->assertEquals(1, $resultset->unvailablecount);
+    }
+
+    function test_is_single_course_true() {
+        $this->resetAfterTest(true);
+
+        // Setup program content.
+        $progcontent = new prog_content($this->program1->id);
+        $progcontent->add_set(CONTENTTYPE_MULTICOURSE);
+
+        $coursesets = $progcontent->get_course_sets();
+
+        $coursedata = new stdClass();
+        $coursedata->{$coursesets[0]->get_set_prefix() . 'courseid'} = $this->course1->id;
+        $progcontent->add_course(1, $coursedata);
+
+        // Do some more setup.
+        $coursesets[0]->nextsetoperator = NEXTSETOPERATOR_OR;
+
+        // Set completion type.
+        $coursesets[0]->completiontype = COMPLETIONTYPE_ALL;
+
+        // Set certifpath.
+        $coursesets[0]->certifpath = CERTIFPATH_STD;
+
+        // Save the sets
+        $coursesets[0]->save_set();
+
+        // Assign the user to the program.
+        $this->program_generator->assign_program($this->program1->id, array($this->user1->id));
+
+        // Get the program and process the coursesets.
+        $program_item = \totara_program\user_learning\item::one($this->user1->id, $this->program1->id);
+
+        $this->assertEquals($program_item->is_single_course()->fullname, $this->course1->fullname);
+        $this->assertEquals($program_item->is_single_course()->id, $this->course1->id);
+    }
+
+    function test_is_single_course_false() {
+        $this->resetAfterTest(true);
+
+        // Setup program content.
+        $progcontent = new prog_content($this->program1->id);
+        $progcontent->add_set(CONTENTTYPE_MULTICOURSE);
+
+        $coursesets = $progcontent->get_course_sets();
+
+        $coursedata = new stdClass();
+        $coursedata->{$coursesets[0]->get_set_prefix() . 'courseid'} = $this->course1->id;
+        $progcontent->add_course(1, $coursedata);
+        $coursedata->{$coursesets[0]->get_set_prefix() . 'courseid'} = $this->course2->id;
+        $progcontent->add_course(1, $coursedata);
+
+        // Do some more setup.
+        $coursesets[0]->nextsetoperator = NEXTSETOPERATOR_AND;
+
+        // Set completion type.
+        $coursesets[0]->completiontype = COMPLETIONTYPE_ALL;
+
+        // Set certifpath.
+        $coursesets[0]->certifpath = CERTIFPATH_STD;
+
+        // Save the sets
+        $coursesets[0]->save_set();
+
+        // Assign the user to the program.
+        $this->program_generator->assign_program($this->program1->id, array($this->user1->id));
+
+        // Get the program and process the coursesets.
+        $program_item = \totara_program\user_learning\item::one($this->user1->id, $this->program1->id);
+
+        $this->assertFalse($program_item->is_single_course());
     }
 }

@@ -56,12 +56,9 @@ $shortname = 'team_members';
 $reportrecord = $DB->get_record('report_builder', array('shortname' => $shortname));
 $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($reportrecord);
 
-if (!$report = reportbuilder_get_embedded_report($shortname, null, false, $sid, $globalrestrictionset)) {
+$config = (new rb_config())->set_sid($sid)->set_global_restriction_set($globalrestrictionset);
+if (!$report = reportbuilder::create_embedded($shortname, $config)) {
     print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
-}
-
-if ($debug) {
-    $report->debug($debug);
 }
 
 $logurl = $PAGE->url->out_as_local_url();
@@ -97,23 +94,25 @@ if ($PAGE->user_allowed_editing()) {
     $USER->editing = 0;
 }
 
-$PAGE->set_totara_menu_selected('myteam');
+$PAGE->set_totara_menu_selected('\totara_core\totara\menu\myteam');
 $PAGE->set_title($strheading);
 $PAGE->set_heading(format_string($SITE->fullname));
 $PAGE->set_button($report->edit_button().$editbutton);
 
+/** @var totara_reportbuilder_renderer $renderer */
 $renderer = $PAGE->get_renderer('totara_reportbuilder');
 echo $OUTPUT->header();
+
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $renderer->report_html($report, $debug);
+echo $debughtml;
 
 // Plan page content.
 echo $OUTPUT->container_start('', 'my-teammembers-content');
 
 $report->display_restrictions();
 
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
-
-$heading = $strheading . ': ' . $renderer->print_result_count_string($countfiltered, $countall);
+$heading = $strheading . ': ' . $renderer->result_count_info($report);
 echo $OUTPUT->heading($heading);
 
 echo $renderer->print_description($report->description, $report->_id);
@@ -125,13 +124,10 @@ $report->display_sidebar_search();
 
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
-
-$report->display_table();
+echo $reporthtml;
 
 // Export button.
 $renderer->export_select($report, $sid);
 
 echo $OUTPUT->container_end();
 echo $OUTPUT->footer();
-
-?>

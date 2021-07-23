@@ -22,7 +22,7 @@
  * @subpackage coursecatalog
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
 require_once($CFG->dirroot . '/totara/program/lib.php');
 
@@ -30,10 +30,10 @@ $debug = optional_param('debug', 0, PARAM_INT);
 
 $PAGE->set_context(context_system::instance());
 
-$enhancedcatalogenabled = get_config('core', 'enhancedcatalog');
+$catalogtype = get_config('core', 'catalogtype');
 
-if ($enhancedcatalogenabled) {
-    $PAGE->set_totara_menu_selected('programs');
+if ($catalogtype === 'enhanced') {
+    $PAGE->set_totara_menu_selected('\totara_coursecatalog\totara\menu\programs');
 }
 
 $PAGE->set_pagelayout('noblocks');
@@ -44,11 +44,12 @@ if ($CFG->forcelogin) {
 
 check_program_enabled();
 
+/** @var totara_reportbuilder_renderer $renderer */
 $renderer = $PAGE->get_renderer('totara_reportbuilder');
 $strheading = get_string('searchprograms', 'totara_program');
 $shortname = 'catalogprograms';
 
-if (!$report = reportbuilder_get_embedded_report($shortname, null, false, 0)) {
+if (!$report = reportbuilder::create_embedded($shortname)) {
     print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
 }
 
@@ -68,17 +69,13 @@ $PAGE->set_button($report->edit_button());
 $PAGE->set_heading(format_string($SITE->fullname));
 echo $OUTPUT->header();
 
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $renderer->report_html($report, $debug);
+echo $debughtml;
 
 $report->display_restrictions();
 
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
-
-$heading = $strheading . ': ' .
-    $renderer->print_result_count_string($countfiltered, $countall);
+$heading = $strheading . ': ' . $renderer->result_count_info($report);
 echo $OUTPUT->heading($heading);
 
 print $renderer->print_description($report->description, $report->_id);
@@ -86,6 +83,6 @@ print $renderer->print_description($report->description, $report->_id);
 $report->display_search();
 $report->display_sidebar_search();
 
-$report->display_table();
+echo $reporthtml;
 
 echo $OUTPUT->footer();

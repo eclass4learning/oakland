@@ -38,20 +38,17 @@ class totara_program_observer_testcase extends reportcache_advanced_testcase {
     /** @var totara_reportbuilder_cache_generator */
     private $data_generator;
 
-    /** @var totara_program_generator*/
-    private $program_generator;
-
     /** @var stdClass */
-    private $course1, $course2, $course3;
+    private $course1, $course2, $course3, $course4, $course5;
 
     /** @var program */
     private $program1, $program2;
 
     protected function tearDown() {
         $this->data_generator = null;
-        $this->program_generator = null;
-        $this->course1 = null;
-        $this->program1 = null;
+        $this->course1 = $this->course2 = $this->course3 = $this->course4 = $this->course5 = null;
+        $this->program1 = $this->program2 = null;
+
         parent::tearDown();
     }
 
@@ -61,13 +58,14 @@ class totara_program_observer_testcase extends reportcache_advanced_testcase {
         global $DB;
 
         $this->data_generator = $this->getDataGenerator();
-        $this->program_generator = $this->data_generator->get_plugin_generator('totara_program');
 
-        $this->course1 = $this->data_generator->create_course();
-        $this->course2 = $this->data_generator->create_course();
-        $this->course3 = $this->data_generator->create_course();
-        $this->program1 = $this->program_generator->create_program();
-        $this->program2 = $this->program_generator->create_program();
+        $this->course1 = $this->data_generator->create_course(array('enablecompletion' => 1));
+        $this->course2 = $this->data_generator->create_course(array('enablecompletion' => 1));
+        $this->course3 = $this->data_generator->create_course(array('enablecompletion' => 1));
+        $this->course4 = $this->data_generator->create_course(array('enablecompletion' => 1));
+        $this->course5 = $this->data_generator->create_course(array('enablecompletion' => 1));
+        $this->program1 = $this->data_generator->create_program();
+        $this->program2 = $this->data_generator->create_program();
 
         // Reload courses. Otherwise when we compare the courses with the returned courses,
         // we get subtle differences in some values such as cacherev and sortorder.
@@ -75,6 +73,8 @@ class totara_program_observer_testcase extends reportcache_advanced_testcase {
         $this->course1 = $DB->get_record('course', array('id' => $this->course1->id));
         $this->course2 = $DB->get_record('course', array('id' => $this->course2->id));
         $this->course3 = $DB->get_record('course', array('id' => $this->course3->id));
+        $this->course4 = $DB->get_record('course', array('id' => $this->course4->id));
+        $this->course5 = $DB->get_record('course', array('id' => $this->course5->id));
     }
 
     public function reload_course($course) {
@@ -460,5 +460,272 @@ class totara_program_observer_testcase extends reportcache_advanced_testcase {
         $program2_record = $DB->get_record('prog', array('id' => $this->program2->id));
         $this->assertEquals(0, $program1_record->assignmentsdeferred);
         $this->assertEquals(1, $program2_record->assignmentsdeferred);
+    }
+
+    /*
+     * Check that starting a course marks the courseset and programs as started.
+     */
+    public function test_course_started() {
+        global $DB;
+
+        $this->resetAfterTest(true);
+        set_config('enablecompletion', 1);
+
+        $now = time();
+
+        $user1 = $this->data_generator->create_user(); // Test user.
+        $user2 = $this->data_generator->create_user(); // Control user.
+
+        // Create some programs.
+        $this->data_generator->add_courseset_program(
+            $this->program1->id,
+            array($this->course1->id, $this->course2->id)
+        );
+        $this->data_generator->add_courseset_program(
+            $this->program1->id,
+            array($this->course3->id, $this->course4->id)
+        );
+        $p1content = $this->program1->get_content();
+        $p1content->fix_set_sortorder();
+        $p1content->save_content();
+
+        $cs1id = $DB->get_field('prog_courseset', 'id', array('programid' => $this->program1->id, 'sortorder' => 1));
+        $cs2id = $DB->get_field('prog_courseset', 'id', array('programid' => $this->program1->id, 'sortorder' => 2));
+
+        $this->data_generator->add_courseset_program(
+            $this->program2->id,
+            array($this->course5->id)
+        );
+        $p2content = $this->program2->get_content();
+        $p2content->fix_set_sortorder();
+        $p2content->save_content();
+
+        $cs3id = $DB->get_field('prog_courseset', 'id', array('programid' => $this->program2->id, 'sortorder' => 1));
+
+        // Assign some users.
+        $this->data_generator->assign_to_program($this->program1->id, ASSIGNTYPE_INDIVIDUAL, $user1->id);
+        $this->data_generator->assign_to_program($this->program1->id, ASSIGNTYPE_INDIVIDUAL, $user2->id);
+        $this->program1->update_learner_assignments(true);
+
+        $this->data_generator->assign_to_program($this->program2->id, ASSIGNTYPE_INDIVIDUAL, $user1->id);
+        $this->program2->update_learner_assignments(true);
+
+        // Check the time created is set but the time started is empty.
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'programid' => $this->program1->id, 'coursesetid' => 0));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertEquals(0, $record->timestarted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs1id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertEquals(0, $record->timestarted);
+
+        // User 1 starts the first course.
+        $setcourses = $DB->get_records('prog_courseset_course', array('coursesetid' => $cs1id));
+        $setcrs1 = $DB->get_record('course', array('id' => array_pop($setcourses)->courseid));
+        $this->data_generator->enrol_user($user1->id, $setcrs1->id);
+        $completion = new completion_completion(array('userid' => $user1->id, 'course' => $setcrs1->id));
+        $completion->mark_inprogress($now + 10000);
+
+        // Check the timestarted for program 1 and courseset 1.
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'programid' => $this->program1->id,  'coursesetid' => 0));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted); // Note: this will be set to now() if its in the future.
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs1id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted); // Note: this will be set to now() if its in the future.
+
+        // User 1 completes the courses for courseset 1.
+        $completion->mark_complete($now + 10000);
+        $setcrs2 = $DB->get_record('course', array('id' => array_pop($setcourses)->courseid));
+        $this->data_generator->enrol_user($user1->id, $setcrs2->id);
+        $completion = new completion_completion(array('userid' => $user1->id, 'course' => $setcrs2->id));
+        $completion->mark_inprogress($now + 20000);
+        $completion->mark_complete($now + 20000);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs2id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertEquals(0, $record->timestarted);
+
+        // User 1 starts courseset 2.
+        $setcourses = $DB->get_records('prog_courseset_course', array('coursesetid' => $cs2id));
+        $setcrs3 = $DB->get_record('course', array('id' => array_pop($setcourses)->courseid));
+        $this->data_generator->enrol_user($user1->id, $setcrs3->id);
+        $completion = new completion_completion(array('userid' => $user1->id, 'course' => $setcrs3->id));
+        $completion->mark_inprogress($now + 30000);
+
+        // Check the existing timestarted doesn't change but the courseset 2 timestarted is set to $now.
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'programid' => $this->program1->id, 'coursesetid' => 0));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs1id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs2id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted);
+
+        // Complete the program and check the data.
+        $completion->mark_complete($now + 30000);
+        $setcrs4 = $DB->get_record('course', array('id' => array_pop($setcourses)->courseid));
+        $this->data_generator->enrol_user($user1->id, $setcrs4->id);
+        $completion = new completion_completion(array('userid' => $user1->id, 'course' => $setcrs4->id));
+        $completion->mark_inprogress($now + 40000);
+        $completion->mark_complete($now + 40000);
+
+        prog_update_completion($user1->id);
+
+        // Make sure the controls are unaffected by everything.
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'programid' => $this->program1->id, 'coursesetid' => 0));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted);
+        $this->assertEquals($now + 40000, $record->timecompleted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs1id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted);
+        $this->assertEquals($now + 20000, $record->timecompleted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs2id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertGreaterThanOrEqual($now, $record->timestarted);
+        $this->assertEquals($now + 40000, $record->timecompleted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user2->id, 'programid' => $this->program1->id, 'coursesetid' => 0));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertEquals(0, $record->timestarted);
+        $this->assertEquals(0, $record->timecompleted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user2->id, 'coursesetid' => $cs1id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertEquals(0, $record->timestarted);
+        $this->assertEquals(0, $record->timecompleted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'programid' => $this->program2->id, 'coursesetid' => 0));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertEquals(0, $record->timestarted);
+        $this->assertEquals(0, $record->timecompleted);
+
+        $record = $DB->get_record('prog_completion', array('userid' => $user1->id, 'coursesetid' => $cs3id));
+        $this->assertGreaterThanOrEqual($now, $record->timecreated);
+        $this->assertEquals(0, $record->timestarted);
+        $this->assertEquals(0, $record->timecompleted);
+    }
+
+    /**
+     * This test only covers what happens to the program and certification completion records when a user is deleted.
+     */
+    public function test_user_deleted_completion_records() {
+        global $DB;
+
+        $generator = $this->data_generator;
+
+        // Create some users.
+        $user1 = $generator->create_user();
+        $user2 = $generator->create_user();
+
+        // Create some certs.
+        $cert1 = $generator->create_certification();
+        $cert2 = $generator->create_certification();
+
+        // Create some programs.
+        $prog1 = $generator->create_program();
+        $prog2 = $generator->create_program();
+
+        // Add the users to the certs.
+        $generator->assign_to_program($cert1->id, ASSIGNTYPE_INDIVIDUAL, $user1->id);
+        $generator->assign_to_program($cert1->id, ASSIGNTYPE_INDIVIDUAL, $user2->id);
+        $generator->assign_to_program($cert2->id, ASSIGNTYPE_INDIVIDUAL, $user1->id);
+        $generator->assign_to_program($cert2->id, ASSIGNTYPE_INDIVIDUAL, $user2->id);
+
+        // Add the users to the programs.
+        $generator->assign_to_program($prog1->id, ASSIGNTYPE_INDIVIDUAL, $user1->id);
+        $generator->assign_to_program($prog1->id, ASSIGNTYPE_INDIVIDUAL, $user2->id);
+        $generator->assign_to_program($prog2->id, ASSIGNTYPE_INDIVIDUAL, $user1->id);
+        $generator->assign_to_program($prog2->id, ASSIGNTYPE_INDIVIDUAL, $user2->id);
+
+        // Mark one of the programs complete for both users.
+        $progcompletion = prog_load_completion($prog1->id, $user1->id);
+        $progcompletion->status = STATUS_PROGRAM_COMPLETE;
+        $progcompletion->timecompleted = 100;
+        $this->assertEquals(array(), prog_get_completion_errors($progcompletion));
+        $this->assertTrue(prog_write_completion($progcompletion));
+
+        $progcompletion = prog_load_completion($prog1->id, $user2->id);
+        $progcompletion->status = STATUS_PROGRAM_COMPLETE;
+        $progcompletion->timecompleted = 100;
+        $this->assertEquals(array(), prog_get_completion_errors($progcompletion));
+        $this->assertTrue(prog_write_completion($progcompletion));
+
+        // Make one of the certifications certified for both users.
+        list($certcompletion, $progcompletion) = certif_load_completion($cert1->id, $user1->id);
+        $certcompletion->status = CERTIFSTATUS_COMPLETED;
+        $certcompletion->renewalstatus = CERTIFRENEWALSTATUS_NOTDUE;
+        $certcompletion->certifpath = CERTIFPATH_RECERT;
+        $certcompletion->timecompleted = 100;
+        $certcompletion->timewindowopens = 200;
+        $certcompletion->timeexpires = 300;
+        $certcompletion->baselinetimeexpires = 300;
+        $progcompletion->status = STATUS_PROGRAM_COMPLETE;
+        $progcompletion->timecompleted = 100;
+        $progcompletion->timedue = 300;
+        $this->assertEquals(array(), certif_get_completion_errors($certcompletion, $progcompletion));
+        $this->assertTrue(certif_write_completion($certcompletion, $progcompletion));
+
+        list($certcompletion, $progcompletion) = certif_load_completion($cert1->id, $user2->id);
+        $certcompletion->status = CERTIFSTATUS_COMPLETED;
+        $certcompletion->renewalstatus = CERTIFRENEWALSTATUS_NOTDUE;
+        $certcompletion->certifpath = CERTIFPATH_RECERT;
+        $certcompletion->timecompleted = 100;
+        $certcompletion->timewindowopens = 200;
+        $certcompletion->timeexpires = 300;
+        $certcompletion->baselinetimeexpires = 300;
+        $progcompletion->status = STATUS_PROGRAM_COMPLETE;
+        $progcompletion->timecompleted = 100;
+        $progcompletion->timedue = 300;
+        $this->assertEquals(array(), certif_get_completion_errors($certcompletion, $progcompletion));
+        $this->assertTrue(certif_write_completion($certcompletion, $progcompletion));
+
+        // Load the current set of data.
+        $expectedcertcompletions = $DB->get_records('certif_completion');
+        $expectedprogcompletions = $DB->get_records('prog_completion');
+        list($expectedcertcompletionhistory, $progcompletion) = certif_load_completion($cert1->id, $user1->id);
+
+        // Trigger the user deleted observer by deleting user1.
+        delete_user($user1);
+
+        // Manually make the same change to the expected data.
+        foreach ($expectedcertcompletions as $key => $certcompletion) {
+            // Both cert completions for user1 are gone.
+            if ($certcompletion->userid == $user1->id) {
+                unset($expectedcertcompletions[$key]);
+            }
+        }
+        foreach ($expectedprogcompletions as $key => $progcompletion) {
+            // The incomplete prog completions for user1 are gone.
+            $deletedprogs = array($cert2->id, $prog2->id);
+            if ($progcompletion->userid == $user1->id && in_array($progcompletion->programid, $deletedprogs)) {
+                unset($expectedprogcompletions[$key]);
+            }
+        }
+        unset($expectedcertcompletionhistory->id);
+        unset($expectedcertcompletionhistory->timemodified);
+        $expectedcertcompletionhistory->unassigned = 1;
+
+        // Then just compare the current data with the expected.
+        $actualcertcompletions = $DB->get_records('certif_completion');
+        $actualprogcompletions = $DB->get_records('prog_completion');
+        $this->assertEquals($expectedcertcompletions, $actualcertcompletions);
+        $this->assertEquals($expectedprogcompletions, $actualprogcompletions);
+
+        // Make sure that the history record has been created.
+        $certcomplhistories = $DB->get_records('certif_completion_history');
+        $this->assertCount(1, $certcomplhistories);
+        $certcompletionhistory = reset($certcomplhistories);
+        unset($certcompletionhistory->id);
+        unset($certcompletionhistory->timemodified);
+        $this->assertEquals($expectedcertcompletionhistory, $certcompletionhistory);
     }
 }

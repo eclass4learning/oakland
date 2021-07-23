@@ -29,11 +29,11 @@ class customfield_checkbox extends customfield_base {
      * Pulls out the options for the checkbox from the database and sets the
      * the corresponding key for the data if it exists
      */
-    public function __construct($fieldid=0, $item, $prefix, $tableprefix, $addsuffix = false) {
+    public function __construct($fieldid=0, $item, $prefix, $tableprefix, $addsuffix = false, $suffix = '') {
         global $DB;
 
         // First call parent constructor.
-        parent::__construct($fieldid, $item, $prefix, $tableprefix, $addsuffix);
+        parent::__construct($fieldid, $item, $prefix, $tableprefix, $addsuffix, $suffix);
 
         if (!empty($this->field)) {
             $datafield = $DB->get_field($tableprefix.'_info_data', 'data', array($prefix.'id' => $item->id, 'fieldid' => $this->fieldid));
@@ -61,8 +61,12 @@ class customfield_checkbox extends customfield_base {
      * Display the data for this field
      */
     static function display_item_data($data, $extradata=array()) {
-        $options = new stdClass();
-        $options->para = false;
+
+        // Exporting 0 or 1
+        if (!empty($extradata['isexport'])) {
+            return (string)intval($data);
+        }
+
         if (intval($data) === 1) {
             return get_string('yes');
         } else {
@@ -93,5 +97,23 @@ class customfield_checkbox extends customfield_base {
 
         return $syncitem;
 
+    }
+
+    /**
+     * Does some extra pre-processing for totara sync uploads.
+     *
+     * @param  object $itemnew The item being saved
+     * @return object          The same item after processing
+     */
+    public function sync_data_preprocess($syncitem) {
+        $fieldname = $this->inputname;
+
+        if (!isset($syncitem->$fieldname)) {
+            return $syncitem;
+        }
+
+        $syncitem->{$fieldname} = clean_param($syncitem->{$fieldname}, PARAM_INT);
+
+        return $syncitem;
     }
 }

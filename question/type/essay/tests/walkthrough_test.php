@@ -265,11 +265,11 @@ class qtype_essay_walkthrough_testcase extends qbehaviour_walkthrough_test_base 
         // Process a response and check the expected result.
         // First we need to get the draft item ids.
         $this->render();
-        if (!preg_match('/env=editor&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/div class="qtype_essay_editorfilepicker.*?itemid" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('Editor draft item id not found.');
         }
         $editordraftid = $matches[1];
-        if (!preg_match('/env=filemanager&amp;action=browse&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/.*?[0-9]_attachments" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('File manager draft item id not found.');
         }
         $attachementsdraftid = $matches[1];
@@ -293,11 +293,11 @@ class qtype_essay_walkthrough_testcase extends qbehaviour_walkthrough_test_base 
         $this->load_quba();
 
         $this->render();
-        if (!preg_match('/env=editor&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/div class="qtype_essay_editorfilepicker.*?itemid" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('Editor draft item id not found.');
         }
         $editordraftid = $matches[1];
-        if (!preg_match('/env=filemanager&amp;action=browse&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/.*?[0-9]_attachments" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('File manager draft item id not found.');
         }
         $attachementsdraftid = $matches[1];
@@ -341,11 +341,11 @@ class qtype_essay_walkthrough_testcase extends qbehaviour_walkthrough_test_base 
         $this->load_quba();
 
         $this->render();
-        if (!preg_match('/env=editor&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/div class="qtype_essay_editorfilepicker.*?itemid" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('Editor draft item id not found.');
         }
         $editordraftid = $matches[1];
-        if (!preg_match('/env=filemanager&amp;action=browse&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/.*?[0-9]_attachments" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('File manager draft item id not found.');
         }
         $attachementsdraftid = $matches[1];
@@ -389,11 +389,11 @@ class qtype_essay_walkthrough_testcase extends qbehaviour_walkthrough_test_base 
         // Process a response and check the expected result.
         // First we need to get the draft item ids.
         $this->render();
-        if (!preg_match('/env=editor&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/div class="qtype_essay_editorfilepicker.*?itemid" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('Editor draft item id not found.');
         }
         $editordraftid = $matches[1];
-        if (!preg_match('/env=filemanager&amp;action=browse&amp;.*?itemid=(\d+)&amp;/', $this->currentoutput, $matches)) {
+        if (!preg_match('/.*?[0-9]_attachments" value="(\d+)"/', $this->currentoutput, $matches)) {
             throw new coding_exception('File manager draft item id not found.');
         }
         $attachementsdraftid = $matches[1];

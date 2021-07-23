@@ -201,6 +201,10 @@ function tm_message_send($eventdata) {
         tm_message_set_default_message_preferences($eventdata->userto);
     }
 
+    // Most likely all totara messages are outside the course, if not they need to be fixed.
+    if (!isset($eventdata->courseid)) {
+        $eventdata->courseid = SITEID;
+    }
     // call core message processing - this will trigger either output_totara_task output_totara_alert
     $eventdata->savedmessageid = message_send($eventdata);
 
@@ -271,7 +275,7 @@ function tm_insert_metadata($eventdata, $processorid) {
  * @return boolean success
  */
 function tm_alert_send($eventdata) {
-    global $CFG, $PAGE, $OUTPUT;;
+    global $CFG;
 
     if (empty($CFG->messaging)) {
         // Messaging currently disabled
@@ -302,18 +306,24 @@ function tm_alert_send($eventdata) {
     }
     $eventdata->notification = 1;
 
-    if (!isset($eventdata->contexturl)) {
+    if (empty($eventdata->contexturl)) {
         $eventdata->contexturl     = '';
         $eventdata->contexturlname = '';
-    }
+    } else {
+        $contexturl = $eventdata->contexturl;
+        if ($eventdata->contexturl instanceof moodle_url) {
+            $contexturl = $eventdata->contexturl->out();
+        }
+        $context_link_html = html_writer::empty_tag('br')
+            . html_writer::empty_tag('br')
+            . get_string('viewdetailshere', 'totara_message', $contexturl);
 
-    // Oakland Modifications
-    if (!empty($PAGE->theme->settings->logo)) {
-        $logourl = $PAGE->theme->setting_file_url('logo', 'logo');
-    }else{
-        $logourl = $OUTPUT->pix_url('logo', 'theme');
+        // Don't append the link if it's already appended.
+        // This can easily happen if this method is called with the same $eventdata object repeatedly.
+        if (strpos($eventdata->fullmessagehtml, $context_link_html) === false) {
+            $eventdata->fullmessagehtml .= $context_link_html;
+        }
     }
-    $eventdata->fullmessagehtml = "<div><img src='".substr($logourl,strpos($logourl,"//")+2)."' width='125' height='75'><br><br></div>" . $eventdata->fullmessagehtml;
 
     $result = tm_message_send($eventdata);
 
@@ -331,10 +341,6 @@ function tm_alert_send($eventdata) {
         // Send alert email
         if (empty($eventdata->subject)) {
             $eventdata->subject = strlen($eventdata->fullmessage) > 80 ? substr($eventdata->fullmessage, 0, 78).'...' : $eventdata->fullmessage;
-        }
-
-        if ($eventdata->contexturl) {
-            $eventdata->fullmessagehtml .= html_writer::empty_tag('br') . html_writer::empty_tag('br') . $string_manager->get_string('viewdetailshere', 'totara_message', $eventdata->contexturl, $eventdata->userto->lang);
         }
 
         // Add footer to email in the recipient language explaining how to change email preferences. However, this is only for system users.
@@ -750,7 +756,7 @@ function tm_messages_get($type, $order_by=false, $userto=false, $limit=true) {
             d.icon,
             m.contexturl,
             m.contexturlname
-            FROM ({message} m INNER JOIN  {message_working} w ON m.id = w.unreadmessageid) LEFT JOIN {message_metadata} d ON (d.messageid = m.id)
+            FROM ({message} m INNER JOIN  {message_working} w ON m.id = w.unreadmessageid) INNER JOIN {message_metadata} d ON (d.messageid = m.id)
             WHERE m.useridto = ? AND w.processorid = ?' .$order_by,
             array($userid, $processor->id), 0, $limit);
 
@@ -788,7 +794,7 @@ function tm_messages_count($type, $userto=false) {
         $msgs = $DB->get_records_sql('SELECT m.id AS count
             FROM ({message} m
             INNER JOIN {message_working} w ON m.id = w.unreadmessageid)
-            LEFT JOIN {message_metadata} d ON (d.messageid = m.id)
+            INNER JOIN {message_metadata} d ON (d.messageid = m.id)
             WHERE ' . $where,
             array($userid, $processor->id));
         return count($msgs);
@@ -803,8 +809,8 @@ function tm_set_preference_defaults() {
     set_config('totara_task_provider_totara_message_task_permitted', 'permitted', 'message');
     set_config('totara_alert_provider_totara_message_alert_permitted', 'permitted', 'message');
     set_config('totara_alert_provider_totara_message_task_permitted', 'disallowed', 'message');
-    set_config('message_provider_totara_message_alert_loggedin', 'totara_alert,email', 'message');
-    set_config('message_provider_totara_message_alert_loggedoff', 'totara_alert,email', 'message');
+    set_config('message_provider_totara_message_alert_loggedin', 'totara_alert,popup,email', 'message');
+    set_config('message_provider_totara_message_alert_loggedoff', 'totara_alert,popup,email', 'message');
     set_config('message_provider_totara_message_task_loggedin', 'totara_task,email', 'message');
     set_config('message_provider_totara_message_task_loggedoff', 'totara_task,email', 'message');
     set_config('popup_provider_totara_message_task_permitted', 'disallowed', 'message');

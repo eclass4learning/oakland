@@ -123,7 +123,7 @@ class block_totara_report_table extends block_base {
      * @return stdClass
      */
     public function get_content() {
-        global $DB, $SESSION, $CFG;
+        global $DB, $SESSION, $CFG, $OUTPUT;
 
         // Include report builder here.
         require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
@@ -180,7 +180,9 @@ class block_totara_report_table extends block_base {
         try {
             reportbuilder::overrideuniqueid($this->get_uniqueid());
             reportbuilder::overrideignoreparams(true);
-            $report = new reportbuilder($id, null, false, $sid, null, false, array(), $globalrestrictionset);
+            $config = new rb_config();
+            $config->set_sid($sid)->set_global_restriction_set($globalrestrictionset);
+            $report = reportbuilder::create($id, $config, true);
         } catch (moodle_exception $e) {
             // Don't break page if report became unavailable.
             return $this->content;
@@ -201,42 +203,53 @@ class block_totara_report_table extends block_base {
         }
 
         // Ensure that the toolbar search is disabled, as this will not work from the report block.
-        // Only sorting and paging are supported.
-        $report->toolbarsearch = false;
+        $report->hidetoolbar = true;
 
         \totara_reportbuilder\event\report_viewed::create_from_report($report)->trigger();
 
-        if (!empty($this->config->title)) {
-            $this->title = format_string($this->config->title);
-        } else {
-            $this->title = format_string($report->fullname);
+        $this->title = format_string($report->fullname);
 
-            if (!empty($savedfiltername)) {
-                $this->title .= ': ' . format_string($savedfiltername);
-            }
-        }
-
-        $countfiltered = $report->get_filtered_count();
-        $countall = $report->get_full_count();
-
-        if ($this->config->hideifnoresults && ((isset($sid) && $countfiltered == 0) || $countall == 0)) {
-            return $this->content;
+        if (!empty($savedfiltername)) {
+            $this->title .= ': ' . format_string($savedfiltername);
         }
 
         $reporturl = new moodle_url($report->report_url());
+
+        // If initial filtering is enabled then return now and show a message
+        if ($report->is_initially_hidden()) {
+            $reportname = $report->fullname;
+            $reportlink = html_writer::link($reporturl, get_string('gotoreportpage', 'block_totara_report_table'));
+            $message = get_string('reportinitialdisplayfiltered', 'block_totara_report_table', ['reportname' => $reportname, 'reportlink' => $reportlink]);
+            $message = html_writer::tag('p', $message, ['class' => 'no-results']);
+            $this->content->text = $OUTPUT->notification($message);
+            return $this->content;
+        }
+
+        $report->include_js();
         if ($sid) {
             $reporturl->param('sid', $sid);
         }
-
-        // Use output buffering so we can call the existing display_table() function.
-        ob_start();
         $report->set_baseurl($reporturl);
-        $report->display_table();
-        $output = ob_get_contents();
-        ob_end_clean();
+        /** @var totara_reportbuilder_renderer $renderer */
+        $renderer = $this->page->get_renderer('totara_reportbuilder');
+        list($reporthtml, $debughtml) = $renderer->report_html($report, 0);
+
+        // We only want to show the report if it is not empty, or if it is empty but has been filtered and has total results.
+        if (!empty($this->config->hideifnoresults)) {
+            // Done inside a nested IF just to be extremely sure the count calls aren't executed unless needed.
+            // Filtered count will do for this as it bypasses the can_display_total_count setting.
+            if ($report->get_filtered_count() == 0) {
+                return $this->content;
+            }
+        }
+
+        if ($report->has_disabled_filters()) {
+            global $OUTPUT;
+            $reporthtml = $OUTPUT->notification(get_string('filterdisabledwarning', 'totara_reportbuilder'), 'warning') . $reporthtml;
+        }
 
         // The table has already been rendered so just return the class.
-        $this->content->text = $output;
+        $this->content->text = $reporthtml;
         $this->content->footer = html_writer::link($reporturl, get_string('viewfullreport', 'block_totara_report_table'));
 
         return $this->content;

@@ -59,7 +59,7 @@ if ($type == 'course') {
     // Load course completion
     $completion = new completion_completion($params);
 
-} elseif (is_numeric($type)) {
+} else if (is_numeric($type)) {
     // Load activity completion
     $params['criteriaid'] = (int)$type;
     $completion = new completion_criteria_completion($params);
@@ -101,6 +101,8 @@ if (!empty($cmid)) {
     $data->coursemoduleid = $cmid;
     $data->completionstate = strlen($rpl) ? COMPLETION_COMPLETE : COMPLETION_INCOMPLETE;
     $data->timemodified = time();
+    $data->timecompleted = $data->timemodified;
+    $data->reaggregate = $data->timemodified;
     $cm = get_coursemodule_from_id(null, $cmid, $course->id, false, MUST_EXIST);
     $info->internal_set_data($cm, $data);
 } else {
@@ -124,7 +126,10 @@ if (strlen($rpl)) {
     ));
     $completion->update();
     \report_completion\event\rpl_deleted::create_from_rpl($user->id, $course->id, $cmid, $type)->trigger();
-    $completion->aggregate();
+
+    if ($type == 'course') {
+        $completion->aggregate();
+    }
 }
 
 // Redirect, if requested (not an ajax request)

@@ -25,19 +25,21 @@
 defined('MOODLE_INTERNAL') || die;
 
 $string['modulename'] = 'Book';
-$string['modulename_help'] = 'The book module enables a teacher to create a multi-page resource in a book-like format, with chapters and subchapters. Books can contain media files as well as text and are useful for displaying lengthy passages of information which can be broken down into sections.
+$string['modulename_help'] = 'The book module enables a trainer to create a multi-page resource in a book-like format, with chapters and subchapters. Books can contain media files as well as text and are useful for displaying lengthy passages of information which can be broken down into sections.
 
 A book may be used
 
-* To display reading material for individual modules of study
-* As a staff departmental handbook
-* As a showcase portfolio of student work';
-$string['modulename_link'] = 'mod/book/view';
+* To display reading material for individual modules/section of the course.
+* As a staff departmental handbook.
+* As a showcase portfolio of learner work.';
+$string['modulename_link'] = 'Book';
 $string['modulenameplural'] = 'Books';
 $string['pluginname'] = 'Book';
 $string['pluginadministration'] = 'Book administration';
 
 $string['toc'] = 'Table of contents';
+$string['chapterandsubchaptersdeleted'] = 'Chapter "{$a->title}" and its {$a->subchapters} subchapters were deleted';
+$string['chapterdeleted'] = 'Chapter "{$a->title}" was deleted';
 $string['customtitles'] = 'Custom titles';
 $string['customtitles_help'] = 'Normally the chapter title is displayed in the table of contents (TOC) AND as a heading above the content.
 
@@ -55,22 +57,28 @@ $string['editchapter'] = 'Edit chapter "{$a}"';
 $string['hidechapter'] = 'Hide chapter "{$a}"';
 $string['movechapterup'] = 'Move chapter up "{$a}"';
 $string['movechapterdown'] = 'Move chapter down "{$a}"';
+$string['search:activity'] = 'Book - resource information';
+$string['search:chapter'] = 'Book - chapters';
 $string['showchapter'] = 'Show chapter "{$a}"';
 $string['subchapter'] = 'Subchapter';
 $string['navimages'] = 'Images';
 $string['navoptions'] = 'Available options for navigational links';
 $string['navoptions_desc'] = 'Options for displaying navigation on the book pages';
 $string['navstyle'] = 'Style of navigation';
-$string['navstyle_help'] = '* Images - Icons are used for navigation
-* Text - Chapter titles are used for navigation';
+$string['navstyle_help'] = 'Choose from:
+
+* **Images**: Icons are used for navigation.
+* **Text**: Chapter titles are used for navigation.';
 $string['navtext'] = 'Text';
 $string['navtoc'] = 'TOC Only';
 $string['nocontent'] = 'No content has been added to this book yet.';
 $string['numbering'] = 'Chapter formatting';
-$string['numbering_help'] = '* None - Chapter and subchapter titles have no formatting
-* Numbers - Chapters and subchapter titles are numbered 1, 1.1, 1.2, 2, ...
-* Bullets - Subchapters are indented and displayed with bullets in the table of contents
-* Indented - Subchapters are indented in the table of contents';
+$string['numbering_help'] = 'The options are:
+
+* **None**: Chapter and subchapter titles have no formatting.
+* **Numbers**: Chapters and subchapter titles are numbered 1, 1.1, 1.2, 2, etc.
+* **Bullets**: Subchapters are indented and displayed with bullets in the table of contents.
+* **Indented**: Subchapters are indented in the table of contents.';
 $string['numbering0'] = 'None';
 $string['numbering1'] = 'Numbers';
 $string['numbering2'] = 'Bullets';
@@ -82,7 +90,9 @@ $string['confchapterdelete'] = 'Do you really want to delete this chapter?';
 $string['confchapterdeleteall'] = 'Do you really want to delete this chapter and all its subchapters?';
 $string['top'] = 'top';
 $string['navprev'] = 'Previous';
+$string['navprevtitle'] = 'Previous: {$a}';
 $string['navnext'] = 'Next';
+$string['navnexttitle'] = 'Next: {$a}';
 $string['navexit'] = 'Exit book';
 $string['book:addinstance'] = 'Add a new book';
 $string['book:read'] = 'View book';

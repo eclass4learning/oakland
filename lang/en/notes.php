@@ -58,13 +58,17 @@ $string['personalnotes'] = 'Personal notes';
 $string['publishstate'] = 'Context';
 $string['publishstate_help'] = 'A note\'s context determines who can see the note.
 
-* Personal - The note will be visible only to you
-* Course - The note will be visible to teachers in this course
-* Site - The note will be visible to teachers in all courses';
+* **Personal**: The note will be visible only to you.
+* **Course**: The note will be visible to trainers in this course.
+* **Site**: The note will be visible to trainers in all courses.';
 $string['selectnotestate'] = "Select note state";
 $string['site'] = 'site';
 $string['sitenotes'] = 'Site notes';
 $string['unknown'] = 'unknown';
+$string['userdataitemnotes_purge'] = 'All notes about the user';
+$string['userdataitemnotes_export_hidden'] = 'Notes not visible to the user';
+$string['userdataitemnotes_export_hidden_help'] = 'This data is not ordinarily visible to the user.';
+$string['userdataitemnotes_export_visible'] = 'Notes visible to the user';
 
 // Deprecated since Moodle 3.0.
 $string['cannotdeletepost'] = 'Error occurred while deleting post';

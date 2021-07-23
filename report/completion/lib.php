@@ -61,6 +61,52 @@ function report_completion_extend_navigation_user($navigation, $user, $course) {
 }
 
 /**
+ * Is current user allowed to access this report
+ *
+ * @private defined in lib.php for performance reasons
+ *
+ * @param stdClass $user
+ * @param stdClass $course
+ * @return bool
+ */
+function report_completion_can_access_user_report($user, $course) {
+    global $USER, $CFG;
+
+    if (empty($CFG->enablecompletion)) {
+        return false;
+    }
+
+    if ($course->id != SITEID and !$course->enablecompletion) {
+        return false;
+    }
+
+    $coursecontext = context_course::instance($course->id);
+    $personalcontext = context_user::instance($user->id);
+
+    if ($user->id == $USER->id) {
+        if ($course->showreports and (is_viewing($coursecontext, $USER) or is_enrolled($coursecontext, $USER))) {
+            return true;
+        }
+    } else if (has_capability('moodle/user:viewuseractivitiesreport', $personalcontext)) {
+        if ($course->showreports and (is_viewing($coursecontext, $user) or is_enrolled($coursecontext, $user))) {
+            return true;
+        }
+
+    }
+
+    // Check if $USER shares group with $user (in case separated groups are enabled and 'moodle/site:accessallgroups' is disabled).
+    if (!groups_user_groups_visible($course, $user->id)) {
+        return false;
+    }
+
+    if (has_capability('report/completion:view', $coursecontext)) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Return a list of page types
  * @param string $pagetype current page type
  * @param stdClass $parentcontext Block's parent context
@@ -95,9 +141,14 @@ function report_completion_myprofile_navigation(core_user\output\myprofile\tree 
         // We want to display these reports under the site context.
         $course = get_fast_modinfo(SITEID)->get_course();
     }
+
+    if (!report_completion_can_access_user_report($user, $course)) {
+        return false;
+    }
+
     if (completion_can_view_data($user->id, $course->id)) {
         $url = new moodle_url('/report/completion/user.php', array('id'=>$user->id, 'course'=>$course->id));
-        $node = new core_user\output\myprofile\node('reports', 'completetion', get_string('coursecompletion'), null, $url);
+        $node = new core_user\output\myprofile\node('reports', 'completion', get_string('coursecompletion'), null, $url);
         $tree->add_node($node);
     }
 }

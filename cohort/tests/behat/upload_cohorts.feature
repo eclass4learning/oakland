@@ -16,7 +16,7 @@ Feature: A privileged user can create cohorts using a CSV file
   @javascript
   Scenario: Upload audiences with default System context as admin
     When I log in as "admin"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Upload audiences"
     And I upload "cohort/tests/fixtures/uploadcohorts1.csv" file to "File" filemanager
     And I click on "Preview" "button"
@@ -32,12 +32,12 @@ Feature: A privileged user can create cohorts using a CSV file
     And I should see "Uploaded 6 audiences"
     And I press "Continue"
     And the following should exist in the "cohort_admin" table:
-      | Audience Name | ID        | No. of Members | Type |
+      | Audience Name | Id        | No. of Members | Type |
       | cohort name 1 | cohortid1 | 0              | Set  |
       | cohort name 2 | cohortid2 | 0              | Set  |
     And I follow "All audiences"
     And the following should exist in the "cohort_admin" table:
-      | Category      | Audience Name | ID        | No. of Members | Type |
+      | Category      | Audience Name | Id        | No. of Members | Type |
       | System        | cohort name 1 | cohortid1 | 0              | Set  |
       | System        | cohort name 2 | cohortid2 | 0              | Set  |
       | Miscellaneous | cohort name 3 | cohortid3 | 0              | Set  |
@@ -48,7 +48,7 @@ Feature: A privileged user can create cohorts using a CSV file
   @javascript
   Scenario: Upload audiences with default category context as admin
     When I log in as "admin"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Upload audiences"
     And I upload "cohort/tests/fixtures/uploadcohorts1.csv" file to "File" filemanager
     And I set the field "Default context" to "Cat 1 / Cat 3"
@@ -64,10 +64,10 @@ Feature: A privileged user can create cohorts using a CSV file
     And I press "Upload audiences"
     And I should see "Uploaded 6 audiences"
     And I press "Continue"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "All audiences"
     And the following should exist in the "cohort_admin" table:
-      | Category      | Audience Name | ID        | No. of Members | Type |
+      | Category      | Audience Name | Id        | No. of Members | Type |
       | Cat 3         | cohort name 1 | cohortid1 | 0              | Set  |
       | Cat 3         | cohort name 2 | cohortid2 | 0              | Set  |
       | Miscellaneous | cohort name 3 | cohortid3 | 0              | Set  |
@@ -84,7 +84,7 @@ Feature: A privileged user can create cohorts using a CSV file
       | user  | role    | contextlevel | reference |
       | user1 | manager | Category     | CAT1      |
     When I log in as "user1"
-    And I click on "Courses" "link" in the "Navigation" "block"
+    And I am on course index
     And I follow "Cat 1"
     And I navigate to "Audiences" node in "Category: Cat 1"
     And I follow "Upload audiences"
@@ -107,7 +107,7 @@ Feature: A privileged user can create cohorts using a CSV file
       | name   | idnumber  |
       | Cohort | cohortid2 |
     When I log in as "admin"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Upload audiences"
     And I upload "cohort/tests/fixtures/uploadcohorts1.csv" file to "File" filemanager
     And I click on "Preview" "button"
@@ -125,7 +125,7 @@ Feature: A privileged user can create cohorts using a CSV file
   @javascript
   Scenario: Upload audiences with different ways of specifying context
     When I log in as "admin"
-    And I navigate to "Audiences" node in "Site administration > Users > Accounts"
+    And I navigate to "Audiences" node in "Site administration > Audiences"
     And I follow "Upload audiences"
     And I upload "cohort/tests/fixtures/uploadcohorts2.csv" file to "File" filemanager
     And I click on "Preview" "button"

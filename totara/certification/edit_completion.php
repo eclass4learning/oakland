@@ -21,7 +21,7 @@
  * @package totara_certification
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot . '/totara/certification/lib.php');
 require_once($CFG->dirroot . '/totara/program/lib.php');
@@ -53,7 +53,7 @@ if (!$certification) {
 $user = $DB->get_record('user', array('id' => $userid), '*', MUST_EXIST);
 
 $url = new moodle_url('/totara/certification/edit_completion.php', array('id' => $id, 'userid' => $userid));
-$PAGE->set_context($programcontext);
+$PAGE->set_program($program);
 
 if ($dismissedexceptions = $program->check_user_for_dismissed_exceptions($userid)) {
     $resetexception = optional_param('resetexception', 0, PARAM_INT);
@@ -107,6 +107,7 @@ if ($certcompletion && $progcompletion && empty($exceptions) && !$dismissedexcep
     $currentformdata->timecompleted = $certcompletion->timecompleted;
     $currentformdata->timewindowopens = $certcompletion->timewindowopens;
     $currentformdata->timeexpires = $certcompletion->timeexpires;
+    $currentformdata->baselinetimeexpires = $certcompletion->baselinetimeexpires;
     $currentformdata->progstatus = $progcompletion->status;
     $currentformdata->progtimecompleted = $progcompletion->timecompleted;
 
@@ -174,6 +175,22 @@ if ($certcompletion && $progcompletion && empty($exceptions) && !$dismissedexcep
                 if ($currentformdata->state == CERTIFCOMPLETIONSTATE_CERTIFIED && $newstate != CERTIFCOMPLETIONSTATE_CERTIFIED) {
                     prog_reset_course_set_completions($id, $userid);
                 }
+
+                // Trigger an event to notify any listeners that the user state has been edited.
+                $event = \totara_certification\event\certification_completionstateedited::create(
+                    array(
+                        'objectid' => $id,
+                        'context' => context_program::instance($id),
+                        'userid' => $userid,
+                        'other' => array(
+                            'oldstate' => $currentformdata->state,
+                            'newstate' => $newstate,
+                            'changedby' => $USER->id
+                        ),
+                    )
+                );
+                $event->trigger();
+
                 totara_set_notification(get_string('completionchangessaved', 'totara_program'),
                     $url,
                     array('class' => 'notifysuccess'));
@@ -185,7 +202,7 @@ if ($certcompletion && $progcompletion && empty($exceptions) && !$dismissedexcep
         }
     }
 
-    // Init form core js before certification.
+    // Init form core js.
     $args = $editform->_form->getLockOptionObject();
     if (count($args[1]) > 0) {
         $PAGE->requires->js_init_call('M.form.initFormDependencies', $args, false, moodleform::get_js_module());
@@ -207,14 +224,16 @@ $heading = get_string('completionsforuserinprog', 'totara_program',
     array('user' => fullname($user), 'prog' => format_string($program->fullname)));
 
 // Javascript includes.
-$jsmodule = array(
-    'name' => 'totara_editcertcompletion',
-    'fullpath' => '/totara/certification/edit_completion.js');
-$PAGE->requires->js_init_call('M.totara_editcertcompletion.init', array(), false, $jsmodule);
-$PAGE->requires->strings_for_js(
-    array('notapplicable', 'perioddays', 'periodweeks', 'periodmonths', 'periodyears'), 'totara_certification');
-$PAGE->requires->strings_for_js(
-    array('bestguess', 'confirmdeletecompletion'), 'totara_program');
+if (isset($editform)) {
+    $jsmodule = array(
+        'name' => 'totara_editcertcompletion',
+        'fullpath' => '/totara/certification/edit_completion.js');
+    $PAGE->requires->js_init_call('M.totara_editcertcompletion.init', array(), false, $jsmodule);
+    $PAGE->requires->strings_for_js(
+        array('notapplicable', 'perioddays', 'periodweeks', 'periodmonths', 'periodyears'), 'totara_certification');
+    $PAGE->requires->strings_for_js(
+        array('bestguess', 'confirmdeletecompletion'), 'totara_program');
+}
 
 $PAGE->requires->strings_for_js(array('fixconfirmone', 'fixconfirmtitle'), 'totara_program');
 $PAGE->requires->js_call_amd('totara_program/check_completion', 'init');
@@ -227,8 +246,35 @@ $completionurl = new moodle_url('/totara/program/completion.php', array('id' => 
 echo html_writer::tag('ul', html_writer::tag('li', html_writer::link($completionurl,
     get_string('completionreturntocertification', 'totara_certification'))));
 
-// Display if and how this user is assigned, or otherwise why they might have the completion record.
-echo $OUTPUT->notification($program->display_completion_record_reason($user, $progcompletion), 'notifymessage');
+// Display if and how this user is assigned.
+echo $OUTPUT->notification($program->display_completion_record_reason($user), 'notifymessage');
+
+// If either of the completion records is missing but should be there then provide a link to fix it.
+$missingcompletionrs = certif_find_missing_completions($program->id, $userid);
+if ($missingcompletionrs->valid()) {
+    $solution = certif_get_completion_error_solution('error:missingcompletion', $program->id, $userid, true);
+    echo $OUTPUT->notification(html_writer::span($solution, 'problemsolution'), 'notifyproblem');
+}
+$missingcompletionrs->close();
+
+// If the certification completion record exists when it shouldn't then provide a link to fix it.
+$unassignedcertifcompletionrs = certif_find_unassigned_certif_completions($program->id, $userid);
+if ($unassignedcertifcompletionrs->valid()) {
+    $solution = certif_get_completion_error_solution('error:unassignedcertifcompletion', $program->id, $userid, true);
+    echo $OUTPUT->notification(html_writer::span($solution, 'problemsolution'), 'notifyproblem');
+}
+$unassignedcertifcompletionrs->close();
+
+// If the certification completion record exists when it shouldn't then provide a link to fix it.
+$orphanedexceptionsrs = prog_find_orphaned_exceptions($program->id, $userid, 'certification');
+if ($orphanedexceptionsrs->valid()) {
+    $problemkey = 'error:orphanedexception';
+    $solution = get_string($problemkey, 'totara_program') .
+        html_writer::empty_tag('br') .
+        certif_get_completion_error_solution($problemkey, $program->id, $userid, true);
+    echo $OUTPUT->notification(html_writer::span($solution, 'problemsolution'), 'notifyproblem');
+}
+$orphanedexceptionsrs->close();
 
 // Display the edit completion record form.
 if (isset($editform)) {

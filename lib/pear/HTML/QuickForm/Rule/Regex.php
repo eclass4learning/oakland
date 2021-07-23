@@ -39,6 +39,7 @@ class HTML_QuickForm_Rule_Regex extends HTML_QuickForm_Rule
                     'lettersonly'   => '/^[a-zA-Z]+$/',
                     'alphanumeric'  => '/^[a-zA-Z0-9]+$/',
                     'numeric'       => '/(^-?\d\d*\.\d*$)|(^-?\d\d*$)|(^-?\.\d\d*$)/',
+                    'integer'       => '/(^-?\d\d*$)/',
                     'nopunctuation' => '/^[^().\/\*\^\?#!@$%+=,\"\'><~\[\]{}]+$/',
                     'nonzero'       => '/^-?[1-9][0-9]*/'
                     );

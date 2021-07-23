@@ -1,4 +1,4 @@
-@totara @totara_customfield @totara_customfield_location @javascript
+@totara @totara_customfield @javascript
 Feature: Administrators can add a custom location field to complete during room / session creation
   In order for the custom field to appear during room creation
   As admin
@@ -7,6 +7,8 @@ Feature: Administrators can add a custom location field to complete during room 
   Background:
     Given I am on a totara site
     And I log in as "admin"
+    And I set the following administration settings values:
+      | catalogtype | enhanced |
 
     # Set up first custom field
     When I navigate to "Custom fields" node in "Site administration > Courses"
@@ -39,7 +41,7 @@ Feature: Administrators can add a custom location field to complete during room 
     And I click on "Save changes" "button"
 
   Scenario: Test custom location field
-    Given I click on "Find Learning" in the totara menu
+    Given I click on "Courses" in the totara menu
     And I click on "Create Course" "button"
     And I expand all fieldsets
     # Check the defaults
@@ -106,4 +108,5 @@ Feature: Administrators can add a custom location field to complete during room 
 
     When I set the field "addresslookup" to "150 Willis st"
     And I click on "Search" "button" in the "Set map location" "fieldset"
-    Then I should not see "Location not found" in the "Set map location" "fieldset"
+    # Google maps without applied key will not work.
+    #Then I should not see "Location not found" in the "Set map location" "fieldset"

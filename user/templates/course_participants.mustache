@@ -65,7 +65,7 @@
 
 <h4 class="username">{{name}}</h4>
 {{#bulkoperations}}
-<input type="checkbox" class="usercheckbox" name="user{{id}}" id="user{{id}}" />
+<input type="checkbox" class="usercheckbox" name="user{{id}}" id="user{{id}}"{{#selectall}} checked="checked"{{/selectall}} />
 <label for="user{{id}}" class="accesshide">{{bulklabel}}</label>
 {{/bulkoperations}}
 {{{image}}}

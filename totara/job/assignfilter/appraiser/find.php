@@ -21,7 +21,7 @@
  * @package totara_job
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))).'/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot.'/totara/core/dialogs/dialog_content_users.class.php');
 require_once($CFG->dirroot.'/totara/core/js/lib/setup.php');
@@ -59,6 +59,8 @@ if (!($canviewreport and $reporthasfilter)) {
 
 // Load dialog content generator
 $dialog = new totara_dialog_content_users();
+
+$dialog->urlparams = array('reportid' => $reportid);
 
 // Toggle treeview only display
 $dialog->show_treeview_only = $treeonly;

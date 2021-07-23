@@ -23,10 +23,10 @@ $CFG->sslproxy  = false;
 
 $CFG->directorypermissions = 0777;
 
-#$CFG->debug = E_ALL | E_STRICT;
-#$CFG->debugdisplay = 1;
-#ini_set('display_startup_errors', 1);
-3ini_set('display_errors', 1);
+$CFG->debug = E_ALL | E_STRICT;
+$CFG->debugdisplay = 1;
+ini_set('display_startup_errors', 1);
+ini_set('display_errors', 1);
 
 require_once(dirname(__FILE__) . '/lib/setup.php');
 

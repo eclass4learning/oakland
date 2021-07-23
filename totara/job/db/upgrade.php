@@ -28,9 +28,26 @@
  * @return  boolean $result
  */
 function xmldb_totara_job_upgrade($oldversion) {
-    global $CFG, $DB, $OUTPUT;
+    global $CFG, $DB;
 
-    $dbman = $DB->get_manager(); // Loads ddl manager and xmldb classes.
+    $dbman = $DB->get_manager();
+
+    // Totara 10 branching line.
+
+    if ($oldversion < 2018092100) {
+        // Update the indexes on the job_assignment table to remove the additional index on id
+        $table = new xmldb_table('job_assignment');
+
+        // Define new index to be removed.
+        $index = new xmldb_index('id', XMLDB_INDEX_UNIQUE, array('id'));
+        // Conditionally launch to remove the index.
+        if ($dbman->index_exists($table, $index)) {
+            $dbman->drop_index($table, $index);
+        }
+
+        // Core savepoint reached.
+        upgrade_plugin_savepoint(true, 2018092100, 'totara', 'job');
+    }
 
     return true;
 }

@@ -21,11 +21,16 @@
  * @package totara_reportbuilder
  */
 
+/**
+ * @group totara_reportbuilder
+ */
 class totara_reportbuilder_rb_global_restriction_testcase extends advanced_testcase {
     public static function setUpBeforeClass() {
         global $CFG;
         parent::setUpBeforeClass();
-        require_once("$CFG->dirroot/totara/reportbuilder/classes/rb_global_restriction.php");
+
+        require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
+        require_once($CFG->dirroot . '/totara/reportbuilder/classes/rb_global_restriction.php');
     }
 
     public function test_insert() {

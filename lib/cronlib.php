@@ -54,9 +54,6 @@ function cron_run() {
     // Increase memory limit
     raise_memory_limit(MEMORY_EXTRA);
 
-    // Emulate normal session - we use admin accoutn by default
-    cron_setup_user();
-
     // Start output log
     $timenow  = time();
     mtrace("Server Time: ".date('r', $timenow)."\n\n");
@@ -64,6 +61,10 @@ function cron_run() {
     // Run all scheduled tasks.
     while (!\core\task\manager::static_caches_cleared_since($timenow) &&
            $task = \core\task\manager::get_next_scheduled_task($timenow)) {
+
+        // Emulate normal session - we use admin account by default
+        cron_setup_user();
+
         $fullname = $task->get_name() . ' (' . get_class($task) . ')';
         mtrace('Execute scheduled task: ' . $fullname);
         cron_trace_time_and_memory();
@@ -72,6 +73,7 @@ function cron_run() {
         $pretime      = microtime(1);
         try {
             get_mailer('buffer');
+            cron_prepare_core_renderer();
             $task->execute();
             if ($DB->is_transaction_started()) {
                 throw new coding_exception("Task left transaction open");
@@ -108,6 +110,8 @@ function cron_run() {
             error_log($logerrmsg);
 
             \core\task\manager::scheduled_task_failed($task);
+        } finally {
+            cron_prepare_core_renderer(true);
         }
         get_mailer('close');
         unset($task);
@@ -116,6 +120,10 @@ function cron_run() {
     // Run all adhoc tasks.
     while (!\core\task\manager::static_caches_cleared_since($timenow) &&
            $task = \core\task\manager::get_next_adhoc_task($timenow)) {
+
+        // Emulate normal session - we use admin account by default
+        cron_setup_user();
+
         mtrace("Execute adhoc task: " . get_class($task));
         cron_trace_time_and_memory();
         $predbqueries = null;
@@ -123,6 +131,7 @@ function cron_run() {
         $pretime      = microtime(1);
         try {
             get_mailer('buffer');
+            cron_prepare_core_renderer();
             $task->execute();
             if ($DB->is_transaction_started()) {
                 throw new coding_exception("Task left transaction open");
@@ -152,6 +161,8 @@ function cron_run() {
                 mtrace(format_backtrace($e->getTrace(), true));
             }
             \core\task\manager::adhoc_task_failed($task);
+        } finally {
+            cron_prepare_core_renderer(true);
         }
         get_mailer('close');
         unset($task);
@@ -300,4 +311,44 @@ function cron_bc_hack_plugin_functions($plugintype, $plugins) {
     }
 
     return $plugins;
+}
+
+/**
+ * Prepare the output renderer for the cron run.
+ *
+ * This involves creating a new $PAGE, and $OUTPUT fresh for each task and prevents any one task from influencing
+ * any other.
+ *
+ * @param   bool    $restore Whether to restore the original PAGE and OUTPUT
+ */
+function cron_prepare_core_renderer($restore = false) {
+    global $OUTPUT, $PAGE;
+
+    // Store the original PAGE and OUTPUT values so that they can be reset at a later point to the original.
+    // This should not normally be required, but may be used in places such as the scheduled task tool's "Run now"
+    // functionality.
+    static $page = null;
+    static $output = null;
+
+    if (null === $page) {
+        $page = $PAGE;
+    }
+
+    if (null === $output) {
+        $output = $OUTPUT;
+    }
+
+    if (!empty($restore)) {
+        $PAGE = $page;
+        $page = null;
+
+        $OUTPUT = $output;
+        $output = null;
+    } else {
+        // Setup a new General renderer.
+        // Cron tasks may produce output to be used in web, so we must use the appropriate renderer target.
+        // This allows correct use of templates, etc.
+        $PAGE = new \moodle_page();
+        $OUTPUT = new \core_renderer($PAGE, RENDERER_TARGET_GENERAL);
+    }
 }

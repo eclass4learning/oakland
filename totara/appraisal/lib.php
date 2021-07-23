@@ -257,6 +257,7 @@ class appraisal {
 
         $assign = new totara_assign_appraisal('appraisal', $this);
         $assign->store_user_assignments();
+        $assign->store_job_assignments(null, false);
         $assign->store_role_assignments();
 
         $this->create_answers_table();
@@ -270,6 +271,20 @@ class appraisal {
         // Set all users active stage id to first stage.
         $stages = appraisal_stage::get_stages($this->id);
         $DB->set_field('appraisal_user_assignment', 'activestageid', reset($stages)->id, array('appraisalid' => $this->id));
+
+        // Set the schedules for all relevant messages.
+        $sql = "SELECT id FROM {appraisal_event} WHERE triggered = 0 AND event IN (:act, :due) AND appraisalid = :aid";
+        $params = array(
+            'act' => appraisal_message::EVENT_APPRAISAL_ACTIVATION,
+            'due' => appraisal_message::EVENT_STAGE_DUE,
+            'aid' => $this->id
+        );
+        $events = $DB->get_records_sql($sql, $params);
+        foreach ($events as $id => $eventdata) {
+            $eventmessage = new appraisal_message($id);
+            $eventmessage->schedule($eventmessage->get_schedule_from($time));
+            $eventmessage->save();
+        }
 
         $this->set_status(self::STATUS_ACTIVE);
         $event = \totara_appraisal\event\appraisal_activation::create(
@@ -391,19 +406,20 @@ class appraisal {
                 DEBUG_DEVELOPER);
         }
 
+        // Due to the potentially large amounts of missing roles, only the first
+        // few missing appraisee roles should be displayed.
+        $shownlimit = 10;
         $assign = new totara_assign_appraisal('appraisal', $this);
-        $missing = $assign->missing_role_assignments();
+        $missing = $assign->missing_role_assignments($shownlimit);
         if ($missing->appraiseecount === 0) {
             $err = get_string('appraisalinvalid:learners', 'totara_appraisal');
             return ['learners' => $err];
         }
 
-        // Due to the potentially large amounts of missing roles, only the first
-        // few missing appraisee roles should be displayed.
-        $shownlimit = 10;
-        $allmissing = $missing->roles;
-        $shown = array_slice($allmissing, 0, $shownlimit, true);
-
+        $shown = $missing->roles;
+        if (empty($shown)) {
+            return [];
+        }
         $fullnames = [];
         foreach (user_get_users_by_id(array_keys($shown)) as $user) {
             $fullnames[$user->id] = fullname($user);
@@ -414,27 +430,30 @@ class appraisal {
         foreach ($shown as $appraiseeid => $roles) {
             $csv = array_reduce(
                 $roles,
-
                 function ($accumulated, $role) use ($roledesc) {
                     $desc = get_string($roledesc[$role], 'totara_appraisal');
                     return empty($accumulated) ? $desc : "$accumulated, $desc";
                 },
-
                 ''
             );
 
             $param = new stdClass();
             $param->user = $fullnames[$appraiseeid];
             $param->role = $csv;
+            if (in_array($appraiseeid, $missing->nojobselected)) {
+                $translationkey = 'appraisalinvalid:missingjob';
+            } else {
+                $translationkey = 'appraisalinvalid:missingrole';
+            }
             $error = get_string(
-                'appraisalinvalid:missingrole', 'totara_appraisal', $param
+                $translationkey, 'totara_appraisal', $param
             );
 
             $count = count($war);
             $war["missingroles$count"] = $error;
         }
 
-        $excess = count($allmissing) - count($shown);
+        $excess = $missing->appraiseecount - $missing->validappraiseecount - count($shown);
         if ($excess > 0) {
             $err = get_string('xmoremissingroles', 'totara_appraisal', $excess);
             $war['missingrolesmore'] = $err;
@@ -454,6 +473,15 @@ class appraisal {
         $assignment->store_role_assignment_for_appraisee($appraiseeid);
     }
 
+    /**
+     * Check if automatic job assignment can be done.
+     *
+     * @return bool
+     */
+    public static function can_auto_link_job_assignments(): bool {
+        // If multiple job assignments are allowed, auto-linking should not happen.
+        return empty(get_config(null, 'totara_job_allowmultiplejobs'));
+    }
 
     /**
      * Update user and role assignments for a live appraisal.
@@ -469,6 +497,24 @@ class appraisal {
 
         $assign = new totara_assign_appraisal('appraisal', $this);
 
+        // Remember new appraisee ids for potential job assignment linking below.
+        // Also need to get new appraisees so that activation notifications can
+        // be sent out.
+        $linkjobappraiseeids = [];
+        $appraiseestonotify = [];
+
+        $added = $assign->get_unstored_users();
+        if ($added->valid()) {
+            foreach ($added as $newappraisee) {
+                $appraiseestonotify[] = $newappraisee->id;
+
+                if (self::can_auto_link_job_assignments()) {
+                    $linkjobappraiseeids[] = $newappraisee->id;
+                }
+            }
+        }
+        $added->close();
+
         // Create user assignments and role assignments for new users.
         $added = $assign->get_unstored_users();
         if ($added->valid()) {
@@ -479,9 +525,28 @@ class appraisal {
             $DB->set_field('appraisal_user_assignment', 'activestageid', reset($stages)->id, array('appraisalid' => $this->id, 'activestageid' => null));
         }
 
+        // Link job assignments if required. The manager is not notified at this
+        // time; this will done when the notification is sent to the appraisees
+        // below.
+        $assign->store_job_assignments($linkjobappraiseeids, false);
+
         // Find old user assignments that need to be reactivated.
-        list($assignjoinsql, $assignparams, $assignalias) = $assign->get_users_from_assignments_sql('u', 'id');
         list($groupjoinsql, $groupparams, $groupalias) = $assign->get_users_from_groups_sql('u', 'id');
+
+        // If old user previously completed the appraisal, timecompleted will be not null.
+        // Restore these to status COMPLETED.
+        $sql = "UPDATE {appraisal_user_assignment}
+                   SET status = ?
+                 WHERE status = ?
+                   AND appraisalid = ?
+                   AND timecompleted IS NOT NULL
+                   AND userid IN (
+                       SELECT u.id
+                         FROM {user} u
+                       " . $groupjoinsql . "
+                   )";
+        $params = array_merge(array(self::STATUS_COMPLETED, self::STATUS_CLOSED, $this->id), $groupparams);
+        $DB->execute($sql, $params);
 
         $sql = "UPDATE {appraisal_user_assignment}
                    SET status = ?
@@ -579,26 +644,62 @@ class appraisal {
                 }
             }
         }
+
+        if (!empty($appraiseestonotify)) {
+            // Unfortunately there are many independent threads of control when
+            // it comes to firing activation notifications: cron, this method and
+            // appraisal_user_assignment::send_manager_messages(). Hence the
+            // 'triggered' condition here:
+            // - for static appraisals:
+            //   - initially, the appraisal event would NOT be marked as
+            //     "triggered"
+            //   - cron would then tell the appraisee and manager and mark the
+            //     event as "triggered".
+            //   - Therefore this part of the code does not need to do anything.
+            // - for dynamic appraisals:
+            //   - initially, the appraisal event would NOT be marked as
+            //     "triggered"
+            //   - cron would only send the notification to the appraisees that
+            //     were assigned BEFORE activation BUT WOULD STILL MARK THE EVENT
+            //     AS "triggered". The event would not fire again.
+            //   - This method must then send out notifications to the newly
+            //     assigned appraisees.
+            //
+            // Complicating the mess even further, the UI allows the admin to
+            // define multiple, independent message "instances" for a single
+            // activation. So it is possible for the appraisee to get multiple
+            // emails about the same appraisal activation.
+            $filters = [
+                'event' => appraisal_message::EVENT_APPRAISAL_ACTIVATION,
+                'appraisalid' => $this->id,
+                'triggered' => true
+            ];
+            foreach ($DB->get_records("appraisal_event", $filters) as $event) {
+                $msg = new appraisal_message($event->id);
+                $msg->event_appraisal($this->id);
+
+                foreach ($appraiseestonotify as $appraisee) {
+                    $msg->send_user_specific_message($appraisee);
+                }
+            }
+        }
     }
 
     /**
-     * Check for user assignments with missing roles.
+     * Get the appraisal expected completed date, (the due date of the last stage).
      *
-     * @deprecated since 9.0
-     * @throws coding_exception
+     * @return int timestamp
      */
-    public function get_missingrole_users() {
-        throw new coding_exception('get_missingrole_users has been deprecated since 9.0. Use functions from totara_assign_appraisal instead.');
-    }
+    public function get_expected_completion_date() {
+        global $DB;
 
-    /**
-     * Get role changes for user assignments for the current appraisal
-     *
-     * @deprecated since 9.0
-     * @throws coding_exception
-     */
-    public function get_changedrole_users() {
-        throw new coding_exception('get_changedrole_users has been deprecated since 9.0. Use functions from totara_assign_appraisal instead.');
+        $sql = "SELECT MAX(timedue) AS due_date
+                  FROM {appraisal_stage}
+                 WHERE appraisalid = :appraisalid";
+        $params = array('appraisalid' => $this->id);
+        $record = $DB->get_record_sql($sql, $params);
+
+        return $record->due_date;
     }
 
     /**
@@ -611,91 +712,15 @@ class appraisal {
         global $DB;
 
         if (isset($formdata->sendalert) && $formdata->sendalert) {
-            $alert = new stdClass();
-            $alert->userfrom = core_user::get_support_user();
-            $alert->fullmessageformat = FORMAT_HTML;
-            $formdata->alertbody = $formdata->alertbody_editor['text'];
-
-            // Send message to learners.
-            $alert->subject = $formdata->alerttitle;
-            $alert->fullmessage = $formdata->alertbody;
-            $alert->fullmessagehtml = $alert->fullmessage;
-
-            $learnersql = "SELECT u.*
-                            FROM {appraisal_user_assignment} aua
-                       LEFT JOIN {user} u
-                              ON aua.userid = u.id
-                           WHERE aua.appraisalid = :appraisalid
-                             AND aua.timecompleted IS NULL
-                             AND aua.status = :status";
-            $learnerparams = array('appraisalid' => $formdata->id, 'status' => self::STATUS_ACTIVE);
-            $learners = $DB->get_records_sql($learnersql, $learnerparams);
-
-            foreach ($learners as $learner) {
-                $alert->userto = $learner;
-                tm_alert_send($alert);
-            }
-
-            // Send message to role users (other than learners, and only one message per user).
-            $alert->subject = get_string('closealerttitledefault', 'totara_appraisal', $this);
-
-            // Find all users in roles that are not learner, who have a learner who is not finished.
-            $rolesql = 'SELECT ara.userid AS id,
-                           ' . sql_group_concat(sql_cast2char('usr.id'),',') . ' AS staff
-                      FROM {appraisal_user_assignment} aua
-                      JOIN {appraisal_role_assignment} ara
-                        ON aua.id = ara.appraisaluserassignmentid
-                      JOIN {user} usr
-                        ON aua.userid = usr.id
-                     WHERE aua.timecompleted IS NULL
-                       AND aua.appraisalid = :appraisalid
-                       AND aua.status = :status
-                       AND ara.appraisalrole != :roletype
-                       AND ara.userid <> 0
-                  GROUP BY ara.userid';
-            $roleparams = array('appraisalid' => $formdata->id, 'status' => self::STATUS_ACTIVE, 'roletype' => self::ROLE_LEARNER);
-            $roleusers = $DB->get_records_sql($rolesql, $roleparams);
-
-            // Collect all distinct staff ids.
-            $staffids = array();
-            foreach ($roleusers as $roleuser) {
-                $ids = explode(',', $roleuser->staff);
-                $staffids = array_merge($staffids, $ids);
-            }
-
-            if ($staffids) {
-                // Get data from DB for staff names.
-                $userfieldssql = get_all_user_name_fields(true);
-                list($staffsql, $staffparams) = $DB->get_in_or_equal($staffids);
-                $staff = $DB->get_records_sql("SELECT id, {$userfieldssql} FROM {user} WHERE id {$staffsql}", $staffparams);
-            } else {
-                $staff = array();
-            }
-
-            unset($staffids);
-
-            // Create array of staff names keyed by id.
-            $staffnames = array();
-            foreach ($staff as $staffmember) {
-                $staffnames[$staffmember->id] = fullname($staffmember);
-            }
-
-            foreach ($roleusers as $roleuser) {
-                $staff = explode(',', $roleuser->staff);
-
-                $affectedstaff = array();
-                foreach ($staff as $staffmember) {
-                    $affectedstaff[] = $staffnames[$staffmember];
-                }
-
-                $formdata->staff = implode(', ', $affectedstaff);
-                $alert->fullmessage = get_string('closealertadminbody', 'totara_appraisal', $formdata);
-
-                $alert->fullmessagehtml = $alert->fullmessage;
-                // Get full user record for message.
-                $alert->userto = core_user::get_user($roleuser->id);
-                tm_alert_send($alert);
-            }
+            // Set up a closure message to send on the next cron run.
+            // Note: There is a custom send function for closure messages, which doesn't use a lot of this data.
+            $msg = new appraisal_message();
+            $msg->event_appraisal($formdata->id, appraisal_message::EVENT_APPRAISAL_CLOSURE);
+            $msg->set_delta(0, 1); // O days.
+            $msg->set_roles(array(1, 2, 4, 8), appraisal_message::MESSAGE_SEND_ONLY_INCOMPLETE);
+            $msg->set_message(0, $formdata->alerttitle, $formdata->alertbody_editor['text']);
+            $msg->schedule($msg->get_schedule_from(time()));
+            $msg->save();
         }
 
         // Mark the status as closed for the appraisal.
@@ -704,7 +729,6 @@ class appraisal {
         // Mark the status as closed for all user assignments.
         $sql = "UPDATE {appraisal_user_assignment} SET status = ? WHERE status = ? AND appraisalid = ?";
         $DB->execute($sql, array(self::STATUS_CLOSED, self::STATUS_ACTIVE, $this->id));
-
     }
 
 
@@ -744,6 +768,20 @@ class appraisal {
                 $DB->update_record('appraisal_quest_data_'.$this->id, $answers);
             }
         }
+
+        $event = \totara_appraisal\event\appraisal_role_page_saved::create(
+            array(
+                'objectid' => $this->id,
+                'context' => context_system::instance(),
+                // 'userid' is the user who performed the action, defaults to $USER->id.
+                'relateduserid' => $roleassignment->subjectid, // Learner whose appraisal this is.
+                'other' => array(
+                    'pageid' => $pageid,
+                    'role' => $roleassignment->appraisalrole,
+                )
+            )
+        );
+        $event->trigger();
 
         if ($updateprogress) {
             // Check if page is valid and user wants to go to next page.
@@ -786,12 +824,53 @@ class appraisal {
      * @return stdClass
      */
     public function import_answers($pageid, stdClass $questdata, appraisal_role_assignment $roleassignment) {
+        global $CFG;
+
         $records = appraisal_question::fetch_page($pageid);
         $answers = new stdClass();
         foreach ($records as $record) {
             $question = new appraisal_question($record->id, $roleassignment);
             if ($question->get_element()->get_type() == 'redisplay') {
                 $question = new appraisal_question($question->get_element()->param1, $roleassignment);
+            }
+
+            if ($question->get_element()->get_type() == "goals") {
+                // If a learner's reporting hierarchy changes after a dynamic
+                // appraisal is completed, the new reporting hierarchy sees the
+                // the completed appraisal and the old hierarchy cannot see it.
+                // For static appraisals, the new reporting hierarchy will not
+                // be able to see any appraisal - whether active or not. But the
+                // appraisals will be visible to the old hierarchy and the goals
+                // module must then check against the old hierarchy with respect
+                // to access rights.
+                if (!$CFG->dynamicappraisals) {
+                    $finder = function ($subjectid) {
+                        $managerids = [];
+                        $teamleaderids = [];
+                        $appraiserids = [];
+
+                        $roles = $this->get_user_roles_involved(0, $subjectid);
+                        foreach ($roles as $role) {
+                            switch ($role->appraisalrole) {
+                                case self::ROLE_MANAGER:
+                                    $managerids[] = $role->userid;
+                                    break;
+
+                                case self::ROLE_TEAM_LEAD:
+                                    $teamleaderids[] = $role->userid;
+                                    break;
+
+                                case self::ROLE_APPRAISER:
+                                    $appraiserids[] = $role->userid;
+                                    break;
+                            }
+                        }
+
+                        return [$managerids, $teamleaderids, $appraiserids];
+                    };
+
+                    $question->get_element()->set_reporting_hierarchy_finder($finder);
+                }
             }
             $answers = $question->get_element()->set_as_db($questdata)->get_as_form($answers, true);
         }
@@ -954,7 +1033,7 @@ class appraisal {
                         WHERE aua.userid = ?
                           AND aua.appraisalid = ?
                           AND appraisalrole {$insql}";
-        $missingparams = array_merge(array($subjectid, $this->appraisalid), $inparam);
+        $missingparams = array_merge(array($subjectid, $this->id), $inparam);
         return $DB->get_records_sql($missingsql, $missingparams);
     }
 
@@ -1079,7 +1158,7 @@ class appraisal {
     public function delete_all_snapshots() {
         $context = context_system::instance();
         $fs = get_file_storage();
-        $fs->delete_area_files($context->id, 'totara_appraisal', 'snapshot_', $this->id);
+        $fs->delete_area_files($context->id, 'totara_appraisal', 'snapshot_'.$this->id);
     }
 
     /**
@@ -1186,36 +1265,6 @@ class appraisal {
             self::ROLE_TEAM_LEAD => 'roleteamlead',
             self::ROLE_APPRAISER => 'roleappraiser'
             );
-        return $roles;
-    }
-
-    /**
-     * Get the current position assignments for a users appraisal role assignments
-     *
-     * With the change to job assignments, this will only get values for the first job assignment.
-     * Use job assignment code to get these values for all or specific job assignments as needed.
-     *
-     * @deprecated since 9.0
-     * @param int userid The id of the user to get the current assignments for
-     * @return array(appraisal::ROLE_* => userid)
-     */
-    public static function get_live_role_assignments($userid) {
-
-        debugging('appraisal::get_live_role_assignments has been deprecated since 9.0. Use job assignment code to get values for these roles.',
-            DEBUG_DEVELOPER);
-
-        $jobassignment = \totara_job\job_assignment::get_first($userid);
-        $managerid = $jobassignment->managerid;
-        $teamleaderid = $jobassignment->teamleaderid;
-        $appraiserid = $jobassignment->appraiserid;
-
-        $roles = array(
-            self::ROLE_LEARNER => $userid,
-            self::ROLE_MANAGER => $managerid ? $managerid : 0,
-            self::ROLE_TEAM_LEAD => $teamleaderid ? $teamleaderid : 0,
-            self::ROLE_APPRAISER => $appraiserid ? $appraiserid : 0,
-        );
-
         return $roles;
     }
 
@@ -1679,7 +1728,20 @@ class appraisal {
     public static function get_user_appraisals($subjectid, $role, $status = array()) {
         global $DB, $USER;
         $params = array($USER->id, $role);
-        $sql = 'SELECT ' . $DB->sql_concat(sql_cast2char('a.id'), "'_'", sql_cast2char('aua.userid')) . ' AS uniqueid,
+        $aidchar    = $DB->sql_cast_2char('a.id');
+        $useridchar = $DB->sql_cast_2char('aua.userid');
+
+        $join_user = '';
+        $used_name_fields_group_by = '';
+        $used_name_fields_order_by = '';
+        // Also order by user name fields when result can have more than one learner.
+        if ($role !== self::ROLE_LEARNER) {
+            $join_user = ' JOIN {user} u ON (u.id = aua.userid) ';
+            $used_name_fields_group_by = ', ' . totara_get_all_user_name_fields(true, 'u', null, null, true);
+            $used_name_fields_order_by = ', ' . $DB->sql_concat_join("' '", totara_get_all_user_name_fields_join('u', null, true));
+        }
+
+        $sql = 'SELECT ' . $DB->sql_concat($aidchar, "'_'", $useridchar) . ' AS uniqueid,
                        a.id, aua.userid, a.name, a.timestarted, aua.status, MAX(ast.timedue) AS timedue, aua.timecompleted,
                        ara.id as roleassignmentid
                   FROM {appraisal} a
@@ -1687,6 +1749,7 @@ class appraisal {
                     ON (aua.appraisalid = a.id)
                   JOIN {appraisal_role_assignment} ara
                     ON (ara.appraisaluserassignmentid = aua.id)
+                  ' . $join_user . '
                   LEFT JOIN {appraisal_stage} ast ON (ast.appraisalid = a.id)
                  WHERE ara.userid = ?
                    AND ara.appraisalrole = ?';
@@ -1700,7 +1763,10 @@ class appraisal {
             $params = array_merge($params, $paramstatus);
         }
         $sql .= ' GROUP BY a.id, aua.userid, a.name, a.timestarted, aua.status, aua.timecompleted, ara.id
-                  ORDER BY CASE WHEN aua.timecompleted IS NULL AND aua.status = ? THEN 0 ELSE 1 END, a.timestarted DESC';
+                  ' . $used_name_fields_group_by . '
+                  ORDER BY CASE WHEN aua.timecompleted IS NULL AND aua.status = ? THEN 0 ELSE 1 END, a.timestarted DESC
+                  ' . $used_name_fields_order_by;
+
         $params[] = self::STATUS_ACTIVE;
         $appraisals = $DB->get_records_sql($sql, $params);
         return $appraisals;
@@ -1750,7 +1816,7 @@ class appraisal {
                 $DB->delete_records('appraisal_scale_data', array('appraisalroleassignmentid' => $roleassignmentid));
                 $DB->delete_records('appraisal_quest_data_' . $appraisalid, array('appraisalroleassignmentid' => $roleassignmentid));
                 $DB->delete_records('appraisal_stage_data', array('appraisalroleassignmentid' => $roleassignmentid));
-                $fs->delete_area_files($context->id, 'totara_appraisal', 'snapshot_', $appraisalid, $roleassignmentid);
+                $fs->delete_area_files($context->id, 'totara_appraisal', "snapshot_$appraisalid", $roleassignmentid);
             }
 
             $DB->delete_records('appraisal_role_assignment', array('appraisaluserassignmentid' => $userassignmentid));
@@ -1765,14 +1831,21 @@ class appraisal {
      * Unassign all role_assignments for a given user, but retain associated data.
      *
      * @param int $userid   - The id of the user to run this for.
+     * @param bool $includeownappraisals true if learner role assignments should also be removed.
      */
-    public static function unassign_user_roles($userid) {
+    public static function unassign_user_roles($userid, bool $includeownappraisals = true) {
         global $DB;
 
         $transaction = $DB->start_delegated_transaction();
 
         // Flag all data associated with other users assignments as deleted but keep the data.
-        $roles = $DB->get_records('appraisal_role_assignment', array('userid' => $userid));
+        if ($includeownappraisals) {
+            $roles = $DB->get_records('appraisal_role_assignment', array('userid' => $userid));
+        } else {
+            $select = "userid = :userid AND appraisalrole <> :rolelearner";
+            $params = array('userid' => $userid, 'rolelearner' => self::ROLE_LEARNER);
+            $roles = $DB->get_records_select('appraisal_role_assignment', $select, $params);
+        }
 
         // Create role changed records for all the roles.
         $todb = new stdClass();
@@ -1788,15 +1861,21 @@ class appraisal {
         }
 
         // Unassign all the users role assignments.
-        $sql = "UPDATE {appraisal_role_assignment} SET userid = 0 WHERE userid = ?";
-        $DB->execute($sql, array($userid));
+        if ($includeownappraisals) {
+            $sql = "UPDATE {appraisal_role_assignment} SET userid = 0 WHERE userid = ?";
+            $DB->execute($sql, array($userid));
+        } else {
+            $sql = "UPDATE {appraisal_role_assignment} SET userid = 0 WHERE userid = :userid AND appraisalrole <> :rolelearner";
+            $params = array('userid' => $userid, 'rolelearner' => self::ROLE_LEARNER);
+            $DB->execute($sql, $params);
+        }
 
         $transaction->allow_commit();
     }
 
 
     /**
-     * Get array of appraisals with their start dates and number of learners
+     * Get array of appraisals with their start dates, number of assigned and completed learners
      *
      * @return array
      */
@@ -1809,12 +1888,23 @@ class appraisal {
             if ($appraisal->status == self::STATUS_DRAFT) {
                 $assign = new totara_assign_appraisal('appraisal', new appraisal($appraisal->id));
                 $appraisal->lnum = $assign->get_current_users_count();
-            } else if ($appraisal->status == self::STATUS_ACTIVE) {
-                $params = array('appraisalid' => $appraisal->id, 'status' => self::STATUS_ACTIVE);
-                $appraisal->lnum = $DB->count_records('appraisal_user_assignment', $params);
+                // Not yet activated, so no completed appraisals.
+                $appraisal->cnum = 0;
             } else {
-                $params = array('appraisalid' => $appraisal->id);
-                $appraisal->lnum = $DB->count_records('appraisal_user_assignment', $params);
+                // Restricting the counts to consider only non-closed assignments.
+                // This ensures the numbers are consistent with what is shown in the 'Assignments' tab.
+                $params = array('appraisalid' => $appraisal->id, 'status' => self::STATUS_CLOSED);
+                $sql = "SELECT count(completed) AS total, coalesce(sum(completed), 0) AS completed
+                          FROM (SELECT CASE
+                                        WHEN timecompleted IS NOT NULL THEN 1
+                                        ELSE 0
+                                       END AS completed
+                                  FROM {appraisal_user_assignment} ua
+                                 WHERE ua.appraisalid = :appraisalid
+                                   AND ua.status <> :status) AS assignments";
+                $row = $DB->get_record_sql($sql, $params);
+                $appraisal->lnum = $row->total;
+                $appraisal->cnum = $row->completed;
             }
         }
         return $appraisals;
@@ -2001,15 +2091,26 @@ class appraisal {
     public static function get_inactive_with_stats() {
         global $DB;
 
+        // We should not count completed appraisal_user_assignment rows with status CLOSED as completed
+        // These indicate that although the user has completed the appraisal, he was later removed from the
+        // assigned user group(s) and will be shown to have status 'Assignment Cancelled' in the reports.
         $sql = 'SELECT app.id, app.name, app.status, app.timefinished,
-                       COUNT(aua.timecompleted) AS userscomplete, COUNT(aua.id) AS userstotal
+                       COUNT(aua.timecompleted) - COUNT(aca.timecompleted) AS userscomplete,
+                       COUNT(aua.id) - COUNT(aca.timecompleted) AS userstotal
                   FROM {appraisal} app
                   JOIN {appraisal_user_assignment} aua
                     ON app.id = aua.appraisalid
-                 WHERE app.status IN (?, ?)
+                  LEFT JOIN {appraisal_user_assignment} aca
+                    ON aua.id = aca.id
+                   AND aca.status = :statusclosed1
+                   AND aca.timecompleted IS NOT NULL
+                 WHERE app.status IN (:statusclosed2, :statuscompleted)
                  GROUP BY app.id, app.name, app.status, app.timefinished';
+        $params = array('statusclosed1' => self::STATUS_CLOSED,
+                        'statusclosed2' => self::STATUS_CLOSED,
+                        'statuscompleted' => self::STATUS_COMPLETED);
 
-        return $DB->get_records_sql($sql, array(self::STATUS_CLOSED, self::STATUS_COMPLETED));
+        return $DB->get_records_sql($sql, $params);
     }
 
     /**
@@ -2064,6 +2165,69 @@ class appraisal {
         }
     }
 
+    /**
+     * This is the code used by the totara appraisal scheduled_messages task.
+     * It loops through all the appraisal messages that are scheduled
+     * and attempts to send them.
+     *
+     * @param $time timestamp - this should really only be set in tests
+     */
+    public static function send_scheduled($time = 0) {
+        global $DB, $CFG;
+
+        if (empty($time)) {
+            $time = time();
+        }
+
+        // Execute the cron if Appraisals are not disabled or static.
+        if (totara_feature_disabled('appraisals')) {
+            return;
+        }
+
+        $active = \appraisal::STATUS_ACTIVE;
+        $closed = \appraisal::STATUS_CLOSED;
+
+        $asql = "SELECT ae.*, a.status as appstat
+                  FROM {appraisal_event} ae
+                  JOIN {appraisal} a
+                    ON ae.appraisalid = a.id
+                 WHERE ae.triggered = :trig
+                   AND ae.timescheduled > 0
+                   AND ae.timescheduled <= :now
+               ";
+        $aparams = array('trig' => 0, 'now' => $time);
+        $aevents = $DB->get_records_sql($asql, $aparams);
+        foreach ($aevents as $aevent) {
+            if ($aevent->appstat == $active) {
+                // Handle regular messages.
+                $event = new \appraisal_message($aevent->id);
+                $event->send_appraisal_wide_message();
+            } else if ($aevent->appstat == $closed && $aevent->event == \appraisal_message::EVENT_APPRAISAL_CLOSURE) {
+                // Handle closure messages.
+                $event = new \appraisal_message($aevent->id);
+                $event->send_appraisal_wide_closure_message();
+            }
+        }
+
+        // Then do scheduled messages that go to specific users.
+        // Timescheduled in aue must always be set and triggered in ae is not relevant to these events.
+        $usql = "SELECT ae.id, aue.userid, aue.timescheduled
+                  FROM {appraisal_event} ae
+            INNER JOIN {appraisal} a
+                    ON ae.appraisalid = a.id
+                  JOIN {appraisal_user_event} aue
+                    ON aue.eventid = ae.id
+                 WHERE a.status = :stat";
+        $uparams = array('stat' => $active);
+        $uevents = $DB->get_records_sql($usql, $uparams);
+        foreach ($uevents as $uevent) {
+            $event = new \appraisal_message($uevent->id);
+            $event->schedule($uevent->timescheduled); // Use user-specific timescheduled for is_time calculation.
+            if ($event->is_time($time)) {
+                $event->send_user_specific_message($uevent->userid);
+            }
+        }
+    }
 }
 
 
@@ -2081,7 +2245,7 @@ class appraisal_stage {
     /**
      * Appraisal id that this stage is related to
      *
-     * @var type
+     * @var int
      */
     public $appraisalid = null;
 
@@ -2511,7 +2675,7 @@ class appraisal_stage {
                   JOIN {appraisal_quest_field} aqf
                     ON asp.id = aqf.appraisalstagepageid
                   JOIN {appraisal_quest_field} aqfr
-                    ON " . sql_cast2char('aqf.id') . ' = ' . $DB->sql_compare_text('aqfr.param1') . "
+                    ON " . $DB->sql_cast_2char('aqf.id') . ' = ' . $DB->sql_compare_text('aqfr.param1') . "
                  WHERE asp.appraisalstageid = ?";
 
         return $DB->count_records_sql($sql, array($stageid));
@@ -2555,33 +2719,89 @@ class appraisal_stage {
      * @param appraisal_role_assignment $roleassignment
      */
     public function complete_for_role(appraisal_role_assignment $roleassignment) {
-        global $DB;
+        global $DB, $USER;
 
         if (!$DB->record_exists('appraisal_stage_data',
             array('appraisalroleassignmentid' => $roleassignment->id, 'appraisalstageid' => $this->id))) {
             // Mark the role as complete.
             $stage_data = new stdClass();
             $stage_data->appraisalroleassignmentid = $roleassignment->id;
+            $stage_data->usercompleted = $USER->id;
+            $realuser = \core\session\manager::get_realuser();
+            $stage_data->realusercompleted = \core\session\manager::is_loggedinas() ? $realuser->id : null;
             $stage_data->timecompleted = time();
             $stage_data->appraisalstageid = $this->id;
             $DB->insert_record('appraisal_stage_data', $stage_data);
 
-            // Check if all involved roles are complete for this user and stage.
-            $rolescompletion = $this->get_mandatory_completion($roleassignment->subjectid);
-            $complete = true;
-            foreach ($rolescompletion as $rolecompletion) {
-                if (!isset($rolecompletion->timecompleted)) {
-                    $complete = false;
-                    break;
-                }
-            }
-            if ($complete) {
+            $event = \totara_appraisal\event\appraisal_role_stage_completed::create(
+                array(
+                    'objectid' => $this->appraisalid,
+                    'context' => context_system::instance(),
+                    // 'userid' is the user who performed the action, defaults to $USER->id.
+                    'relateduserid' => $roleassignment->subjectid, // Learner whose appraisal this is.
+                    'other' => array(
+                        'stageid' => $this->id,
+                        'role' => $roleassignment->appraisalrole,
+                    )
+                )
+            );
+            $event->trigger();
+
+            if ($this->is_all_roles_complete($roleassignment->subjectid, true)) {
                 // Mark this stage as complete for this user.
                 $this->complete_for_user($roleassignment->subjectid);
             }
         }
     }
 
+    /**
+     * Check if all involved roles are complete for this user and stage.
+     *
+     * @param $subjectid
+     * @param bool $check_unfilled_roles  when false: method will also return true if there are currently no roles involved.
+     * @return bool
+     */
+    public function is_all_roles_complete($subjectid, $check_unfilled_roles = false) {
+        $rolescompletion = $this->get_mandatory_completion($subjectid);
+        if (empty($rolescompletion) && $check_unfilled_roles) {
+            // No valid roles for this stage. Check if it was completed before by a role that got removed.
+            return $this->has_completion_by_unfilled_role($subjectid);
+        }
+
+        $complete = true;
+        foreach ($rolescompletion as $rolecompletion) {
+            if (!isset($rolecompletion->timecompleted)) {
+                $complete = false;
+                break;
+            }
+        }
+        return $complete;
+    }
+
+    /**
+     * Checks if at least one role that is unassigned by now has completed this stage before,
+     * This can be the case for example when a manager is unassigned from a learner or a manager account is deleted.
+     *
+     * @param $subjectid
+     * @return bool
+     */
+    public function has_completion_by_unfilled_role($subjectid) {
+        global $DB;
+
+        $sql = 'SELECT ara.appraisalrole, ara.userid, ara.activepageid, asd.timecompleted,
+                       asd.usercompleted, asd.realusercompleted
+                  FROM {appraisal_role_assignment} ara
+                  JOIN {appraisal_user_assignment} aua
+                    ON ara.appraisaluserassignmentid = aua.id
+             LEFT JOIN (SELECT * FROM {appraisal_stage_data}
+                         WHERE appraisalstageid = ?) asd
+                    ON ara.id = asd.appraisalroleassignmentid
+                 WHERE aua.userid = ?
+                   AND aua.appraisalid = ?
+                   AND asd.timecompleted > 0
+                   AND ara.userid = 0';
+        return $DB->record_exists_sql($sql, [$this->id, $subjectid, $this->appraisalid]);
+    }
 
     /**
      * Mark this stage as complete for the given user.
@@ -2609,12 +2829,29 @@ class appraisal_stage {
         if (!empty($nextstageid)) {
             $DB->set_field('appraisal_user_assignment', 'activestageid', $nextstageid,
                 array('userid' => $subjectid, 'appraisalid' => $this->appraisalid));
-        } else {
+        }
+
+        $event = \totara_appraisal\event\appraisal_stage_completed::create(
+            array(
+                'objectid' => $this->appraisalid,
+                'context' => context_system::instance(),
+                // 'userid' is the user who performed the action, defaults to $USER->id.
+                'relateduserid' => $subjectid, // Learner whose appraisal this is.
+                'other' => array(
+                    'stageid' => $this->id,
+                    'complete_for_user' => empty($nextstageid),
+                )
+            )
+        );
+        $event->trigger();
+
+        if (empty($nextstageid)) {
             // Mark the appraisal as complete for the given user.
             $appraisal = new appraisal($this->appraisalid);
             $appraisal->complete_for_user($subjectid);
         }
 
+        // Deprecated in Totara 12.2 - observe event appraisal_stage_completed (triggered just above) instead.
         $event = \totara_appraisal\event\appraisal_stage_completion::create(
             array(
                 'objectid' => $this->appraisalid,
@@ -2628,6 +2865,19 @@ class appraisal_stage {
             )
         );
         $event->trigger();
+
+        // Check if this was the last stage for this user.
+        if (!empty($nextstageid)) {
+            // Check if the next stage is complete.
+            $nextstage = new appraisal_stage($nextstageid);
+            if ($nextstage->is_all_roles_complete($subjectid, true)) {
+                $nextstage->complete_for_user($subjectid);
+            }
+        } else {
+            // Mark the appraisal as complete for the given user.
+            $appraisal = new appraisal($this->appraisalid);
+            $appraisal->complete_for_user($subjectid);
+        }
     }
 
 
@@ -2694,24 +2944,23 @@ class appraisal_stage {
     }
 
     public function get_mandatory_completion($subjectid) {
-        global $DB;
+        global $CFG, $DB;
 
         $cananswer = $this->get_user_roles_involved(appraisal::ACCESS_CANANSWER, $subjectid);
-        $mustanswer = $this->get_user_roles_involved(appraisal::ACCESS_MUSTANSWER, $subjectid);
 
         $roles = array();
 
-        foreach ($mustanswer as $role) {
+        foreach ($cananswer as $role) {
             $roles[$role->appraisalrole] = $role->appraisalrole;
         }
 
-        foreach ($cananswer as $role) {
-            if (!empty($role->userid)) {
-                $roles[$role->appraisalrole] = $role->appraisalrole;
-            }
-        }
+        // Ignore empty roles when dynamic appraisals is off or dynamic appraisals is on and
+        // auto-progress is switched on.
+        $skip_empty_roles = empty($CFG->dynamicappraisals) || !empty($CFG->dynamicappraisalsautoprogress);
+        $exclude_empty = $skip_empty_roles ? "AND ara.userid <> 0" : "";
 
-        $sql = 'SELECT ara.appraisalrole, ara.userid, ara.activepageid, asd.timecompleted
+        $sql = 'SELECT ara.appraisalrole, ara.userid, ara.activepageid, asd.timecompleted,
+                       asd.usercompleted, asd.realusercompleted
                   FROM {appraisal_role_assignment} ara
                   JOIN {appraisal_user_assignment} aua
                     ON ara.appraisaluserassignmentid = aua.id
@@ -2720,7 +2969,7 @@ class appraisal_stage {
                     ON ara.id = asd.appraisalroleassignmentid
                  WHERE aua.userid = ?
                    AND aua.appraisalid = ?
-                   AND ara.userid <> 0
+                   ' . $exclude_empty . '
                  ORDER BY ara.appraisalrole';
         $completiondata = $DB->get_records_sql($sql, array($this->id, $subjectid, $this->appraisalid));
         return array_intersect_key($completiondata, $roles);
@@ -2881,6 +3130,32 @@ class appraisal_stage {
         return $stages;
     }
 
+    /**
+     * Get the previous stage
+     *
+     * @return object appraisal_stage
+     */
+    public function get_previous() {
+        global $DB;
+
+        if (empty($this->id)) {
+            return false;
+        }
+
+        $sql = "appraisalid = :appraisalid AND timedue <= :timedue AND id <> :id";
+        $params = array(
+            'appraisalid' => $this->appraisalid,
+            'timedue' => $this->timedue,
+            'id' => $this->id,
+        );
+        $record = $DB->get_records_select('appraisal_stage', $sql, $params, 'timedue DESC, id DESC', 'id', 0, 1);
+
+        if ($record) {
+            return new self(current($record)->id);
+        } else {
+            return false;
+        }
+    }
 
     /**
      * Remove stage if possible
@@ -3213,7 +3488,10 @@ class appraisal_page {
         $answers = new stdClass();
         foreach ($questions as $question) {
             if (!$question->is_locked($roleassignment)) {
-                $rights = $question->roles[$roleassignment->appraisalrole];
+                $rights = array_key_exists($roleassignment->appraisalrole, $question->roles)
+                          ? $question->roles[$roleassignment->appraisalrole]
+                          : 0;
+
                 // If a user isn't required to answer a question don't try and set form as it doesn't exist.
                 if (($rights & appraisal::ACCESS_CANANSWER) == appraisal::ACCESS_CANANSWER) {
                     $answers = $question->get_element()->set_as_form($formdata)->get_as_db($answers);
@@ -3372,7 +3650,7 @@ class appraisal_page {
                   LEFT JOIN {appraisal_quest_field} aqf
                     ON asp.id = aqf.appraisalstagepageid
                   LEFT JOIN {appraisal_quest_field} aqfr
-                    ON (' . sql_cast2char('aqf.id') . ' = ' . $DB->sql_compare_text('aqfr.param1') . '
+                    ON (' . $DB->sql_cast_2char('aqf.id') . ' = ' . $DB->sql_compare_text('aqfr.param1') . '
                     AND aqfr.datatype = ?)
                  WHERE asp.appraisalstageid = ?
                  GROUP BY asp.id, asp.appraisalstageid, asp.name, asp.sortorder
@@ -3422,7 +3700,7 @@ class appraisal_page {
             $paramsstageids = array($stageid);
         }
 
-        $sql = "SELECT DISTINCT ap.*, ast.timedue
+        $sql = "SELECT DISTINCT ap.*, ast.id AS stageid, ast.timedue
                   FROM {appraisal_stage_page} ap
                   JOIN {appraisal_stage} ast
                     ON ap.appraisalstageid = ast.id
@@ -3432,7 +3710,7 @@ class appraisal_page {
                     ON aqfr.appraisalquestfieldid = aqf.id
                  WHERE ap.appraisalstageid {$sqlstageids}
                    AND aqfr.appraisalrole = ? AND {$sqlrights}
-                 ORDER BY ast.timedue, ap.sortorder";
+                 ORDER BY ast.timedue, ast.id, ap.sortorder";
         $params = array_merge($paramsstageids, array($role), $paramrights);
         $pagesrs = $DB->get_records_sql($sql, $params);
 
@@ -4025,24 +4303,17 @@ class appraisal_question extends question_storage {
         $questroles = $this->roles;
         unset($questroles[$roleassignment->appraisalrole]);
         $rolecodestrings = appraisal::get_roles();
-        $isviewonlyquestion = true;
         foreach ($questroles as $eachrole => $rights) {
             if (isset($otherassignments[$eachrole]) && ($rights & appraisal::ACCESS_CANANSWER) == appraisal::ACCESS_CANANSWER) {
-                $isviewonlyquestion = false;
                 // Show role user icon.
-                $subjectid = $otherassignments[$eachrole]->userid;
-                if ($subjectid == 0) {
-                    continue;
-                }
-
-                $subject = $DB->get_record('user', array('id' => $subjectid));
+                $otheruserid = $otherassignments[$eachrole]->userid;
 
                 // Add information about other roles to element.
-                $questioninfo = new question_manager($subjectid, $otherassignments[$eachrole]->id);
+                $questioninfo = new question_manager($roleassignment->subjectid, $otherassignments[$eachrole]->id);
                 $questioninfo->viewonly = true;
-                if (!$nouserpic && $subjectid != 0) {
-                    $subject = $DB->get_record('user', array('id' => $subjectid));
-                    $questioninfo->userimage = $OUTPUT->user_picture($subject);
+                if (!$nouserpic && $otheruserid != 0) {
+                    $otheruser = $DB->get_record('user', array('id' => $otheruserid));
+                    $questioninfo->userimage = $OUTPUT->user_picture($otheruser);
                 } else {
                    $questioninfo->userimage = '';
                 }
@@ -4050,9 +4321,40 @@ class appraisal_question extends question_storage {
                 $this->get_element()->add_question_role_info($eachrole, $questioninfo);
             }
         }
-        return $isviewonlyquestion;
+
+        return ($this->roles[$roleassignment->appraisalrole] & appraisal::ACCESS_CANANSWER) === appraisal::ACCESS_CANANSWER;
     }
 
+    /**
+     * Adding custom validation to the appraisal question.
+     *
+     * This can be used if appraisal questions need to validate with extra rules which are not defined in the core
+     * questions classes.
+     *
+     * @param question_base $element
+     * @param array    $data
+     *
+     */
+    public static function add_custom_validation(question_base $element, array $data) {
+        global $CFG;
+        require_once($CFG->dirroot . '/totara/question/field/multichoice.class.php');
+        $errors = [];
+
+        if ($element instanceof multichoice) {
+            // Add validation only for new options
+            if (isset($data['selectchoices']) && $data['selectchoices'] == 0) {
+                for ($i = 0; $i < $element::MAX_CHOICES; $i++) {
+                    if (isset($data['choice'][$i]['option'])) {
+                        if (core_text::strlen($data['choice'][$i]['option']) > 255) {
+                            $errors["choice[{$i}]"] = get_string('maximumchars', '', 255);
+                        }
+                    }
+                }
+            }
+        }
+
+        return $errors;
+    }
 
     /**
      * Get all questions of the page.
@@ -4072,6 +4374,7 @@ class appraisal_question extends question_storage {
      *
      * @param int $pageid
      * @param appraisal_role_assignment $roleassignment
+     * @return appraisal_question[]
      */
     public static function fetch_page_role($pageid, appraisal_role_assignment $roleassignment) {
         global $DB;
@@ -4175,6 +4478,57 @@ class appraisal_question extends question_storage {
         return $questionrs;
     }
 
+    /**
+     * MySQL only: Calculate if we are (close to) hitting the internal row size limit
+     * when creating mdl_appraisal_quest_data_* table for this appraisal.
+     *
+     * For MySQL the *internal* storage of one row is usually limited to a bit less
+     * than 8KB and creating a table e.g. with 190 columns of type LONGTEXT will just
+     * exceed that because of minimum bytes required for pointers to external storage
+     * of row data etc.
+     *
+     * We try to find out if the questions in this appraisal are coming close to
+     * causing a row size limit error, so we can give a warning.
+     *
+     * The mentioned 8KB limit can be adjusted by changing MySQL config innodb_page_size
+     * but this is rarely done and given that this is a rare problem anyway, we assume
+     * the default configuration. If cases occur where this is not accurate enough,
+     * this calculation could be refined by taking non-default config into account.
+     *
+     * @param int $appraisalid
+     * @param int $max_bytes  Mainly for testing purposes. Defaults to 8000.
+     * @return bool
+     */
+    public static function has_too_many_questions($appraisalid, $max_bytes = 8000) {
+        global $DB;
+
+        if ($DB->get_dbfamily() != 'mysql') {
+            // We haven't had problems with hitting limits on pgsql or sqlsrv yet.
+            return false;
+        }
+
+        $map_type_to_row_bytes = [
+            'text' => 43, // Text
+            'datepicker' => 11, // Integer
+            'fileupload' => 11,
+            'longtext' => 65, // Text + 2*Integer
+            'multichoicemulti' => 11,
+            'multichoicesingle' => 11,
+            'ratingcustom' => 54, // Text + Integer
+            'ratingnumeric' => 11,
+        ];
+
+        $estimated_bytes = 0;
+        $questions = self::fetch_appraisal($appraisalid);
+        foreach ($questions as $question) {
+            if (isset($map_type_to_row_bytes[$question->datatype])) {
+                $estimated_bytes += $map_type_to_row_bytes[$question->datatype];
+            }
+        }
+
+        return ($estimated_bytes > $max_bytes);
+    }
+
 
     /**
      * Get list of questions and count the number of redisplay items pointing to it.
@@ -4188,7 +4542,7 @@ class appraisal_question extends question_storage {
         $sql = 'SELECT aqf.id, aqf.name, aqf.datatype, COUNT(aqfr.id) hasredisplay
                   FROM {appraisal_quest_field} aqf
                   LEFT JOIN {appraisal_quest_field} aqfr
-                    ON (' . sql_cast2char('aqf.id') . ' = ' . $DB->sql_compare_text('aqfr.param1') . '
+                    ON (' . $DB->sql_cast_2char('aqf.id') . ' = ' . $DB->sql_compare_text('aqfr.param1') . '
                     AND aqfr.datatype = ?)
                  WHERE aqf.appraisalstagepageid = ?
                  GROUP BY aqf.id, aqf.name, aqf.datatype, aqf.sortorder
@@ -4274,6 +4628,8 @@ class appraisal_exception extends Exception {
 
 /**
  * Appraisal event notification
+ *
+ * @property $id
  */
 class appraisal_message {
     /**
@@ -4282,6 +4638,7 @@ class appraisal_message {
     const EVENT_APPRAISAL_ACTIVATION = 'appraisal_activation';
     const EVENT_STAGE_COMPLETE = 'appraisal_stage_completion';
     const EVENT_STAGE_DUE = 'stage_due';
+    const EVENT_APPRAISAL_CLOSURE = 'appraisal_closure';
 
     /**
      * Only send messages if they are in the appropriate state.
@@ -4370,6 +4727,51 @@ class appraisal_message {
     protected $timescheduled = 0;
 
     /**
+     * Array of available placeholders.
+     * @var array
+     */
+    public static $placeholders = [
+        // Site.
+        'sitename',
+        'siteurl',
+
+        // Appraisal.
+        'appraisalname',
+        'appraisaldescription',
+        'expectedappraisalcompletiondate',
+
+        // Stage.
+        'listofstagenames',
+        'currentstagename',
+        'expectedstagecompletiondate',
+        'previousstagename',
+
+        // The appraisee.
+        'userusername',
+        'userfirstname',
+        'userlastname',
+        'userfullname',
+
+        // Manager.
+        'managerusername',
+        'managerfirstname',
+        'managerlastname',
+        'managerfullname',
+
+        // Team lead.
+        'managersmanagerusername',
+        'managersmanagerfirstname',
+        'managersmanagerlastname',
+        'managersmanagerfullname',
+
+        // Appraiser.
+        'appraiserusername',
+        'appraiserfirstname',
+        'appraiserlastname',
+        'appraiserfullname',
+    ];
+
+    /**
      * Create instance appraisal notification
      */
     public function __construct($id = 0) {
@@ -4397,10 +4799,10 @@ class appraisal_message {
      *
      * @param type $appraisalid
      */
-    public function event_appraisal($appraisalid) {
+    public function event_appraisal($appraisalid, $type = self::EVENT_APPRAISAL_ACTIVATION) {
         $this->appraisalid = $appraisalid;
         $this->stageid = 0;
-        $this->type = self::EVENT_APPRAISAL_ACTIVATION;
+        $this->type = $type;
     }
 
 
@@ -4434,7 +4836,7 @@ class appraisal_message {
             }
         }
         $this->delta = $delta;
-        $this->deltaperiod = $period;
+        $this->deltaperiod = ($delta == 0) ? 0 : $period;
     }
 
 
@@ -4630,7 +5032,7 @@ class appraisal_message {
      * @return bool
      */
     public function is_immediate() {
-        return $this->delta == 0;
+        return $this->delta == 0 && $this->deltaperiod == 0;
     }
 
 
@@ -4668,6 +5070,112 @@ class appraisal_message {
 
 
     /**
+     * Function to send closure messages on the cron.
+     */
+    public function send_appraisal_wide_closure_message() {
+        global $DB;
+
+        // Don't send this message if it has already been sent.
+        if ($this->triggered) {
+            return;
+        }
+
+        // Get the message content, which may be different depending on the role.
+        $appraisal = new appraisal($this->appraisalid);
+        $message = $this->get_message(appraisal::ROLE_LEARNER);
+
+        $alert = new stdClass();
+        $alert->userfrom = core_user::get_support_user();
+        $alert->fullmessageformat = FORMAT_HTML;
+
+        // Send message to learners.
+        $alert->subject = $message->name;
+        $alert->fullmessage = $message->content;
+        $alert->fullmessagehtml = $message->content;
+
+        $learnersql = "SELECT u.*
+                        FROM {appraisal_user_assignment} aua
+                   LEFT JOIN {user} u
+                          ON aua.userid = u.id
+                       WHERE aua.appraisalid = :appraisalid
+                         AND aua.timecompleted IS NULL
+                         AND aua.status = :status";
+        $learnerparams = array('appraisalid' => $this->appraisalid, 'status' => appraisal::STATUS_CLOSED);
+        $learners = $DB->get_records_sql($learnersql, $learnerparams);
+
+        foreach ($learners as $learner) {
+            $alert->userto = $learner;
+            tm_alert_send($alert);
+        }
+
+        // Send message to role users (other than learners, and only one message per user).
+        $a = new stdClass();
+        $a->name = $appraisal->name;
+        $a->alerttitle = $message->name;
+        $a->alertbody = $message->content;
+        $alert->subject = get_string('closealerttitledefault', 'totara_appraisal', $a);
+
+        // Find all users in roles that are not learner, who have a learner who is not finished.
+        $staffuid = $DB->sql_group_concat($DB->sql_cast_2char('usr.id'), ',');
+        $rolesql = "SELECT ara.userid AS id, {$staffuid} AS staff
+                      FROM {appraisal_user_assignment} aua
+                      JOIN {appraisal_role_assignment} ara ON aua.id = ara.appraisaluserassignmentid
+                      JOIN {user} usr ON aua.userid = usr.id
+                     WHERE aua.timecompleted IS NULL
+                       AND aua.appraisalid = :appraisalid
+                       AND aua.status = :status
+                       AND ara.appraisalrole != :roletype
+                       AND ara.userid <> 0
+                  GROUP BY ara.userid";
+        $roleparams = array('appraisalid' => $this->appraisalid, 'status' => appraisal::STATUS_CLOSED, 'roletype' => appraisal::ROLE_LEARNER);
+        $roleusers = $DB->get_records_sql($rolesql, $roleparams);
+
+        // Collect all distinct staff ids.
+        $staffids = array();
+        foreach ($roleusers as $roleuser) {
+            $ids = explode(',', $roleuser->staff);
+            $staffids = array_merge($staffids, $ids);
+        }
+
+        if ($staffids) {
+            // Get data from DB for staff names.
+            $userfieldssql = get_all_user_name_fields(true);
+            list($staffsql, $staffparams) = $DB->get_in_or_equal($staffids);
+            $staff = $DB->get_records_sql("SELECT id, {$userfieldssql} FROM {user} WHERE id {$staffsql}", $staffparams);
+        } else {
+            $staff = array();
+        }
+
+        unset($staffids);
+
+        // Create array of staff names keyed by id.
+        $staffnames = array();
+        foreach ($staff as $staffmember) {
+            $staffnames[$staffmember->id] = fullname($staffmember);
+        }
+
+        foreach ($roleusers as $roleuser) {
+            $staff = explode(',', $roleuser->staff);
+
+            $affectedstaff = array();
+            foreach ($staff as $staffmember) {
+                $affectedstaff[] = $staffnames[$staffmember];
+            }
+
+            $a->staff = implode(', ', $affectedstaff);
+            $alert->fullmessage = get_string('closealertadminbody', 'totara_appraisal', $a);
+            $alert->fullmessagehtml = $alert->fullmessage;
+            // Get full user record for message.
+            $alert->userto = core_user::get_user($roleuser->id);
+            tm_alert_send($alert);
+        }
+
+        $this->triggered = 1;
+        $this->save();
+    }
+
+
+    /**
      * Send this message to all roles associated with the given user.
      *
      * @param  bool $managers_only true if the messages should only be sent to non-learner roles
@@ -4699,6 +5207,8 @@ class appraisal_message {
      */
     public function send($userassignments, $managers_only=false) {
         global $DB;
+
+        $appraisal = new appraisal($this->appraisalid);
 
         $sentaddress = array();
         foreach ($userassignments as $userassignment) {
@@ -4744,34 +5254,181 @@ class appraisal_message {
                         // Get the message content, which may be different depending on the role.
                         $message = $this->get_message($role);
 
+                        // Do the placeholders substitutions.
+                        list($messagesubject, $messagecontent) = $this->message_substitutions(
+                            $appraisal, array($message->name, $message->content), $userassignment, $rcpt);
+
                         // Create a message.
                         $eventdata = new stdClass();
                         $eventdata->component         = 'moodle';
                         $eventdata->name              = 'instantmessage';
                         $eventdata->userfrom          = core_user::get_noreply_user();
                         $eventdata->userto            = $rcpt;
-                        $eventdata->subject           = $message->name;
-                        $eventdata->fullmessage       = $message->content;
+                        $eventdata->subject           = $messagesubject;
+                        $eventdata->fullmessage       = $messagecontent;
                         $eventdata->fullmessageformat = FORMAT_PLAIN;
                         // The content is plain text so make sure we convert linebreaks for the HTML content.
-                        $eventdata->fullmessagehtml   = html_writer::tag('pre', $message->content);
-                        $eventdata->smallmessage      = $message->content;
+                        $eventdata->fullmessagehtml   = html_writer::tag('pre', $messagecontent);
+                        $eventdata->smallmessage      = $messagecontent;
 
-                        // Send the message, preventing duplicates. E.g. If someone is a manager and appraiser and there are two
-                        // different messages set up then they will receive one of each type. If someone has multiple roles with
-                        // all roles set to the same message then they will only receive one message.
-                        if (!isset($sentaddress[$rcpt->email]) || !in_array($message->id, $sentaddress[$rcpt->email])) {
+
+                        // Send the message, preventing duplicates. "Duplicate" here refers not only to the
+                        // recipient email and message type but _also of the final message content_. For example
+                        // if the message content is the same for all roles, then each role will only receive one
+                        // email each for a given message type. If the content differs (eg the learner name changes
+                        // each time), then each role will get multiple, distinct emails for the same message type.
+                        //
+                        // Also, this method does not record details about sent emails. That means that duplicate
+                        // emails will never be sent *during an invocation* but may be sent *across* invocations.
+                        $hash = md5(sprintf(
+                            '%s/%d/%s/%s', $rcpt->email, $message->id, $messagesubject, $messagecontent
+                        ));
+                        if (!in_array($hash, $sentaddress)) {
+                            $sentaddress[] = $hash;
                             tm_alert_send($eventdata);
-
-                            if (!isset($sentaddress[$rcpt->email])) {
-                                $sentaddress[$rcpt->email] = array();
-                            }
-                            $sentaddress[$rcpt->email][] = $message->id;
                         }
                     }
                 }
             }
         }
+    }
+
+
+    /**
+     * Subsitute the placeholders in message templates for the actual data
+     *
+     * @param object $appraisal The appraisal object
+     * @param array $messages An array containing the messages
+     * @param object $userassignments The user_assignment records to send the message to.
+     * @param object $rcpt The recipient user object
+     * @return  string
+     */
+    public function message_substitutions($appraisal, $messages, $userassignment, $rcpt) {
+        global $DB, $CFG;
+
+        if (empty($messages)) {
+            return array();
+        }
+
+        if (!empty($userassignment->jobassignmentid)) {
+            $jobassignment = job_assignment::get_with_id($userassignment->jobassignmentid);
+        }
+
+        // Create the data array, placeholder => value. (All empty values to start).
+        $data = array();
+        foreach (self::$placeholders as $placeholder) {
+            $data['[' . $placeholder . ']'] = '';
+        }
+
+        // Site.
+        $data['[sitename]'] = format_string(get_site()->fullname);
+        $data['[siteurl]'] = $CFG->wwwroot;
+
+        // Appraisal.
+        $data['[appraisalname]'] = format_string($appraisal->name);
+        $data['[appraisaldescription]'] = format_string($appraisal->description);
+        $data['[expectedappraisalcompletiondate]'] = userdate($appraisal->get_expected_completion_date(), get_string('strfdateshortmonth', 'langconfig'));
+
+        // Get the stage object.
+        $stage = new appraisal_stage($this->stageid);
+
+        // Current stage.
+        if ($this->stageid) {
+            $data['[currentstagename]'] = format_string($stage->name);
+            $data['[expectedstagecompletiondate]'] = userdate($stage->timedue, get_string('strfdateshortmonth', 'langconfig'));
+        } else {
+            $stages = appraisal_stage::get_stages($appraisal->id);
+            if ($stages) {
+                $data['[currentstagename]'] = format_string(current($stages)->name);
+                $data['[expectedstagecompletiondate]'] = userdate(current($stages)->timedue, get_string('strfdateshortmonth', 'langconfig'));
+            }
+        }
+
+        // All stages.
+        $allstagenames = '';
+        foreach ($stage->fetch_appraisal($appraisal->id) as $stagerecord) {
+            $allstagenames .= "* {$stagerecord->name}\n";
+        }
+        if (!empty($allstagenames)) {
+            $data['[listofstagenames]'] = format_string($allstagenames);
+        }
+
+        // Previous stage.
+        $previousstage = $stage->get_previous();
+        if ($previousstage) {
+            $data['[previousstagename]'] = format_string($previousstage->name);
+        } else {
+            $data['[previousstagename]'] = get_string('placeholders:default_previousstagename', 'totara_appraisal');
+        }
+
+        // Appraisee.
+        $appraisee = ($rcpt->id != $userassignment->userid) ?
+            $DB->get_record('user', array('id' => $userassignment->userid)) : $rcpt;
+
+        $data['[userusername]'] = $appraisee->username;
+        $data['[userfirstname]'] = $appraisee->firstname;
+        $data['[userlastname]'] = $appraisee->lastname;
+        $data['[userfullname]'] = fullname($appraisee);
+
+        // Manager.
+        if (!empty($jobassignment->managerjaid)) {
+
+            $managerid = $jobassignment->managerid;
+            $manager = ($rcpt->id != $managerid) ? $DB->get_record('user', array('id' => $managerid)) : $rcpt;
+
+            if ($manager) {
+                $data['[managerusername]'] = $manager->username;
+                $data['[managerfirstname]'] = $manager->firstname;
+                $data['[managerlastname]'] = $manager->lastname;
+                $data['[managerfullname]'] = fullname($manager);
+            }
+        } else {
+            // The default.
+            $data['[managerfullname]'] = get_string('placeholders:default_managerfullname', 'totara_appraisal');
+        }
+
+        // Team Lead.
+        if (!empty($jobassignment->teamleaderid)) {
+
+            $teamleadid = $jobassignment->teamleaderid;
+            $teamlead = ($rcpt->id != $teamleadid) ? $DB->get_record('user', array('id' => $teamleadid)) : $rcpt;
+
+            if ($teamlead) {
+                $data['[managersmanagerusername]'] = $teamlead->username;
+                $data['[managersmanagerfirstname]'] = $teamlead->firstname;
+                $data['[managersmanagerlastname]'] = $teamlead->lastname;
+                $data['[managersmanagerfullname]'] = fullname($teamlead);
+            }
+        } else {
+            // The default.
+            $data['[managersmanagerfullname]'] = get_string('placeholders:default_teamleadfullname', 'totara_appraisal');
+        }
+
+        // Appraiser.
+        if (!empty($jobassignment->appraiserid)) {
+            $appraiser = ($rcpt->id != $jobassignment->appraiserid) ?
+                $DB->get_record('user', array('id' => $jobassignment->appraiserid)) : $rcpt;
+
+            if ($appraiser) {
+                $data['[appraiserusername]'] = $appraiser->username;
+                $data['[appraiserfirstname]'] = $appraiser->firstname;
+                $data['[appraiserlastname]'] = $appraiser->lastname;
+                $data['[appraiserfullname]'] = fullname($appraiser);
+            }
+        } else {
+            // The default.
+            $data['[appraiserfullname]'] = get_string('placeholders:default_appraiserfullname', 'totara_appraisal');
+        }
+
+        // Replace placeholders with values.
+        foreach ($messages as $key => $msg) {
+            foreach ($data as $placeholder => $value) {
+                $msg = str_replace($placeholder, $value, $msg);
+            }
+            $messages[$key] = $msg;
+        }
+
+        return $messages;
     }
 
 
@@ -4802,6 +5459,11 @@ class appraisal_message {
         $evtrs = $DB->get_records('appraisal_event', array('appraisalid' => $appraisalid), 'id');
         $events = array();
         foreach ($evtrs as $evtdata) {
+            // Don't list closure messages here, to avoid duplicate messages.
+            if ($evtdata->event == 'appraisal_closure') {
+                continue;
+            }
+
             $events[$evtdata->id] = new appraisal_message($evtdata->id);
         }
         return $events;
@@ -4881,8 +5543,14 @@ class appraisal_message {
      */
     public static function duplicate_appraisal($srcappraisalid, $appraisalid) {
         global $DB;
-        $sql = "SELECT id FROM {appraisal_event} WHERE appraisalid = ? AND (appraisalstageid = 0 OR appraisalstageid IS NULL)";
-        $events = $DB->get_records_sql($sql, array($srcappraisalid));
+
+        // Do not duplicate closure messages, to avoid duplicate messages.
+        $sql = "SELECT id
+                  FROM {appraisal_event}
+                 WHERE appraisalid = :aid
+                   AND event != :closure
+                   AND (appraisalstageid = 0 OR appraisalstageid IS NULL)";
+        $events = $DB->get_records_sql($sql, array('aid' => $srcappraisalid, 'closure' => self::EVENT_APPRAISAL_CLOSURE));
         foreach ($events as $eventdata) {
             $event = new appraisal_message($eventdata->id);
             $event->id = 0;
@@ -5182,6 +5850,8 @@ function totara_appraisal_install_example_appraisal() {
 
 /**
  * Role assignment to appraisal
+ *
+ * @property-read $id
  */
 class appraisal_role_assignment {
     /**
@@ -5363,6 +6033,8 @@ class appraisal_role_assignment {
 
 /**
  * User (Learner) assignment to appraisal
+ *
+ * @property-read $id
  */
 class appraisal_user_assignment {
     /**
@@ -5517,10 +6189,12 @@ class appraisal_user_assignment {
      * Associates a job assignment with this appraisal.
      *
      * @param int $jobassignmentid job assignment identifer.
+     * @param bool $notifymanager if true sends a notification to the appraisee's
+     *        manager about the appraisal.
      *
      * @return \appraisal_user_assignment the updated assignment.
      */
-    public function with_job_assignment($jobassignmentid) {
+    public function with_job_assignment($jobassignmentid, $notifymanager=true) {
         if (empty($jobassignmentid) || !is_numeric($jobassignmentid)) {
             throw new \InvalidArgumentException(
                 "invalid parameter [user_assignment job id]: '$jobassignmentid'"
@@ -5540,7 +6214,9 @@ class appraisal_user_assignment {
         // totara_job\job_assignment::totara_assign_appraisal
         // if we need to send manager messages again when any job
         // assignment is updated
-        $this->send_manager_messages();
+        if ($notifymanager) {
+            $this->send_manager_messages();
+        }
 
         return $this;
     }
@@ -5603,13 +6279,15 @@ class appraisal_user_assignment {
      * @param boolean linkfirst if true, links the first existing job assignment
      *        to the appraisee assignment. Note "first" here is the first in the
      *        list that job_assignment::get_all() returns.
+     * @param bool $notifymanager if true sends a notification to the appraisee's
+     *        manager about the appraisal.
      *
      * @return array (\appraisal_user_assignment, \job_assignment) tuple with an
      *         updated appraisee assignment and assigned job. This could be an
      *         empty array if there were multiple job assignments from which to
      *         choose and the passed 'linkfirst' value was false.
      */
-    public function with_auto_job_assignment($linkfirst) {
+    public function with_auto_job_assignment($linkfirst, $notifymanager=true) {
         // For the appraisee who has already specified a job for this appraisal.
         $jobassignmentid = $this->jobassignmentid;
         if (!empty($jobassignmentid)) {
@@ -5632,12 +6310,12 @@ class appraisal_user_assignment {
 
         if ($noofjobs === 0) {
             $job = job_assignment::create_default($appraisee);
-            return [$this->with_job_assignment($job->id), $job];
+            return [$this->with_job_assignment($job->id, $notifymanager), $job];
         }
         else if ($noofjobs === 1
                  || ($noofjobs > 1 && $linkfirst)) {
             $job = current($jobs);
-            return [$this->with_job_assignment($job->id), $job];
+            return [$this->with_job_assignment($job->id, $notifymanager), $job];
         }
         else {
             // For an appraisee with multiple formal job assignments and cannot
@@ -5671,16 +6349,39 @@ class appraisal_user_assignment {
     private function send_manager_messages() {
         global $DB;
 
-        $appraisalid = $this->appraisalid;
-
-        // For now only do Activation messages that needs to be sent to managers
-        $sql = "SELECT id FROM {appraisal_event} WHERE event = ? AND appraisalid = ?";
-        $params = array(appraisal_message::EVENT_APPRAISAL_ACTIVATION, $appraisalid);
-        $events = $DB->get_records_sql($sql, $params);
-        foreach ($events as $id => $eventdata) {
-            $eventmessage = new appraisal_message($id);
+        // For now only do Activation messages that needs to be sent to managers.
+        //
+        // Unfortunately there are many independent threads of control when it
+        // comes to firing activation notifications: cron, this method and
+        // appraisal::check_assignment_changes(). Hence the 'triggered' condition
+        // here:
+        // - if multiple jobs was off:
+        //   - initially, the appraisal event would NOT be marked as "triggered"
+        //   - cron would then tell the appraisee and manager and mark the event
+        //     as "triggered".
+        //   - Therefore this method does not need to do anything.
+        //
+        // - if multiple jobs was on:
+        //   - initially, the appraisal event would NOT be marked as "triggered"
+        //   - cron would only send the notification to the appraisee BUT WOULD
+        //     STILL MARK THE EVENT AS "triggered". The activation event will
+        //     never fire again.
+        //   - Therefore this method must send out notifications to managers when
+        //     the appraisee finally selects a job assignment.
+        //
+        // Complicating the mess even further, the UI allows the admin to define
+        // multiple, independent message "instances" for a single activation. So
+        // it is possible for the manager to get multiple emails about a single
+        // activation; some about his appraisees, others just because the admin
+        // defined multiple message instances.
+        $filters = [
+            'event' => appraisal_message::EVENT_APPRAISAL_ACTIVATION,
+            'appraisalid' => $this->appraisalid,
+            'triggered' => true
+        ];
+        foreach ($DB->get_records("appraisal_event", $filters) as $event) {
+            $eventmessage = new appraisal_message($event->id);
             $eventmessage->send_user_specific_message($this->userid, true);
         }
     }
-
 }

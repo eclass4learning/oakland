@@ -34,7 +34,7 @@ $page = optional_param('page', 0, PARAM_INT);
 $sid = optional_param('sid', '0', PARAM_INT);
 $showall = optional_param('showall', 0, PARAM_BOOL);
 $format = optional_param('format', '', PARAM_TEXT); //export format
-$debug = optional_param('debug', false, PARAM_BOOL); //report debug
+$debug = optional_param('debug', 0, PARAM_INT); // Debug level for the report.
 
 require_login();
 
@@ -78,30 +78,31 @@ $shortname = 'cohort_admin';
 $reportrecord = $DB->get_record('report_builder', array('shortname' => $shortname));
 $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($reportrecord);
 
-$report = reportbuilder_get_embedded_report($shortname, $data, false, $sid, $globalrestrictionset);
+$config = (new rb_config())->set_global_restriction_set($globalrestrictionset)->set_embeddata($data)->set_sid($sid);
+$report = reportbuilder::create_embedded($shortname, $config);
 if (!empty($format)) {
     $report->export_data($format);
     die;
 }
 
+$report->include_js();
+/** @var totara_reportbuilder_renderer $output */
+$output = $PAGE->get_renderer('totara_reportbuilder');
+
 echo $OUTPUT->header();
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $output->report_html($report, $debug);
+echo $debughtml;
 
 $report->display_restrictions();
 
-$fullcount = $report->get_full_count();
-$filteredcount = $report->get_filtered_count();
-$count = ($fullcount != $filteredcount) ? " ($filteredcount/$fullcount)" : " ($filteredcount)";
-
-$output = $PAGE->get_renderer('totara_reportbuilder');
-
 if ($showall) {
-    $heading = get_string('cohortsin', 'cohort', get_string('allcohorts' , 'core_cohort')) . $count;
+    $heading = get_string('cohortsin', 'cohort', get_string('allcohorts' , 'core_cohort'));
 } else {
-    $heading = get_string('cohortsin', 'cohort', $context->get_context_name()) . $count;
+    $heading = get_string('cohortsin', 'cohort', $context->get_context_name());
 }
+// We don't worry about showing a total count here. That is costly to generate!
+$heading .= ' (' . $report->get_filtered_count() . ')';
 echo $OUTPUT->heading($heading);
 
 $baseurl = new moodle_url('/cohort/index.php', array('contextid' => $context->id, 'showall' => $showall));
@@ -121,8 +122,7 @@ $report->display_sidebar_search();
 
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
-
-$report->display_table();
+echo $reporthtml;
 $output->export_select($report, $sid);
 
 echo $OUTPUT->footer();

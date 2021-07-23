@@ -70,10 +70,19 @@ function confirm_sesskey($sesskey=NULL) {
     }
 
     if (empty($sesskey)) {
-        $sesskey = required_param('sesskey', PARAM_RAW);  // Check script parameters
+        // Totara: Check for HTTP header
+        if (!empty($_SERVER['HTTP_X_TOTARA_SESSKEY'])) {
+            $sesskey = $_SERVER['HTTP_X_TOTARA_SESSKEY'];
+            if (!empty($_GET['sesskey'])) {
+                debugging('Sesskey should not be sent as a URL parameter, it is already being sent as an HTTP header.', DEBUG_DEVELOPER);
+            }
+        } else {
+            $sesskey = required_param('sesskey', PARAM_RAW);  // Check script parameters
+        }
     }
 
-    return (sesskey() === $sesskey);
+    // Totara: Using a timing-attack-safe function to compare the hashes.
+    return hash_equals(sesskey(), $sesskey);
 }
 
 /**
@@ -94,9 +103,6 @@ function is_moodle_cookie_secure() {
     global $CFG;
 
     if (!isset($CFG->cookiesecure)) {
-        return false;
-    }
-    if (!empty($CFG->loginhttps)) {
         return false;
     }
     if (!is_https() and empty($CFG->sslproxy)) {
@@ -150,6 +156,11 @@ function get_moodle_cookie() {
     global $CFG;
 
     if (NO_MOODLE_COOKIES) {
+        return '';
+    }
+
+    if (!empty($CFG->persistentloginenable)) {
+        // Totara: persistent login disables this.
         return '';
     }
 

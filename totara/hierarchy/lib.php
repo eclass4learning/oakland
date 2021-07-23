@@ -29,8 +29,8 @@
  * Library to construct hierarchies such as competencies, positions, etc
  */
 
-require_once(dirname(dirname(__FILE__)) . '/core/utils.php');
-require_once(dirname(dirname(__FILE__)) . '/customfield/fieldlib.php');
+require_once($CFG->dirroot . '/totara/core/utils.php');
+require_once($CFG->dirroot . '/totara/customfield/fieldlib.php');
 
 /**
  * Export option codes
@@ -88,26 +88,33 @@ function totara_hierarchy_install_default_comp_scale() {
     global $USER, $DB;
     $now = time();
 
-    $todb = new stdClass;
-    $todb->name = get_string('competencyscale', 'totara_hierarchy');
-    $todb->description = '';
-    $todb->usermodified = $USER->id;
-    $todb->timemodified = $now;
-    $scaleid = $DB->insert_record('comp_scale', $todb);
+    $scale = new stdClass;
+    $scale->name = get_string('competencyscale', 'totara_hierarchy');
+    $scale->description = '';
+    $scale->usermodified = $USER->id;
+    $scale->timemodified = $now;
+    $scaleid = $DB->insert_record('comp_scale', $scale);
 
     $comp_scale_vals = array(
         array('name'=>get_string('competent', 'totara_hierarchy'), 'scaleid' => $scaleid, 'sortorder' => 1, 'usermodified' => $USER->id, 'timemodified' => $now, 'proficient' => 1),
         array('name'=>get_string('competentwithsupervision', 'totara_hierarchy'), 'scaleid' => $scaleid, 'sortorder' => 2, 'usermodified' => $USER->id, 'timemodified' => $now),
         array('name'=>get_string('notcompetent', 'totara_hierarchy'), 'scaleid' => $scaleid, 'sortorder' => 3, 'usermodified' => $USER->id, 'timemodified' => $now)
-        );
+    );
 
     foreach ($comp_scale_vals as $svrow) {
-        $todb = new stdClass;
+        $svalue = new stdClass;
         foreach ($svrow as $key => $val) {
             // Insert default competency scale values, if non-existent
-            $todb->$key = $val;
+            $svalue->$key = $val;
         }
-        $svid = $DB->insert_record('comp_scale_values', $todb);
+        $svid = $DB->insert_record('comp_scale_values', $svalue);
+
+        // Make the notcompetent scale value the default for the scale.
+        if ($svalue->sortorder == 3) {
+            $scale->id = $scaleid;
+            $scale->defaultid = $svid;
+            $DB->update_record('comp_scale', $scale);
+        }
     }
 
     unset($comp_scale_vals, $scaleid, $svid, $todb);
@@ -189,6 +196,35 @@ class hierarchy {
     var $frameworkid;
 
     /**
+     * Content restriction SQL
+     * @var string
+     */
+    protected $contentwhere = '';
+
+    /**
+     * Content restriction SQL parameters
+     */
+    protected $contentparams = array();
+
+    /**
+     * Set the content restriction where clause to apply as defined in the provided report.
+     *
+     * NOTE: This is intended primarily for hierarchy dialogs in reports.
+     *
+     * @param int $reportid Id of the report containing the content restriction definition
+     * @param int $userid Report user to use - mainly useful for testing
+     */
+    public function set_content_restriction_from_report($reportid, $userid=null) {
+        if (empty($reportid)) {
+            return;
+        }
+
+        $config = (new rb_config())->set_reportfor($userid);
+        $report = reportbuilder::create($reportid, $config, true);
+        list($this->contentwhere, $this->contentparams) = $report->get_hierarchy_content_restrictions($this->shortprefix);
+    }
+
+    /**
      * Get a framework
      *
      * @param integer $id (optional) ID of the framework to return. If not set returns the default (first) framework
@@ -201,21 +237,44 @@ class hierarchy {
     function get_framework($id = 0, $showhidden = false, $noframeworkok = false) {
         global $DB;
 
-        // If no framework id supplied, use first in sortorder
+        $fw_where = '';
+        $params = array();
+        $contentjoin = '';
+        $contentwhere = '';
+
         if ($id == 0) {
-            $visible_sql = $showhidden ? '' : ' WHERE visible = 1';
-            $sql = "SELECT * FROM {{$this->shortprefix}_framework}
-                {$visible_sql}
-                ORDER BY sortorder ASC";
-            if (!$framework = $DB->get_record_sql($sql, null, true)) {
+            if (!$showhidden) {
+                $fw_where = 'fw.visible = :visible';
+                $params['visible'] = 1;
+            } else {
+                $fw_where = '(1=1)';
+            }
+        } else {
+            $fw_where = 'fw.id = :id';
+            $params['id'] = $id;
+        }
+
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('fw', 'frameworkid');
+        $params = array_merge($params, $contentparams);
+
+        $sql =
+            "SELECT fw.*
+               FROM {{$this->shortprefix}_framework} fw
+                    {$contentjoin}
+               WHERE {$fw_where}
+                     {$contentwhere}
+            ORDER BY sortorder ASC";
+
+        // If multiple frameworks, use first in sortorder
+        $framework = $DB->get_record_sql($sql, $params, IGNORE_MULTIPLE);
+        if ($framework === false) {
+            if ($id == 0) {
                 if ($noframeworkok) {
                     return false;
                 } else {
                     print_error('noframeworks', 'totara_hierarchy');
                 }
-            }
-        } else {
-            if (!$framework = $DB->get_record($this->shortprefix.'_framework', array('id' => $id))) {
+            } else {
                 print_error('frameworkdoesntexist', 'totara_hierarchy', '', $this->prefix);
             }
         }
@@ -232,11 +291,22 @@ class hierarchy {
      */
     public function get_type_by_id($id, $usertype = false) {
         global $DB;
-        if ($usertype) {
-            return $DB->get_record($this->shortprefix.'_user_type', array('id' => $id));
-        } else {
-            return $DB->get_record($this->shortprefix.'_type', array('id' => $id));
-        }
+
+        $tablename = $usertype
+            ? $this->shortprefix.'_user_type'
+            : $this->shortprefix.'_type';
+
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('t', 'typeid');
+        $params = array_merge(['id' => $id], $contentparams);
+
+        $sql =
+            "SELECT t.*
+               FROM {{$tablename}} t
+               {$contentjoin}
+               WHERE id = :id
+               {$contentwhere}";
+
+        return $DB->get_record_sql($sql, $params);
     }
 
     /**
@@ -249,29 +319,40 @@ class hierarchy {
     function get_frameworks($extra_data=array(), $showhidden=false) {
         global $DB;
 
-        if (!count($extra_data) && !$showhidden) {
-            return $DB->get_records($this->shortprefix.'_framework', array('visible' => '1'), 'sortorder, fullname');
-        } else if (!count($extra_data)) {
-            return $DB->get_records($this->shortprefix.'_framework', array(), 'sortorder, fullname');
+        $fields = 'f.*';
+        $table = "{{$this->shortprefix}_framework} f ";
+        $where = '';
+        $wherejoin = 'WHERE';
+        $params = array();
+
+        if (count($extra_data)) {
+            if (isset($extra_data['depth_count'])) {
+                $fields .= ",(SELECT COALESCE(MAX(depthlevel), 0) FROM {{$this->shortprefix}} item
+                            WHERE item.frameworkid = f.id) AS depth_count ";
+            }
+            if (isset($extra_data['item_count'])) {
+                $fields .= ",(SELECT COUNT(*) FROM {{$this->shortprefix}} ic
+                            WHERE ic.frameworkid=f.id) AS item_count ";
+            }
         }
 
-        $sql = "SELECT f.* ";
-        if (isset($extra_data['depth_count'])) {
-            $sql .= ",(SELECT COALESCE(MAX(depthlevel), 0) FROM {{$this->shortprefix}} item
-                        WHERE item.frameworkid = f.id) AS depth_count ";
-        }
-        if (isset($extra_data['item_count'])) {
-            $sql .= ",(SELECT COUNT(*) FROM {{$this->shortprefix}} ic
-                        WHERE ic.frameworkid=f.id) AS item_count ";
-        }
-        $sql .= "FROM {{$this->shortprefix}_framework} f ";
         if (!$showhidden) {
-            $sql .= "WHERE f.visible=1 ";
+            $where = " WHERE f.visible=:visible ";
+            $params['visible'] = 1;
+            $wherejoin = 'AND';
         }
-        $sql .= "ORDER BY f.sortorder, f.fullname";
 
-        return $DB->get_records_sql($sql);
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('f', 'frameworkid', $wherejoin);
+        $params = array_merge($params, $contentparams);
 
+        $sql =
+            "SELECT DISTINCT {$fields}
+               FROM {$table}
+                    {$contentjoin}
+               {$where} {$contentwhere}
+           ORDER BY f.sortorder, f.fullname";
+
+        return $DB->get_records_sql($sql, $params);
     }
 
     /**
@@ -283,22 +364,30 @@ class hierarchy {
     function get_types($extra_data=array()) {
         global $DB;
 
-        if (!count($extra_data)) {
-           return $DB->get_records($this->shortprefix.'_type', array(), 'fullname');
+        $fields = "c.*";
+        $table = "{{$this->shortprefix}_type} c";
+
+        if (count($extra_data)) {
+            if (isset($extra_data['custom_field_count'])) {
+                $fields .= ", (SELECT COUNT(*) FROM {{$this->shortprefix}_type_info_field} cif
+                            WHERE cif.typeid = c.id) AS custom_field_count ";
+            }
+            if (isset($extra_data['item_count'])) {
+                $fields .= ", (SELECT COUNT(*) FROM {{$this->shortprefix}} ic
+                     WHERE ic.typeid = c.id) AS item_count";
+            }
         }
 
-        $sql = "SELECT c.* ";
-        if (isset($extra_data['custom_field_count'])) {
-            $sql .= ", (SELECT COUNT(*) FROM {{$this->shortprefix}_type_info_field} cif
-                        WHERE cif.typeid = c.id) AS custom_field_count ";
-        }
-        if (isset($extra_data['item_count'])) {
-            $sql .= ", (SELECT COUNT(*) FROM {{$this->shortprefix}} ic
-                 WHERE ic.typeid = c.id) AS item_count";
-        }
-        $sql .= " FROM {{$this->shortprefix}_type} c
-                  ORDER BY c.fullname";
-        return $DB->get_records_sql($sql);
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('c', 'typeid', 'WHERE');
+
+        $sql =
+            "SELECT {$fields}
+               FROM {$table}
+                    {$contentjoin}
+               {$contentwhere}
+           ORDER BY c.fullname";
+
+        return $DB->get_records_sql($sql, $contentparams);
     }
 
     /**
@@ -345,7 +434,16 @@ class hierarchy {
      */
     function get_types_list() {
         global $DB;
-        return $DB->get_records_menu($this->shortprefix.'_type', array(), 'fullname', 'id,fullname');
+
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('t', 'typeid', 'WHERE');
+
+        $sql = "SELECT t.id, t.fullname
+                  FROM {{$this->shortprefix}_type} t
+                       {$contentjoin}
+                  {$contentwhere}
+              ORDER BY t.fullname";
+
+        return $DB->get_records_sql_menu($sql, $contentparams);
     }
 
     /**
@@ -390,7 +488,18 @@ class hierarchy {
      */
     function get_item($id) {
         global $DB;
-        return $DB->get_record($this->shortprefix, array('id' => $id));
+
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements();
+        $params = array_merge(['id' => $id], $contentparams);
+
+        $sql =
+            "SELECT base.*
+               FROM {{$this->shortprefix}} base
+               {$contentjoin}
+               WHERE id = :id
+               {$contentwhere}";
+
+        return $DB->get_record_sql($sql, $params);
     }
 
     /**
@@ -399,7 +508,21 @@ class hierarchy {
      */
     function get_items() {
         global $DB;
-        return $DB->get_records($this->shortprefix, array('frameworkid' => $this->frameworkid), 'sortthread, fullname');
+
+        $where = "base.frameworkid = :fwid";
+        $params = array('fwid' => $this->frameworkid);
+
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('', '', 'AND');
+        $params = array_merge($params, $contentparams);
+
+        $sql =   "SELECT base.*
+                    FROM {{$this->shortprefix}} base
+                         {$contentjoin}
+                   WHERE {$where}
+                         {$contentwhere}
+                ORDER BY base.sortthread, base.fullname";
+
+        return $DB->get_records_sql($sql, $params);
     }
 
     /**
@@ -425,11 +548,27 @@ class hierarchy {
      */
     function get_items_by_parent($parentid=false) {
         global $DB;
+
         if ($parentid) {
             // Parentid supplied, do not specify frameworkid as
             // sometimes it is not set correctly. And a parentid
             // is enough to get the right results
-            return $DB->get_records_select($this->shortprefix, "parentid = ? AND visible = ?", array($parentid, 1), 'frameworkid, sortthread, fullname');
+
+            $where = "base.parentid = :parentid AND base.visible = :visible";
+            $params = array('parentid' => $parentid, 'visible' => 1);
+
+            list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('', '', 'AND');
+            $params = array_merge($params, $contentparams);
+
+            $sql =
+               "SELECT base.*
+                  FROM {{$this->shortprefix}} base
+                       {$contentjoin}
+                 WHERE {$where}
+                       {$contentwhere}
+              ORDER BY base.frameworkid, base.sortthread, base.fullname";
+
+            return $DB->get_records_sql($sql, $params);
         }
         else {
             // If no parentid, grab the root node of this framework
@@ -437,7 +576,7 @@ class hierarchy {
         }
     }
 
-    /*
+    /**
      * Returns all items at the root level (parentid=0) for the current framework (obtained
      * from $this->frameworkid)
      * If no framework is specified, returns root items across all frameworks
@@ -449,18 +588,34 @@ class hierarchy {
      */
     function get_all_root_items($all=false) {
         global $DB;
-        if (empty($this->frameworkid) || $all) {
-            // all root level items across frameworks
-            return $DB->get_records_select($this->shortprefix, "parentid = ? AND visible = ?", array(0, 1), 'frameworkid, sortthread, fullname');
-        } else {
-            // root level items for current framework only
-            $fwid = $this->frameworkid;
-            return $DB->get_records_select($this->shortprefix, "parentid = ? AND frameworkid = ? AND visible = ?", array(0, $fwid, 1), 'sortthread, fullname');
+
+        $where = "base.parentid = :parentid AND base.visible = :visible";
+        $params = array('parentid' => 0, 'visible' => 1);
+
+        if (!empty($this->frameworkid) && !$all) {
+            $where .= " AND base.frameworkid = :fwid";
+            $params['fwid'] = $this->frameworkid;
         }
+
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('', '', 'AND');
+        $params = array_merge($params, $contentparams);
+
+        $sql =
+            "SELECT base.*
+               FROM {{$this->shortprefix}} base
+                    {$contentjoin}
+               WHERE {$where}
+                     {$contentwhere}
+            ORDER BY base.sortthread, base.fullname";
+
+        return $DB->get_records_sql($sql, $params);
     }
 
     /**
-     * Get descendants of an item
+     * Get descendants of an item.
+     *
+     * NOTE: Includes the given item as well!
+     *
      * @param int $id
      * @return array
      */
@@ -469,11 +624,19 @@ class hierarchy {
         $path = $DB->get_field($this->shortprefix, 'path', array('id' => $id));
         if ($path) {
             // the WHERE clause must be like this to avoid /1% matching /10
-            $sql = "SELECT id, fullname, parentid, path, sortthread
-                    FROM {{$this->shortprefix}}
-                    WHERE path = ? OR " . $DB->sql_like('path', '?') . "
-                    ORDER BY path";
-            return $DB->get_records_sql($sql, array($path, "{$path}/%"));
+            $where = "path = ? OR " . $DB->sql_like('path', '?');
+            $params = array($path, "{$path}/%");
+
+            // We need ? query parameters here
+            list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('', '', 'AND', true);
+            $params = array_merge($params, $contentparams);
+
+            $sql = "SELECT base.id, base.fullname, base.parentid, base.path, base.sortthread
+                    FROM {{$this->shortprefix}} base
+                    WHERE ({$where})
+                          {$contentwhere}
+                    ORDER BY base.path";
+            return $DB->get_records_sql($sql, $params);
         } else {
             print_error('nopathfoundforid', 'totara_hierarchy', '', (object)array('prefix' => $this->prefix, 'id' => $id));
         }
@@ -520,12 +683,18 @@ class hierarchy {
             'sortthread'    =>  $sortthread,
         );
 
-        $sql = "SELECT id FROM {{$this->shortprefix}}
-            WHERE frameworkid = :frameworkid AND
-            depthlevel = :depthlevel AND
-            parentid = :parentid AND
-            sortthread $sqlop :sortthread
-            ORDER BY sortthread $sqlsort";
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('', '', 'AND');
+        $params = array_merge($params, $contentparams);
+
+        $sql =
+            "SELECT id
+               FROM {{$this->shortprefix}} base
+              WHERE base.frameworkid = :frameworkid
+                AND depthlevel = :depthlevel
+                AND base.parentid = :parentid
+                AND base.sortthread $sqlop :sortthread
+                    {$contentwhere}
+            ORDER BY base.sortthread $sqlsort";
         // only return first match
         $dest = $DB->get_record_sql($sql, $params, IGNORE_MULTIPLE);
         if ($dest) {
@@ -544,7 +713,19 @@ class hierarchy {
      */
     protected function get_visible_items_and_map() {
         global $DB;
-        $records = $DB->get_records($this->shortprefix, array('visible' => '1'), 'path', 'id,fullname,shortname,parentid,sortthread,path');
+
+        list($contentjoin, $contentwhere, $contentparams) = $this->get_content_sql_elements('', '', 'AND', true);
+        $params = array_merge(array('visible' => '1'), $contentparams);
+
+        $sql =
+            "SELECT base.id, base.fullname, base.shortname, base.parentid, base.sortthread, base.path
+               FROM {{$this->shortprefix}} base
+                    {$contentjoin}
+              WHERE base.visible = :visible
+                    {$contentwhere}
+            ORDER BY base.path";
+
+        $records = $DB->get_records_sql($sql, $params);
         $pathmap = array();
         $parentmap = array();
         foreach ($records as $record) {
@@ -995,44 +1176,38 @@ class hierarchy {
      * See {@link _delete_hierarchy_items()} in the child class for details
      *
      * @param integer $id the item id to delete
-     * @param boolean $triggerevent If true, this command will trigger a "{$prefix}_added" event handler
+     * @param boolean $triggerevent If true, this command will trigger a "{$prefix}_deleted" event handler
      *
      * @return boolean success or failure
      */
     public function delete_hierarchy_item($id, $triggerevent = true) {
-        global $DB, $USER;
+        global $DB;
 
         if (!$DB->record_exists($this->shortprefix, array('id' => $id))) {
             return false;
         }
 
-        $snapshot = $DB->get_record($this->shortprefix, array('id' => $id));
-
         // Get array of items to delete (the item specified *and* all its children).
-        $delete_list = $this->get_item_descendants($id);
-        // Make a copy for triggering events.
-        $deleted_list = $delete_list;
+        $ids = array_keys($this->get_item_descendants($id));
 
-        // Make sure we know the item's framework id.
-        $frameworkid = isset($this->frameworkid) ? $this->frameworkid :
-            $DB->get_field($this->shortprefix, 'frameworkid', array('id' => $id));
+        // Let's get snapshots for the events, if needed
+        if ($triggerevent) {
+            // We can insert this into a query as we know there is at least one record.
+            [$in_sql, $in_params] = $DB->get_in_or_equal($ids, SQL_PARAMS_NAMED);
+            $snapshots = $DB->get_records_select($this->shortprefix, "id {$in_sql}", $in_params);
+        }
 
-            $transaction = $DB->start_delegated_transaction();
+        $transaction = $DB->start_delegated_transaction();
 
-            // Iterate through 1000 items at a time, because oracle can't use.
-            // More than 1000 items in an sql IN clause.
-            while ($delete_items = totara_pop_n($delete_list, 1000)) {
-                $delete_ids = array_keys($delete_items);
-                if (!$this->_delete_hierarchy_items($delete_ids)) {
-                    return false;
-                }
-            }
-            $transaction->allow_commit();
+        if (!$this->_delete_hierarchy_items($ids)) {
+            return false;
+        }
+
+        $transaction->allow_commit();
 
         // Raise an event for each item deleted to let other parts of the system know.
         if ($triggerevent) {
-            foreach ($deleted_list as $deleted_item) {
-
+            foreach ($snapshots as $snapshot) {
                 $eventclass = "\\hierarchy_{$this->prefix}\\event\\{$this->prefix}_deleted";
                 $eventclass::create_from_instance($snapshot)->trigger();
             }
@@ -1221,8 +1396,9 @@ class hierarchy {
 
         foreach ($cols as $datatype) {
             if ($datatype == 'description') {
-                // Description is entered in a textarea
+                // Description is entered in a textarea - and should be run through format_text().
                 $value = file_rewrite_pluginfile_urls($item->$datatype, 'pluginfile.php', context_system::instance()->id, 'totara_hierarchy', $this->shortprefix, $item->id);
+                $value = format_text($value, FORMAT_HTML);
                 $data[] = array(
                     'title' => get_string($datatype.'view', 'totara_hierarchy'),
                     'value' => $value,
@@ -1308,9 +1484,10 @@ class hierarchy {
      *
      * @access  public
      * @param   string $prefix string  Hierarchy prefix
+     * @param   int $contentreportid Optional id of report containing content restrictions to apply (used for dialogs in reports)
      * @return  hierarchy Instance of the hierarchy prefix object
      */
-    static function load_hierarchy($prefix) {
+    static function load_hierarchy($prefix, $contentreportid = 0) {
         global $CFG;
 
         // $prefix could be user input so sanitize
@@ -1330,7 +1507,14 @@ class hierarchy {
             print_error('error:hierarchyprefixnotfound', 'totara_hierarchy', '', $prefix);
         }
 
-        return new $prefix();
+        /** @var hierarchy $instance */
+        $instance = new $prefix();
+
+        if (!empty($contentreportid)) {
+            $instance->set_content_restriction_from_report($contentreportid);
+        }
+
+        return $instance;
     }
 
 
@@ -1353,6 +1537,7 @@ class hierarchy {
         // @todo get based on item type or better still, don't use inline styles :-(
         $cssclass = !$record->visible ? 'dimmed' : '';
         $out = html_writer::start_tag('div', array('class' => 'hierarchyitem ' . $itemdepth));
+        $out .= $OUTPUT->flex_icon('navitem');
         $systemcontext = context_system::instance();
         $canview = has_capability('totara/hierarchy:view' . $this->prefix, $systemcontext);
         if ($canview) {
@@ -1729,6 +1914,16 @@ class hierarchy {
         $olditem = $DB->get_record($this->shortprefix, array('id' => $itemid));
 
         if ($newitem->parentid != $olditem->parentid || $newitem->frameworkid != $olditem->frameworkid) {
+            // Check that the framework id is valid.
+            if ($newitem->frameworkid != $olditem->frameworkid) {
+                $DB->get_record($this->shortprefix.'_framework', array('id' => $newitem->frameworkid), '*', MUST_EXIST);
+            }
+
+            // Check that the parentid is valid if its not empty.
+            if (!empty($newitem->parentid) && $newitem->parentid != $olditem->parentid) {
+                $DB->get_record($this->shortprefix, array('id' => $newitem->parentid), '*', MUST_EXIST);
+            }
+
             // The item is being moved - first update item without changing parent or framework, then move afterwards.
             $oldparentid = $olditem->parentid;
             $newparentid = $newitem->parentid;
@@ -1760,7 +1955,14 @@ class hierarchy {
             $newparentid = isset($newparentid) ? $newparentid : 0;  // top-level
             $newframeworkid = isset($newframeworkid) ? $newframeworkid : $updateditem->frameworkid;  // same framework
             // Move it.
-            $this->move_hierarchy_item($updateditem, $newframeworkid, $newparentid);
+            $success = $this->move_hierarchy_item($updateditem, $newframeworkid, $newparentid);
+
+            if (!$success) {
+                if ($usetransaction && $DB->is_transaction_started()) {
+                    $e = new moodle_exception('There was a problem updating hierarchy item');
+                    $transaction->rollback($e);
+                }
+            }
         }
         // Get a new copy of the updated item from the db.
         $updateditem = $DB->get_record($this->shortprefix, array('id' => $itemid));
@@ -1925,11 +2127,6 @@ class hierarchy {
     /**
      * Return the HTML to display a framework search form
      *
-     * To get placeholder text to appear include the following in the source page:
-     *
-     * require_once($CFG->dirroot.'/totara/core/js/lib/setup.php');
-     * local_js(array(TOTARA_JS_PLACEHOLDER));
-     *
      * @param string $query An existing query to populate the search box with
      * @param string $placeholdertext Placeholder text to appear when the box is empty (optional)
      *
@@ -2027,7 +2224,7 @@ class hierarchy {
         return '';
     }
 
-    /** Prints select box and Export button to export current report.
+    /** Prints select box and Export button to export current framework.
      *
      * A select is shown if the global settings allow exporting in
      * multiple formats. If only one format specified, prints a button.
@@ -2037,26 +2234,379 @@ class hierarchy {
      * if ($format!='') {$report->export_data($format);die;}
      * before header printed
      *
+     * @param string $baseurl
+     * @param bool $disabled
      * @return No return value but prints export select form
      */
-    function export_select($baseurl=null) {
+    function export_select($baseurl = null, $disabled = false) {
         global $CFG;
         require_once($CFG->dirroot.'/totara/hierarchy/export_form.php');
         if (empty($baseurl)) {
             $baseurl = qualified_me();
         }
-        $export = new hierarchy_export_form($baseurl, null, 'post', '', array('class' => 'hierarchy-export-form'));
+
+        $attributes = $disabled ? 'disabled="disabled"' : '';
+        $export = new hierarchy_export_form($baseurl, array('attributes' => $attributes), 'post', '', array('class' => 'hierarchy-export-form'));
         $export->display();
     }
 
     /**
-     * Exports the data from the current results, maintaining
+     * Return html for select box and Export button to export all frameworks.
+     *
+     * A select is shown if the global settings allow exporting in
+     * multiple formats. If only one format specified, prints a button.
+     * If no formats are set in global settings, no export options are shown
+     *
+     * @param string $baseurl
+     * @param bool $disabled
+     * @return string HTML code
+     */
+    public function export_frameworks_select_for_template($baseurl = null, $disabled = false) {
+        global $CFG;
+        require_once($CFG->dirroot.'/totara/hierarchy/export_frameworks_form.php');
+        if (empty($baseurl)) {
+            $baseurl = qualified_me();
+        }
+
+        $attributes = $disabled ? 'disabled="disabled"' : '';
+        $export = new hierarchy_export_frameworks_form($baseurl, array('attributes' => $attributes), 'post', '', array('class' => 'hierarchy-export-framweworks-form'));
+        return $export->render();
+    }
+
+    /**
+     * Default method returning hierarchy fields to include in export
+     *
+     * @return array Array of heading and query field maps
+     */
+    protected function get_export_fields() {
+        return [
+            'idnumber' => 'hierarchy.idnumber',
+            'fullname' => 'hierarchy.fullname',
+            'shortname' => 'hierarchy.shortname',
+            'description' => 'hierarchy.description',
+            'frameworkidnumber' => 'framework.idnumber',
+            'parentidnumber' => 'parent.idnumber',
+            'typeidnumber' => 'type.idnumber',
+            'timemodified' => 'hierarchy.timemodified',
+        ];
+    }
+
+    /**
+     * Get the definition of the fields to to export
+     *
+     * @return array Array of heading and query field maps
+     */
+    protected function get_export_field_def() {
+        global $DB;
+
+        // Always exporting all fields with default headings.
+        // Import ignore values that were not mapped
+        $fields = $this->get_export_fields();
+
+        if ($custom_fields = $DB->get_records($this->shortprefix.'_type_info_field')) {
+            foreach ($custom_fields as $field) {
+                // Need only 1 export column for duplicate customfield shortnames
+                if (!array_key_exists("customfield_{$field->shortname}", $fields)) {
+                    $fields["customfield_{$field->shortname}"] = [];
+                }
+                $fields["customfield_{$field->shortname}"][] = ['alias' => "cf_{$field->datatype}_{$field->id}", 'fieldname' => "cf_{$field->id}.data"];
+            }
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Get the export join definition
+     *
+     * @return array Array containing from clause and associated parameters
+     */
+    protected function get_export_join_def() {
+        global $DB;
+
+        $def = [];
+        $def['from'] =
+               "{{$this->shortprefix}} hierarchy
+          INNER JOIN {{$this->shortprefix}_framework} framework
+                  ON hierarchy.frameworkid = framework.id
+           LEFT JOIN {{$this->shortprefix}_type} type
+                  ON hierarchy.typeid = type.id
+           LEFT JOIN {{$this->shortprefix}} parent
+                  ON hierarchy.parentid = parent.id";
+        $def['params'] = [];
+
+        if ($custom_fields = $DB->get_records($this->shortprefix.'_type_info_field')) {
+            foreach ($custom_fields as $field) {
+                $def['from'] .= " LEFT JOIN {{$this->shortprefix}_type_info_data} cf_{$field->id}
+                                         ON hierarchy.id = cf_{$field->id}.{$this->prefix}id
+                                        AND cf_{$field->id}.fieldid = :cf_{$field->id}";
+                $def['params']["cf_{$field->id}"] = $field->id;
+            }
+        }
+
+        return $def;
+    }
+
+    /**
+     * Exports the data from the current results in a flat format
+     * including all fields and custom fields
+     *
+     * @param string $format Format for the export hr/ods/csv/xls
+     * @param bool $exportall Export all elements or only elements in this framework
+     * @param string $file File to export data to - used for testing
+     * @return void
+     */
+    public function export_data(string $format, bool $exportall = false, string $file = null) {
+        global $CFG;
+
+        if (!empty($CFG->hierarchylegacyexport)) {
+            $this->export_data_legacy($format);
+            return;
+        }
+
+        $fields = $this->get_export_field_def();
+        $joindef = $this->get_export_join_def();
+
+        $fldnames = '';
+        foreach ($fields as $alias => $field) {
+            if (is_array($field)) {
+                // Custom fields
+                foreach ($field as $cfield) {
+                    $fldnames .= ", {$cfield['fieldname']} as {$cfield['alias']}";
+                }
+            } else {
+                $fldnames .= ", {$field} as {$alias}";
+            }
+        }
+
+        $params = [];
+        $where = '';
+        if (!$exportall) {
+            $where = "WHERE hierarchy.frameworkid = :fwid";
+            $params['fwid'] = $this->frameworkid;
+        }
+
+        $sql =
+            "SELECT hierarchy.id as id {$fldnames}
+               FROM {$joindef['from']}
+              $where
+           ORDER BY hierarchy.frameworkid, hierarchy.sortthread";
+
+        $params = array_merge($params, $joindef['params']);;
+
+        $this->download_export($format, $fields, $sql, $params, $file);
+
+        if (empty($file)) {
+            die;
+        }
+    }
+
+    /**
+     * Download data in the requested format
+     *
+     * @param string $format Export format
+     * @param array $fields Array of headings and fields
+     * @param string $query SQL query to run to get results
+     * @param array $params SQL query parameters
+     * @param string $file File to export data to - used for testing
+     * @return void
+     */
+    protected function download_export(string $format, array $fields, string $query, array $params = [], string $file = null) {
+        global $CFG;
+        require_once($CFG->libdir . '/csvlib.class.php');
+
+        $shortname = $this->prefix;
+        $filename = clean_filename("{$shortname}_export.{$format}");
+
+        if (empty($file)) {
+            header("Content-Type: application/download\n");
+            header("Content-Disposition: attachment; filename=$filename");
+            header("Expires: 0");
+            header("Cache-Control: must-revalidate,post-check=0,pre-check=0");
+            header("Pragma: public");
+        }
+
+        switch($format) {
+            case 'csv':
+                $this->download_csv($filename, $fields, $query, $params, $file);
+                break;
+            case 'ods':
+                $this->download_ods($filename, $fields, $query, $params, $file);
+                break;
+            case 'xls':
+                $this->download_xls($filename, $fields, $query, $params, $file);
+                break;
+        }
+    }
+
+    /**
+     * Download data in ODS format
+     *
+     * @param string $filename Output filename
+     * @param array $fields Array of headings and fields
+     * @param string $query SQL query to run to get results
+     * @param array $params SQL query parameters
+     * @param string $file File to export data to - used for testing
+     * @return void
+     */
+    protected function download_ods(string $filename, array $fields, string $query, array $params = [], string $file = null) {
+        global $CFG;
+
+        require_once("$CFG->libdir/odslib.class.php");
+
+        $workbook = new MoodleODSWorkbook($filename);
+        $this->download_spreadsheet($workbook, $fields, $query, $params, $file);
+    }
+
+    /**
+     * Download data in XLS format
+     *
+     * @param string $filename Output filename
+     * @param array $fields Array of headings and fields
+     * @param string $query SQL query to run to get results
+     * @param array $params SQL query parameters
+     * @param string $file File to export data to - used for testing
+     * @return void
+     */
+    protected function download_xls(string $filename, array $fields, string $query, array $params = [], string $file = null) {
+        global $CFG;
+
+        require_once("$CFG->libdir/excellib.class.php");
+
+        $workbook = new MoodleExcelWorkbook($filename);
+        $this->download_spreadsheet($workbook, $fields, $query, $params, $file);
+    }
+
+    /**
+     * Write export data to spreadsheet
+     *
+     * @param mixed $workbook Initialised spreadsheet workbook
+     * @param array $fields Array of headings and fields
+     * @param string $query SQL query to run to get results
+     * @param array $params SQL query parameters
+     * @param string $file File to export data to - used for testing
+     * @return void
+     */
+    protected function download_spreadsheet($workbook, array $fields, string $query, array $params = [], $file = null) {
+        global $DB;
+
+        $worksheet = $workbook->add_worksheet('');
+        $row = 0;
+        $col = 0;
+
+        // Headings
+        foreach ($fields as $fieldid => $fieldname) {
+            $worksheet->write($row, $col, $fieldid);
+            $col++;
+        }
+        $row++;
+
+        // Actual data
+        // Use recordset to keep memory use down.
+        $data = $DB->get_recordset_sql($query, $params);
+        if ($data) {
+            foreach ($data as $datarow) {
+                $col = 0;
+
+                // Explicitly export the fields as string to avoid the type being incorrectly detected.
+                foreach ($fields as $fieldid => $fieldname) {
+                    $cellvalue = '';
+
+                    if (is_array($fieldname)) {
+                        // Custom field
+                        // Can have multiple select columns, but at most 1 will have a value
+                        foreach ($fieldname as $cfield) {
+                            if ($datarow->{$cfield['alias']}) {
+                                $cellvalue = $this->parse_customfield($cfield['alias'], $datarow->{$cfield['alias']}, true);
+                                break;
+                            }
+                        }
+                    } else {
+                        $cellvalue = $datarow->$fieldid;
+                    }
+
+                    $worksheet->write_string($row, $col++, htmlspecialchars_decode($cellvalue));
+                }
+                $row++;
+            }
+        }
+
+        $workbook->close();
+        if (empty($file)) {
+            die;
+        }
+    }
+
+    /**
+     * Download data in CSV format
+     *
+     *
+     * @param array $fields Array of headings and fields
+     * @param string $query SQL query to run to get results
+     * @param array $params SQL query parameters
+     * @param string $file Filename to write to - useful for testing purposes
+     * @return void
+     */
+    protected function download_csv(string $filename, array $fields, string $query, array $params = [], string $file = null) {
+        global $DB;
+
+        $headers = [];
+        foreach ($fields as $fieldid => $fieldname) {
+            $headers[] = $fieldid;
+        }
+
+        // The first row is to be the headers.
+        $rows = [$headers];
+
+        // Actual data
+        //Use recordset to keep memory use down
+        $data = $DB->get_recordset_sql($query, $params);
+        if ($data) {
+            foreach ($data as $datarow) {
+                $row = array();
+                foreach ($fields as $fieldid => $fieldname) {
+                    if (is_array($fieldname)) {
+                        // Custom field
+                        // Can have multiple select columns, but at most 1 will have a value
+                        $rowvalue = '';
+
+                        foreach ($fieldname as $cfield) {
+                            if ($datarow->{$cfield['alias']}) {
+                                $rowvalue = $this->parse_customfield($cfield['alias'], $datarow->{$cfield['alias']}, true);
+                                break;
+                            }
+                        }
+                        $row[$fieldid] = $rowvalue;
+
+                    } else {
+                        if ($datarow->$fieldid) {
+                            $row[$fieldid] = $datarow->$fieldid;
+                        } else {
+                            $row[$fieldid] = '';
+                        }
+                    }
+                }
+                $rows[] = $row;
+            }
+        }
+
+        if (empty($file)) {
+            csv_export_writer::download_array($filename, $rows);
+        } else {
+            $fp = fopen($file, "w");
+            fwrite($fp, csv_export_writer::print_array($rows, 'comma', '"', true));
+            fclose($fp);
+        }
+    }
+
+    /**
+     * Exports the data from the current results in , maintaining
      * sort order and active filters but removing pagination
      *
      * @param string $format Format for the export ods/csv/xls
      * @return No return but initiates save dialog
      */
-    function export_data($format) {
+    function export_data_legacy($format) {
         global $DB;
 
         $query = optional_param('query', '', PARAM_TEXT);
@@ -2119,11 +2669,11 @@ class hierarchy {
 
         switch($format) {
             case 'ods':
-                $this->download_ods($headings, $sql, $params, $maxdepth, null, $searchactive);
+                $this->download_ods_legacy($headings, $sql, $params, $maxdepth, null, $searchactive);
             case 'xls':
-                $this->download_xls($headings, $sql, $params, $maxdepth, null, $searchactive);
+                $this->download_xls_legacy($headings, $sql, $params, $maxdepth, null, $searchactive);
             case 'csv':
-                $this->download_csv($headings, $sql, $params, $maxdepth, null, $searchactive);
+                $this->download_csv_legacy($headings, $sql, $params, $maxdepth, null, $searchactive);
         }
         die;
     }
@@ -2155,7 +2705,7 @@ class hierarchy {
      * @param string $file path to the directory where the file will be saved
      * @return Returns the ODS file
      */
-    function download_ods($fields, $query, $params, $maxdepth, $file=null, $searchactive=false) {
+    function download_ods_legacy($fields, $query, $params, $maxdepth, $file=null, $searchactive=false) {
         global $CFG, $DB;
         require_once("$CFG->libdir/odslib.class.php");
         $shortname = $this->prefix;
@@ -2232,7 +2782,7 @@ class hierarchy {
      * @param string $file path to the directory where the file will be saved
      * @return Returns the Excel file
      */
-    function download_xls($fields, $query, $params, $maxdepth, $file=null, $searchactive=false) {
+    function download_xls_legacy($fields, $query, $params, $maxdepth, $file=null, $searchactive=false) {
         global $CFG, $DB;
 
         require_once("$CFG->libdir/excellib.class.php");
@@ -2310,7 +2860,7 @@ class hierarchy {
      * @param integer $maxdepth Number of the deepest depth in this hierarchy
      * @return Returns the CSV file
      */
-    function download_csv($fields, $query, $params, $maxdepth, $file=null, $searchactive=false) {
+    function download_csv_legacy($fields, $query, $params, $maxdepth, $file=null, $searchactive=false) {
         global $DB;
         $shortname = $this->prefix;
         $filename = clean_filename($shortname.'_report.csv');
@@ -3092,6 +3642,50 @@ class hierarchy {
         return $items_to_add;
     }
 
+    /**
+     * Return content restriction join, whereclause and parameters to use
+     * As content restriction is obtained from report builder, we need to use
+     * 'base' as table alias for {shortprefix} table.
+     *
+     * @param string $tablealias Main selection table's alias
+     *                           Leave empty if only selecting from {shortprefix}
+     * @param string $linkcolumn Foreign key in {shortprefix} to main selection table
+     * @param string $wherestr Where connect string
+     * @param bool $q_params Use ? query paramenters
+     * @return array containing join clause, where clause and where clause parameters
+     */
+    protected function get_content_sql_elements($tablealias = '', $linkcolumn = '', $wherestr = 'AND', $q_params = false) {
+        if (!empty($this->contentwhere)) {
+            $contentjoin = '';
+            if (!empty($tablealias) && !empty($linkcolumn)) {
+                $contentjoin =
+                    "INNER JOIN {{$this->shortprefix}} base
+                             ON base.{$linkcolumn} = {$tablealias}.id";
+            }
+
+            $contentwhere = $this->contentwhere;
+            $contentparams = $q_params ? array() : $this->contentparams;
+
+            if ($q_params) {
+                // We need to replace named sql parameters to ?
+                $pattern = '/(?<!:):[a-z][a-z0-9_]*/';
+
+                $named_count = preg_match_all($pattern, $contentwhere, $named_matches); // :: used in pgsql casts
+                foreach ($named_matches[0] as $key) {
+                    $key = trim($key, ':');
+                    if (array_key_exists($key, $this->contentparams)) {
+                        $contentparams[] = $this->contentparams[$key];
+                    }
+                }
+
+                $contentwhere = preg_replace($pattern, '?', $contentwhere);
+            }
+
+            return array($contentjoin, " {$wherestr} {$contentwhere}", $contentparams);
+        }
+
+        return array('', '', array());
+    }
 }
 
 /**

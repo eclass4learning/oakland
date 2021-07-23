@@ -39,7 +39,7 @@ class core_string_manager_standard_testcase extends advanced_testcase {
     public function test_string_manager_instance() {
         $this->resetAfterTest();
 
-        $otherroot = dirname(__FILE__).'/fixtures/langtest';
+        $otherroot = __DIR__.'/fixtures/langtest';
         $stringman = testable_core_string_manager::instance($otherroot);
         $this->assertInstanceOf('core_string_manager', $stringman);
     }
@@ -47,7 +47,7 @@ class core_string_manager_standard_testcase extends advanced_testcase {
     public function test_get_language_dependencies() {
         $this->resetAfterTest();
 
-        $otherroot = dirname(__FILE__).'/fixtures/langtest';
+        $otherroot = __DIR__.'/fixtures/langtest';
         $stringman = testable_core_string_manager::instance($otherroot);
 
         // There is no parent language for 'en'.
@@ -75,13 +75,13 @@ class core_string_manager_standard_testcase extends advanced_testcase {
         $this->assertFalse($stringman->string_deprecated('hidden', 'grades'));
 
         // Check deprecated string.
-        $this->assertTrue($stringman->string_deprecated('timelimitmin', 'mod_quiz'));
-        $this->assertTrue($stringman->string_exists('timelimitmin', 'mod_quiz'));
+        $this->assertTrue($stringman->string_deprecated('modchooserenable', 'core'));
+        $this->assertTrue($stringman->string_exists('modchooserenable', 'core'));
         $this->assertDebuggingNotCalled();
-        $this->assertEquals('Time limit (minutes)', get_string('timelimitmin', 'mod_quiz'));
-        $this->assertDebuggingCalled('String [timelimitmin,mod_quiz] is deprecated. '.
+        $this->assertEquals('Activity chooser on', get_string('modchooserenable', 'core'));
+        $this->assertDebuggingCalled('String [modchooserenable,core] is deprecated. '.
             'Either you should no longer be using that string, or the string has been incorrectly deprecated, in which case you should report this as a bug. '.
-            'Please refer to https://docs.moodle.org/dev/String_deprecation');
+            'Please refer to https://help.totaralearning.com/display/DEV/Deprecating+Language+Strings');
     }
 
     /**
@@ -123,6 +123,31 @@ class core_string_manager_standard_testcase extends advanced_testcase {
 
         $this->assertTrue($stringman->string_exists($matches[1], $matches[2]),
             "String {$string} appearing in one of the lang/en/deprecated.txt files does not exist");
+    }
+
+    /**
+     * Test that debugging of strings works as exepected
+     */
+    public function test_get_string_debug() {
+        global $CFG;
+
+        $this->resetAfterTest();
+
+        $otherroot = dirname(__FILE__).'/fixtures/langtest';
+        $stringman = testable_core_string_manager::instance($otherroot);
+
+        $CFG->debugstringids = true;
+        $this->assertEquals('Admin', $stringman->get_string("admin"));
+        $this->assertEquals('Admin', get_string("admin"));
+        $this->assertEquals('Schedule', $stringman->get_string('schedule', 'totara_core'));
+        $this->assertEquals('Schedule', get_string('schedule', 'totara_core'));
+
+        $_POST['strings'] = 1;
+
+        $this->assertEquals('Admin {admin/moodle}', $stringman->get_string("admin"));
+        $this->assertEquals('Admin {admin/moodle}', get_string("admin"));
+        $this->assertEquals('Schedule {schedule/totara_core}', $stringman->get_string('schedule', 'totara_core'));
+        $this->assertEquals('Schedule {schedule/totara_core}', get_string('schedule', 'totara_core'));
     }
 }
 

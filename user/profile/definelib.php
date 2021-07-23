@@ -51,17 +51,18 @@ class profile_define_base {
 
         $strrequired = get_string('required');
 
-        $form->addElement('text', 'shortname', get_string('profileshortname', 'admin'), 'maxlength="100" size="25"');
-        $form->addRule('shortname', $strrequired, 'required', null, 'client');
-        $form->setType('shortname', PARAM_ALPHANUM);
-
         $form->addElement('text', 'name', get_string('profilename', 'admin'), 'size="50"');
         $form->addRule('name', $strrequired, 'required', null, 'client');
         $form->setType('name', PARAM_TEXT);
 
+        $form->addElement('text', 'shortname', get_string('profileshortname', 'admin'), 'maxlength="100" size="25"');
+        $form->addRule('shortname', $strrequired, 'required', null, 'client');
+        $form->setType('shortname', PARAM_ALPHANUM);
+
         $form->addElement('editor', 'description', get_string('profiledescription', 'admin'), null, null);
 
         $form->addElement('selectyesno', 'required', get_string('profilerequired', 'admin'));
+        $form->addHelpButton('required', 'profilerequired', 'admin');
 
         $form->addElement('selectyesno', 'locked', get_string('profilelocked', 'admin'));
 
@@ -521,6 +522,13 @@ function profile_edit_field($id, $datatype, $redirect) {
         $field->defaultdataformat = FORMAT_HTML;
     }
 
+    // Save shortname for update event.
+    if ($id != 0) {
+        $oldshortname = $field->shortname;
+    } else {
+        $oldshortname = '';
+    }
+
     // Clean and prepare description for the editor.
     $field->description = clean_text($field->description, $field->descriptionformat);
     $field->description = array('text' => $field->description, 'format' => $field->descriptionformat, 'itemid' => 0);
@@ -574,6 +582,18 @@ function profile_edit_field($id, $datatype, $redirect) {
             $formfield->define_save($data);
             profile_reorder_fields();
             profile_reorder_categories();
+
+            // Don't trigger if we are creating a new field.
+            if ($id != 0) {
+                // Trigger update event.
+                $eventdata = new stdClass();
+                $eventdata->objectid = $id;
+                $eventdata->oldshortname = $oldshortname;
+                $eventdata->shortname = $data->shortname;
+
+                \totara_customfield\event\profilefield_updated::create_from_field($eventdata)->trigger();
+            }
+
             redirect($redirect);
         }
 

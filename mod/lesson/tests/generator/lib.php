@@ -54,14 +54,15 @@ class mod_lesson_generator extends testing_module_generator {
         global $CFG;
 
         // Add default values for lesson.
+        $lessonconfig = get_config('mod_lesson');
         $record = (array)$record + array(
-            'progressbar' => 0,
-            'ongoing' => 0,
-            'displayleft' => 0,
-            'displayleftif' => 0,
-            'slideshow' => 0,
-            'maxanswers' => $CFG->lesson_maxanswers,
-            'feedback' => 0,
+            'progressbar' => $lessonconfig->progressbar,
+            'ongoing' => $lessonconfig->ongoing,
+            'displayleft' => $lessonconfig->displayleftmenu,
+            'displayleftif' => $lessonconfig->displayleftif,
+            'slideshow' => $lessonconfig->slideshow,
+            'maxanswers' => $lessonconfig->maxanswers,
+            'feedback' => $lessonconfig->defaultfeedback,
             'activitylink' => 0,
             'available' => 0,
             'deadline' => 0,
@@ -71,16 +72,16 @@ class mod_lesson_generator extends testing_module_generator {
             'timespent' => 0,
             'completed' => 0,
             'gradebetterthan' => 0,
-            'modattempts' => 0,
-            'review' => 0,
-            'maxattempts' => 1,
-            'nextpagedefault' => $CFG->lesson_defaultnextpage,
-            'maxpages' => 0,
-            'practice' => 0,
-            'custom' => 1,
-            'retake' => 0,
-            'usemaxgrade' => 0,
-            'minquestions' => 0,
+            'modattempts' => $lessonconfig->modattempts,
+            'review' => $lessonconfig->displayreview,
+            'maxattempts' => $lessonconfig->maximumnumberofattempts,
+            'nextpagedefault' => $lessonconfig->defaultnextpage,
+            'maxpages' => $lessonconfig->numberofpagestoshow,
+            'practice' => $lessonconfig->practice,
+            'custom' => $lessonconfig->customscoring,
+            'retake' => $lessonconfig->retakesallowed,
+            'usemaxgrade' => $lessonconfig->handlingofretakes,
+            'minquestions' => $lessonconfig->minimumnumberofquestions,
             'grade' => 100,
         );
         if (!isset($record['mediafile'])) {
@@ -424,5 +425,25 @@ class mod_lesson_generator extends testing_module_generator {
         $context = context_module::instance($lesson->cmid);
         $page = lesson_page::create((object)$record, new lesson($lesson), $context, $CFG->maxbytes);
         return $DB->get_record('lesson_pages', array('id' => $page->id), '*', MUST_EXIST);
+    }
+
+    /**
+     * Wind lesson time back by the specified number of seconds
+     *
+     * @param string $lessonname Lesson name
+     * @param int $seconds Number of seconds to wind back
+     */
+    public function wind_back_timer($lessonname, $seconds) {
+        global $DB;
+
+        $sql = "UPDATE {lesson_timer}
+                   SET starttime = starttime - :seconds1
+                 WHERE lessonid IN (
+                       SELECT id
+                         FROM {lesson}
+                         WHERE name = :lessonname)
+                   AND starttime > :seconds2";
+        $params = array('lessonname' => $lessonname, 'seconds1' => $seconds, 'seconds2' => $seconds);
+        $DB->execute($sql, $params);
     }
 }

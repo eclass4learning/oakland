@@ -1,4 +1,4 @@
-@mod_facetoface @totara
+@mod_facetoface @totara @totara_customfield @core_calendar
 Feature: Filter seminar events in calendar by their customfields
   In order to test the seminar filtering in calendar
   As user
@@ -42,7 +42,7 @@ Feature: Filter seminar events in calendar by their customfields
       | Full name  | Menu of choices |
       | Short name | menuofchoices |
       | Default value | Choice 1          |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       Choice 1
       Choice 2
@@ -96,7 +96,7 @@ Feature: Filter seminar events in calendar by their customfields
       | Full name  | Menu of choices |
       | Short name | menuofchoices |
       | Default value | Choice 1          |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       Choice 1
       Choice 2
@@ -123,20 +123,7 @@ Feature: Filter seminar events in calendar by their customfields
 
     # Enable filtering by customfields, not using values (as they depend on id)
     And I navigate to "Global settings" node in "Site administration > Seminars"
-    And I click on "Event: Checkbox" "option"
-    And I click on "Event: Date time" "option"
-    And I click on "Event: Location" "option"
-    And I click on "Event: Menu of choices" "option"
-    And I click on "Event: Multi-select" "option"
-    And I click on "Event: Text input" "option"
-    And I click on "Event: Text area" "option"
-    And I click on "Room: Checkbox" "option"
-    And I click on "Room: Date time" "option"
-    And I click on "Room: Location" "option"
-    And I click on "Room: Menu of choices" "option"
-    And I click on "Room: Multi-select" "option"
-    And I click on "Room: Building" "option"
-    And I click on "Room: Text area" "option"
+    And I set the field "Add calendar filters" to "Event: Checkbox,Event: Date time,Event: Location,Event: Menu of choices,Event: Multi-select,Event: Text input,Event: Text area,Room: Checkbox,Room: Date time,Room: Location,Room: Menu of choices,Room: Multi-select,Room: Building,Room: Text area"
     And I press "Save changes"
 
     # Create rooms
@@ -145,15 +132,16 @@ Feature: Filter seminar events in calendar by their customfields
     And I set the following fields to these values:
       | Name                          | Room 1          |
       | Address                       | 123 here street |
-      | Maximum bookings              | 5               |
+      | Room capacity                 | 5               |
       | Building                      | That house      |
       | Checkbox                      | 1               |
       | customfield_datetime[enabled] | 1               |
       | customfield_datetime[day]     | 15              |
       | customfield_datetime[month]   | 12              |
-      | customfield_datetime[year]    | 2020            |
+      | customfield_datetime[year]    | ## next year ## Y ## |
       | Menu of choices               | Choice 2        |
       | Text area                     | Big text        |
+    # Untick default - only Option 2 selected
     And I click on "#id_customfield_multiselect_0" "css_element"
     And I click on "#id_customfield_multiselect_1" "css_element"
     And I press "Add a room"
@@ -162,29 +150,63 @@ Feature: Filter seminar events in calendar by their customfields
     And I set the following fields to these values:
       | Name                          | Room 2        |
       | Address                       | 123 other ave |
-      | Maximum bookings              | 5             |
+      | Room capacity                 | 5             |
       | Building                      | My house      |
       | Checkbox                      | 0             |
       | customfield_datetime[enabled] | 1             |
       | customfield_datetime[day]     | 13            |
       | customfield_datetime[month]   | 12            |
-      | customfield_datetime[year]    | 2020          |
+      | customfield_datetime[year]    | ## next year ## Y ## |
       | Menu of choices               | Choice 3      |
       | Text area                     | Some text     |
+    # Option 1 selected by default
+    And I press "Add a room"
+
+    # Create more rooms than is needed to minimize the risk of the session and room having the same id
+    And I press "Add a new room"
+    And I set the following fields to these values:
+      | Name                          | Room 3          |
+      | Address                       | 123 new street  |
+      | Room capacity                 | 15              |
+      | Building                      | New house       |
+      | Checkbox                      | 1               |
+      | customfield_datetime[enabled] | 1               |
+      | customfield_datetime[day]     | 15              |
+      | customfield_datetime[month]   | 12              |
+      | customfield_datetime[year]    | ## next year ## Y ## |
+      | Menu of choices               | Choice 1        |
+      | Text area                     | New text        |
+    # Untick default - only Option 2 selected
     And I click on "#id_customfield_multiselect_0" "css_element"
+    And I click on "#id_customfield_multiselect_1" "css_element"
+    And I press "Add a room"
+
+    And I press "Add a new room"
+    And I set the following fields to these values:
+      | Name                          | Room 4        |
+      | Address                       | 123 old ave   |
+      | Room capacity                 | 15            |
+      | Building                      | Old house     |
+      | Checkbox                      | 0             |
+      | customfield_datetime[enabled] | 1             |
+      | customfield_datetime[day]     | 13            |
+      | customfield_datetime[month]   | 12            |
+      | customfield_datetime[year]    | ## next year ## Y ## |
+      | Menu of choices               | Choice 3      |
+      | Text area                     | Some text     |
+    # Leave default - Options 1 and 2 selected
+    And I click on "#id_customfield_multiselect_1" "css_element"
     And I press "Add a room"
 
     # Add 2 seminars using different custom fields and rooms
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
 
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Seminar one        |
       | Description | Seminar one desc   |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I fill seminar session with relative date in form data:
       | timestart[timezone]  | Australia/Perth |
       | timestart[day]       | 0               |
@@ -198,9 +220,9 @@ Feature: Filter seminar events in calendar by their customfields
       | timefinish[year]     | 0               |
       | timefinish[hour]     | +1              |
       | timefinish[minute]   | 0               |
-    And I press "OK"
+    And I click on "OK" "button" in the "Select date" "totaradialogue"
     And I click on "Select room" "link"
-    And I click on "Room 1" "text" in the "Choose a room" "totaradialogue"
+    And I click on "Room 4" "text" in the "Choose a room" "totaradialogue"
     And I click on "OK" "button" in the "Choose a room" "totaradialogue"
     And I set the following fields to these values:
       | capacity                      | 2             |
@@ -211,21 +233,20 @@ Feature: Filter seminar events in calendar by their customfields
       | customfield_datetime[enabled] | 1             |
       | customfield_datetime[day]     | 13            |
       | customfield_datetime[month]   | 11            |
-      | customfield_datetime[year]    | 2020          |
+      | customfield_datetime[year]    | ## next year ## Y ## |
       | Menu of choices               | Choice 1      |
       | Text area                     | My area       |
     And I click on "#id_customfield_multiselect_0" "css_element"
     And I click on "#id_customfield_multiselect_2" "css_element"
     And I press "Save changes"
 
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Seminar two        |
       | Description | Seminar two desc   |
     And I follow "Seminar two"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I fill seminar session with relative date in form data:
       | timestart[timezone]  | Australia/Perth |
       | timestart[day]       | 0               |
@@ -239,9 +260,9 @@ Feature: Filter seminar events in calendar by their customfields
       | timefinish[year]     | 0               |
       | timefinish[hour]     | +1              |
       | timefinish[minute]   | 0               |
-    And I press "OK"
+    And I click on "OK" "button" in the "Select date" "totaradialogue"
     And I click on "Select room" "link"
-    And I click on "Room 2" "text" in the "Choose a room" "totaradialogue"
+    And I click on "Room 3" "text" in the "Choose a room" "totaradialogue"
     And I click on "OK" "button" in the "Choose a room" "totaradialogue"
     And I set the following fields to these values:
       | capacity                      | 2            |
@@ -252,7 +273,7 @@ Feature: Filter seminar events in calendar by their customfields
       | customfield_datetime[enabled] | 1            |
       | customfield_datetime[day]     | 15           |
       | customfield_datetime[month]   | 11           |
-      | customfield_datetime[year]    | 2020         |
+      | customfield_datetime[year]    | ## next year ## Y ## |
       | Menu of choices               | Choice 2     |
       | Text area                     | Input area   |
     And I click on "#id_customfield_multiselect_0" "css_element"
@@ -293,15 +314,15 @@ Feature: Filter seminar events in calendar by their customfields
       | Event: Location:   | 54 oak street   |
       | Event: Text input: | short desc      |
       | Event: Text area:  | my area         |
-      | Room: Location:      | 123 here street |
-      | Room: Building:      | that house      |
-      | Room: Date time:     | december        |
-      | Room: Text area:     | BIG TEXT        |
+      | Room: Location:    | 123 old ave     |
+      | Room: Building:    | old house       |
+      | Room: Date time:   | december        |
+      | Room: Text area:   | SOME TEXT       |
     And I select "No" from the "field_sess_checkbox" singleselect
     And I select "Choice 1" from the "field_sess_menuofchoices" singleselect
     And I select "Option 3" from the "field_sess_multiselect" singleselect
-    And I select "Yes" from the "field_room_checkbox" singleselect
-    And I select "Choice 2" from the "field_room_menuofchoices" singleselect
+    And I select "No" from the "field_room_checkbox" singleselect
+    And I select "Choice 3" from the "field_room_menuofchoices" singleselect
     And I select "Option 2" from the "field_room_multiselect" singleselect
     When I press "Apply filter"
     Then I should see "Seminar one"
@@ -313,10 +334,10 @@ Feature: Filter seminar events in calendar by their customfields
       | Event: Location:   | oak             |
       | Event: Text input: | desc            |
       | Event: Text area:  | area            |
-      | Room: Location:      | 123             |
-      | Room: Building:      | house           |
-      | Room: Date time:     | december        |
-      | Room: Text area:     | text            |
+      | Room: Location:    | 123             |
+      | Room: Building:    | house           |
+      | Room: Date time:   | december        |
+      | Room: Text area:   | text            |
     And I select "All" from the "field_sess_menuofchoices" singleselect
     And I select "No" from the "field_sess_checkbox" singleselect
     And I select "Option 1" from the "field_sess_multiselect" singleselect

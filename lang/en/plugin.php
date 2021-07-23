@@ -105,11 +105,13 @@ $string['status_upgrade'] = 'To be upgraded';
 $string['status_uptodate'] = 'Installed';
 $string['supportedmoodleversions'] = 'Supported Totara versions';
 $string['systemname'] = 'Identifier';
-$string['totaraaddonnotice'] = 'Totara LMS does not include an add-on installer, all additional plugins must be installed manually by server administrators.
+$string['totaraaddonnotice'] = 'Totara does not include an add-on installer, all additional plugins must be installed manually by server administrators.
 
-Before installing any additional plugins please make sure the code was tested with Totara LMS, is secure, is maintained by authors and contains phpunit and behat tests.
+Before installing any additional plugins please make sure the code was tested with Totara, is secure, is maintained by authors and contains phpunit and behat tests.
 
 Totara Learning Solutions support does not cover plugins that are not included in the standard distribution.';
+$string['type_antivirus'] = 'Antivirus plugin';
+$string['type_antivirus_plural'] = 'Antivirus plugins';
 $string['type_auth'] = 'Authentication method';
 $string['type_auth_plural'] = 'Authentication methods';
 $string['type_availability'] = 'Availability restriction';
@@ -124,6 +126,8 @@ $string['type_calendartype'] = 'Calendar type';
 $string['type_calendartype_plural'] = 'Calendar types';
 $string['type_coursereport'] = 'Course report';
 $string['type_coursereport_plural'] = 'Course reports';
+$string['type_dataformat'] = 'Data format';
+$string['type_dataformat_plural'] = 'Data formats';
 $string['type_editor'] = 'Editor';
 $string['type_editor_plural'] = 'Editors';
 $string['type_enrol'] = 'Enrolment method';
@@ -142,6 +146,8 @@ $string['type_gradingform'] = 'Advanced grading method';
 $string['type_gradingform_plural'] = 'Advanced grading methods';
 $string['type_local'] = 'Local plugin';
 $string['type_local_plural'] = 'Local plugins';
+$string['type_media'] = 'Media player';
+$string['type_media_plural'] = 'Media players';
 $string['type_message'] = 'Messaging output';
 $string['type_message_plural'] = 'Messaging outputs';
 $string['type_mnetservice'] = 'MNet service';
@@ -164,6 +170,8 @@ $string['type_report'] = 'Site report';
 $string['type_report_plural'] = 'Reports';
 $string['type_repository'] = 'Repository';
 $string['type_repository_plural'] = 'Repositories';
+$string['type_search'] = 'Search engine';
+$string['type_search_plural'] = 'Search engines';
 $string['type_theme'] = 'Theme';
 $string['type_theme_plural'] = 'Themes';
 $string['type_tool'] = 'Admin tool';

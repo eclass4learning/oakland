@@ -38,8 +38,10 @@ class mod_scorm_report_settings extends moodleform {
         // -------------------------------------------------------------------------------
         $mform->addElement('header', 'preferencesuser', get_string('preferencesuser', 'scorm'));
 
-        $mform->addElement('text', 'pagesize', get_string('pagesize', 'scorm'));
+        $mform->addElement('text', 'pagesize', get_string('pagesize', 'scorm'), array('size' => '6', 'maxlength' => 4));
         $mform->setType('pagesize', PARAM_INT);
+        $mform->addRule('pagesize', null, 'numeric', null, 'client');
+        $mform->addHelpButton('pagesize', 'pagesize', 'scorm');
 
         $mform->addElement('selectyesno', 'detailedrep', get_string('details', 'scorm'));
 

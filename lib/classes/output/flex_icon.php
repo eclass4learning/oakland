@@ -120,6 +120,36 @@ class flex_icon extends \pix_icon {
     }
 
     /**
+     * Allow the flex icon to be rendered by the pix helper.
+     *
+     * Much simpler version of export that will produce the data required to render this pix with the
+     * pix helper in a mustache tag.
+     *
+     * Introduced by Moodle in 3.2 this method exports the basic properties of the icon so that it can be used
+     * within the pix helper.
+     * See TL-13982.
+     * Of course we don't want to use their pix icon, we want this to be a flex icon, as such we need this to be handled by
+     * the pix helper.
+     *
+     * TOTARA HACK:
+     * This code is a hack, it masquerades the flex_icon as a pix_icon and then detects the flex icon and renderers it correctly
+     * within a matching hack in \core\output\mustache_pix_helper::pix().
+     *
+     * If you change this code you must update that code also!
+     *
+     * @return array
+     */
+    public function export_for_pix() {
+        global $OUTPUT;
+        $icondata = $this->export_for_template($OUTPUT);
+        return [
+            'key' => $icondata['identifier'],
+            'component' => 'flexicon', // HACK ALERT: Read the phpdocs above.
+            'title' => json_encode($icondata)
+        ];
+    }
+
+    /**
      * Does a flex icon with this identifier exist?
      *
      * @param string $identifier Flex icon identifier.
@@ -174,11 +204,20 @@ class flex_icon extends \pix_icon {
             $customdata['alt'] = $icon->attributes['alt'];
         }
 
+        if (isset($icon->attributes['title'])) {
+            if ((!isset($icon->attributes['alt']) || $icon->attributes['alt'] !== $icon->attributes['title'])) {
+                $customdata['title'] = $icon->attributes['title'];
+            }
+        }
+
         return new flex_icon($flexidentifier, $customdata);
     }
 
     /**
      * Create a flex icon from legacy pix_icon if possible.
+     *
+     * Note pix_url has been deprecated in favour of rendering the icon directly. In some cases it has been replaced
+     * with image_url (although image_url should only be used for images, and not icons)
      *
      * @param string|\moodle_url $pixurl
      * @param string|array $customdata list of custom classes added to flex icon
@@ -249,5 +288,36 @@ class flex_icon extends \pix_icon {
         $component = \core_component::normalize_componentname((string)$icon->component);
 
         return "{$component}|{$pixpath}";
+    }
+
+    /**
+     * Given a flex or pix identifier, returns the appropriate icon
+     *
+     * @param string $identifier icon identifier (either flex or pix)
+     * @param string $component which component the icon belongs to
+     * @param array $data additional data to feed into either the flex or pix constructor
+     * @return pix_icon|flex_icon depending on whether a pix or flex icon was requested
+     */
+    public static function get_icon($identifier, $component = 'core', $data = array()) {
+
+        if (self::exists($identifier)) {
+            return new flex_icon($identifier, $data);
+        }
+
+        if (!isset($data['alt'])) {
+            $data['alt'] = '';
+        }
+        if (isset($data['classes'])) {
+            $data['class'] = $data['classes'];
+            unset($data['classes']);
+        }
+        $icon = new pix_icon($identifier, $data['alt'], $component, $data);
+
+        $flex = self::create_from_pix_icon($icon);
+        if ($flex !== null) {
+            $icon = $flex;
+        }
+
+        return $icon;
     }
 }

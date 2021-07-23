@@ -110,6 +110,7 @@ function prog_get_all_programs($userid, $sort = '', $limitfrom = '', $limitnum =
                             AND pc.programid = pua.programid
                             AND pc.userid = pua.userid
                         ) ";
+    $progtype = 'program';
     if ($onlyactive) {
         $where .= " AND pc.status <> :statuscomplete";
         $params['statuscomplete'] = STATUS_PROGRAM_COMPLETE;
@@ -119,19 +120,22 @@ function prog_get_all_programs($userid, $sort = '', $limitfrom = '', $limitnum =
     }
     if ($onlycertifications) {
         $where .= " AND p.certifid IS NOT NULL";
+        $progtype = 'certification';
     }
 
     $params['contextlevel'] = CONTEXT_PROGRAM;
     $params['userid'] = $userid;
 
-    list($visibilitysql, $visibilityparams) = totara_visibility_where($userid,
-                                                                      'p.id',
-                                                                      'p.visible',
-                                                                      'p.audiencevisible',
-                                                                      'p',
-                                                                      'certification',
-                                                                      false,
-                                                                      $showhidden);
+    list($visibilitysql, $visibilityparams) = totara_visibility_where(
+        $userid,
+        'p.id',
+        'p.visible',
+        'p.audiencevisible',
+        'p',
+        $progtype,
+        false,
+        $showhidden
+    );
     $params = array_merge($params, $visibilityparams);
     $where .= " AND {$visibilitysql} ";
 
@@ -242,7 +246,7 @@ function prog_get_certification_programs($userid, $sort='', $limitfrom='', $limi
  * @return  string
  */
 function prog_display_required_programs($userid) {
-    global $CFG, $OUTPUT;
+    global $CFG, $PAGE, $USER;
 
     $count = prog_get_required_programs($userid, '', '', '', true, true);
 
@@ -280,6 +284,10 @@ function prog_display_required_programs($userid) {
     // Add table data
     $programs = prog_get_required_programs($userid, $sort, $table->get_page_start(), $table->get_page_size(), false, true);
 
+    /** @var totara_core_renderer $renderer */
+    $renderer = $PAGE->get_renderer('totara_core');
+    $str_notassigned = new lang_string('notassigned', 'totara_program');
+
     if (!$programs) {
         return '';
     }
@@ -288,10 +296,19 @@ function prog_display_required_programs($userid) {
         if (!prog_is_accessible($p)) {
             continue;
         }
+
+        // Cannot pass $p object here because it is not an instance of program class.
+        $percentage = totara_program_get_user_percentage_complete($p->id, $userid);
+        $progress = $str_notassigned;
+        if ($percentage !== null) {
+            $progress = $renderer->progressbar($percentage, 'medium', false);
+        }
+
         $row = array();
         $row[] = prog_display_summary_widget($p, $userid);
         $row[] = prog_display_duedate($p->duedate, $p->id, $userid);
-        $row[] = prog_display_progress($p->id, $userid);
+        $row[] = (string)$progress;
+
         $table->add_data($row);
         $rowcount++;
     }
@@ -318,6 +335,7 @@ function prog_display_required_programs($userid) {
  * @return  string
  */
 function prog_display_certification_programs($userid) {
+    global $PAGE;
 
     $count = prog_get_certification_programs($userid, '', '', '', true, true, true);
 
@@ -360,11 +378,23 @@ function prog_display_certification_programs($userid) {
         return '';
     }
 
+    /** @var totara_core_renderer $renderer */
+    $renderer = $PAGE->get_renderer('totara_core');
+    $str_notassigned = new lang_string('notassigned', 'totara_program');
+
     $rowcount = 0;
     foreach ($cprograms as $cp) {
         if (!prog_is_accessible($cp)) {
             continue;
         }
+
+        // Cannot pass $cp object here because it is not an instance of program class.
+        $percentage = totara_program_get_user_percentage_complete($cp->id, $userid);
+        $progress = $str_notassigned;
+        if ($percentage !== null) {
+            $progress = $renderer->progressbar($percentage, 'medium', false);
+        }
+
         $row = array();
         $row[] = prog_display_summary_widget($cp, $userid);
         if (!empty($cp->timeexpires)) {
@@ -372,7 +402,8 @@ function prog_display_certification_programs($userid) {
         } else {
             $row[] = prog_display_duedate($cp->duedate, $cp->id, $userid, $cp->certifpath, $cp->status);
         }
-        $row[] = prog_display_progress($cp->id, $userid, $cp->certifpath);
+        // This could be improved, see \totara_certification\rb\display\certif_completion_progress::display
+        $row[] = (string)$progress;
         $table->add_data($row);
         $rowcount++;
     }
@@ -472,6 +503,7 @@ function prog_get_programs($categoryid="all", $sort="p.sortorder ASC",
                            $type = 'program', $options = array()) {
     global $USER, $DB, $CFG;
     require_once($CFG->dirroot . '/totara/cohort/lib.php');
+    require_once($CFG->dirroot . '/totara/coursecatalog/lib.php');
 
     $offset = !empty($options['offset']) ? $options['offset'] : 0;
     $limit = !empty($options['limit']) ? $options['limit'] : null;
@@ -493,37 +525,19 @@ function prog_get_programs($categoryid="all", $sort="p.sortorder ASC",
     }
 
     // Manage visibility.
-    list($visibilityjoinsql, $visibilityjoinparams) = totara_visibility_join($userid, $type, 'p');
-    $params = array_merge($params, $visibilityjoinparams);
+    list($visibilitysql, $visibilityparams) = totara_visibility_where(null, 'p.id', 'p.visible', 'p.audiencevisible', 'p', $type);
+    $params = array_merge($params, $visibilityparams);
 
     // Get context data for preload.
     $ctxfields = context_helper::get_preload_record_columns_sql('ctx');
     $ctxjoin = "LEFT JOIN {context} ctx ON (ctx.instanceid = p.id AND ctx.contextlevel = :contextlevel)";
 
     // Get all programs matching the criteria, with additional visibility info.
-    $sql = "SELECT DISTINCT {$fields}, {$ctxfields}, visibilityjoin.isvisibletouser
+    $sql = "SELECT DISTINCT {$fields}, {$ctxfields}
               FROM {prog} p
-                   {$visibilityjoinsql}
                    {$ctxjoin}
-             WHERE {$wheresql} {$sortstatement}";
+             WHERE {$wheresql} AND {$visibilitysql} {$sortstatement}";
     $programs = $DB->get_records_sql($sql, $params, $offset, $limit);
-
-    // Remove programs that aren't visible.
-    foreach ($programs as $id => $program) {
-        if ($program->isvisibletouser) {
-            unset($program->isvisibletouser); // Visible.
-        } else {
-            context_helper::preload_from_record($program);
-            $context = context_program::instance($id);
-            if ($isprogram && has_capability('totara/program:viewhiddenprograms', $context) ||
-                !$isprogram && has_capability('totara/certification:viewhiddencertifications', $context) ||
-                !empty($CFG->audiencevisibility) && has_capability('totara/coursecatalog:manageaudiencevisibility', $context)) {
-                unset($program->isvisibletouser); // Visible.
-            } else {
-                unset($programs[$id]); // Not visible.
-            }
-        }
-    }
 
     return $programs;
 }
@@ -537,7 +551,7 @@ function prog_get_programs($categoryid="all", $sort="p.sortorder ASC",
  *
  */
 function prog_get_category_breadcrumbs($categoryid, $viewtype = 'program') {
-    global $CFG, $DB;
+    global $DB;
 
     $category = $DB->get_record('course_categories', array('id' => $categoryid));
 
@@ -569,11 +583,20 @@ function prog_get_category_breadcrumbs($categoryid, $viewtype = 'program') {
  *
  * Similar to prog_get_programs, but allows paging
  *
+ * @param string|int $categoryid Either a category id or 'all' for everything
+ * @param string     $sort       A field and direction to sort by
+ * @param string     $fields     The additional fields to return
+ * @param int        $totalcount Reference for the total number of programs
+ * @param string     $limitfrom  The program number to start from
+ * @param string     $limitnum   The number of programs to limit to
+ * @param string     $type       Type 'program' or 'certification'
+ *
+ * @return array
  */
 function prog_get_programs_page($categoryid="all", $sort="sortorder ASC",
                           $fields="p.id,p.sortorder,p.shortname,p.fullname,p.summary,p.visible",
                           &$totalcount, $limitfrom="", $limitnum="", $type = 'program') {
-    global $CFG, $DB;
+    global $DB;
 
     $params = array();
     $categoryselect = "";
@@ -586,8 +609,8 @@ function prog_get_programs_page($categoryid="all", $sort="sortorder ASC",
     $typesql = $isprogram ? " p.certifid IS NULL" : " p.certifid IS NOT NULL";
 
     // Visibility.
-    list($visibilityjoinsql, $visibilityjoinparams) = totara_visibility_join(null, $type, 'p');
-    $params = array_merge($params, $visibilityjoinparams);
+    list($visibilitysql, $visibilityparams) = totara_visibility_where(null, 'p.id', 'p.visible', 'p.audiencevisible', 'p', $type);
+    $params = array_merge($params, $visibilityparams);
 
     // Get context data for preload.
     $ctxfields = context_helper::get_preload_record_columns_sql('ctx');
@@ -595,49 +618,26 @@ function prog_get_programs_page($categoryid="all", $sort="sortorder ASC",
     $params['contextlevel'] = CONTEXT_PROGRAM;
 
     // Pull out all programs matching the cat.
-    $visibleprograms = array();
-
-    $progselect = "SELECT {$fields}, 'program' AS listtype, {$ctxfields}, visibilityjoin.isvisibletouser
+    $select = "SELECT {$fields}, 'program' AS listtype, {$ctxfields}
                      FROM {prog} p
-                          {$visibilityjoinsql}
                           {$ctxjoin}
-                    WHERE {$typesql}";
+                    WHERE {$typesql} {$categoryselect} AND {$visibilitysql} ORDER BY {$sort}";
 
-    $select = $progselect.$categoryselect.' ORDER BY '.$sort;
-    $rs = $DB->get_recordset_sql($select, $params);
+    $allvisibleprograms = $DB->get_records_sql($select, $params);
 
-    $totalcount = 0;
-    $visiblecount = 0;
+    // Nothing to see, set $totalcount to 0 and return.
+    if (!$allvisibleprograms) {
+        $totalcount = 0;
+        return [];
+    }
+
+    $totalcount = count($allvisibleprograms);
 
     if (!$limitfrom) {
         $limitfrom = 0;
     }
 
-    // Iterate through the records until enough have been found, skipping those that are not visible.
-    foreach ($rs as $program) {
-        $visible = false;
-        if ($program->isvisibletouser) {
-            $visible = true;
-        } else {
-            context_helper::preload_from_record($program);
-            $context = context_program::instance($program->id);
-            if ($isprogram && has_capability('totara/program:viewhiddenprograms', $context) ||
-                !$isprogram && has_capability('totara/certification:viewhiddencertifications', $context) ||
-                !empty($CFG->audiencevisibility) && has_capability('totara/coursecatalog:manageaudiencevisibility', $context)) {
-                $visible = true;
-            }
-        }
-        if ($visible) {
-            $totalcount++;
-            if ($totalcount > $limitfrom && (!$limitnum || $visiblecount < $limitnum)) {
-                unset($program->isvisibletouser);
-                $visibleprograms [] = $program;
-                $visiblecount++;
-            }
-        }
-    }
-
-    $rs->close();
+    $visibleprograms = array_slice($allvisibleprograms, $limitfrom, $limitnum, true);
 
     return $visibleprograms;
 }
@@ -675,16 +675,18 @@ function prog_move_programs($programids, $categoryid) {
                         prog_fix_program_sortorder($categoryid);
                     }
 
+                    $trans = $DB->start_delegated_transaction();
+
                     $program->category  = $categoryid;
                     $program->sortorder = $sortorder;
 
-                    if (!$DB->update_record('prog', $program)) {
-                        echo $OUTPUT->notification(get_string('error:prognotmoved', 'totara_program'));
-                    }
+                    $DB->update_record('prog', $program);
 
                     $context   = context_program::instance($program->id);
                     $newparent = context_coursecat::instance($program->category);
                     $context->update_moved($newparent);
+
+                    $trans->allow_commit();
                 }
             }
             prog_fix_program_sortorder();
@@ -700,13 +702,13 @@ function prog_move_programs($programids, $categoryid) {
  * $safe (bool) prevents it from assuming category-sortorder is unique, used to upgrade
  * safely from 1.4 to 1.5
  *
- * @global <type> $CFG
- * @param <type> $categoryid
- * @param <type> $n
- * @param <type> $safe
- * @param <type> $depth
- * @param <type> $path
- * @return <type>
+ * @global $CFG
+ * @param int $categoryid
+ * @param int $n
+ * @param int $safe
+ * @param int $depth
+ * @param string $path
+ * @return int
  */
 function prog_fix_program_sortorder($categoryid=0, $n=0, $safe=0, $depth=0, $path='') {
 
@@ -841,7 +843,7 @@ function prog_fix_program_sortorder($categoryid=0, $n=0, $safe=0, $depth=0, $pat
         $n = $max;
     }
 
-    if ($categories = coursecat::get($categoryid)->get_children()) {
+    if ($categories = coursecat::get($categoryid, MUST_EXIST, true)->get_children()) {
         foreach ($categories as $category) {
             $n = prog_fix_program_sortorder($category->id, $n, $safe, $depth, $path);
         }
@@ -906,7 +908,10 @@ function prog_can_enter_course($user, $course) {
              LEFT JOIN {prog_courseset_course} pcsc ON pcs.id = pcsc.coursesetid AND pcsc.courseid = :c2id
                  WHERE pua.userid = :u2id
                    AND pc.coursesetid = :csid
-             ))
+                   AND pua.exceptionstatus <> :raised
+                   AND pua.exceptionstatus <> :dismissed
+             )
+        )
     ";
     $params = array(
         'avl'  => AVAILABILITY_TO_STUDENTS,
@@ -916,7 +921,9 @@ function prog_can_enter_course($user, $course) {
         'stat' => DP_PLAN_STATUS_APPROVED,
         'c2id' => $course->id,
         'u2id' => $user->id,
-        'csid' => 0
+        'csid' => 0,
+        'raised' => PROGRAM_EXCEPTION_RAISED,
+        'dismissed' => PROGRAM_EXCEPTION_DISMISSED
     );
     $program_records = $DB->get_records_sql($get_programs, $params);
 
@@ -1085,14 +1092,6 @@ function prog_get_programs_search($searchterms, $sort='fullname ASC', $page=0, $
 }
 
 /**
- * @deprecated since 9.0.
- * @param $assignment
- */
-function prog_store_position_assignment($assignment) {
-    throw new coding_exception('prog_store_position_assignment has been deprecated since 9.0. Use \totara_job\job_assignment::update() instead.');
-}
-
-/**
  * Retrieves any recurring programs and returns them in an array or an empty
  * array
  *
@@ -1243,7 +1242,16 @@ function prog_process_extensions($extensionslist, $reasonfordecision = array()) 
                 // Load the program for this extension
                 $extension_program = new program($extension->programid);
 
-                if ($prog_completion = $DB->get_record('prog_completion', array('programid' => $extension_program->id, 'userid' => $extension->userid, 'coursesetid' => 0))) {
+                $cert_completion = null;
+                $prog_completion = null;
+
+                if ($extension_program->certifid) {
+                    list($cert_completion, $prog_completion) = certif_load_completion($extension->programid, $extension->userid, false);
+                } else {
+                    $prog_completion = prog_load_completion($extension->programid, $extension->userid, false);
+                }
+
+                if ($prog_completion) {
                     $duedate = empty($prog_completion->timedue) ? 0 : $prog_completion->timedue;
 
                     if ($extension->extensiondate < $duedate) {
@@ -1259,7 +1267,23 @@ function prog_process_extensions($extensionslist, $reasonfordecision = array()) 
                 }
 
                 // Try to update due date for program using extension date
-                if (!$extension_program->set_timedue($extension->userid, $extension->extensiondate)) {
+                //Check whether user is on a recertification path, and update certification expiry if required
+                if ($cert_completion) {
+                    if ($cert_completion->certifpath == CERTIFPATH_RECERT) {
+                        $cert_completion->timeexpires = $extension->extensiondate;
+                    }
+
+                    $prog_completion->timedue = $extension->extensiondate;
+                    $result = certif_write_completion($cert_completion, $prog_completion, 'Due date extension granted');
+                } else if ($prog_completion) {
+                    $prog_completion->timedue = $extension->extensiondate;
+                    $result = prog_write_completion($prog_completion, 'Due date extension granted');
+                } else {
+                    $update_fail_count++;
+                    continue;
+                }
+
+                if (!$result) {
                     $update_fail_count++;
                     continue;
                 } else {
@@ -1317,11 +1341,16 @@ function prog_process_extensions($extensionslist, $reasonfordecision = array()) 
  * @param int $userid
  * @param program $program if not set - all programs will be updated
  * @param int $courseid if provided (and $program is not) then only programs related to this course will be updated
+ * @param bool $useriscomplete if the users current completion status has already been fetched from the database
+ *     providing it here will shortcut the completion check in this function and save you a query.
+ *     This argument is ignored if no program was provided.
  */
-function prog_update_completion($userid, program $program = null, $courseid = null) {
+function prog_update_completion($userid, program $program = null, $courseid = null, $useriscomplete = null) {
     global $DB;
 
     if (!$program) {
+        // Well they can't possibly have completed it.
+        $useriscomplete = null; // As noted this is ignored.
         $proglist = prog_get_all_programs($userid, '', '', '', false, true);
         $programs = array();
         foreach ($proglist as $progrow) {
@@ -1335,7 +1364,25 @@ function prog_update_completion($userid, program $program = null, $courseid = nu
         $programs = array($program);
     }
 
+    /** @var program[] $programs */
     foreach ($programs as $program) {
+
+        // Clear the progressinfo cache to ensure it is calculated again
+        \totara_program\progress\program_progress_cache::mark_progressinfo_stale($program->id, $userid);
+
+        // First check if the program is already marked as complete for this user and do nothing if it is.
+        if ($useriscomplete !== null) {
+            if ($useriscomplete === true) {
+                // We already know that they are complete.
+                continue;
+            }
+        } else if (prog_is_complete($program->id, $userid)) {
+            // He is already marked complete in the database, no need to proceed.
+            continue;
+        }
+
+        // OK the user has not completed the program yet - lets see if they are complete.
+
         // Get the program content.
         $program_content = $program->get_content();
 
@@ -1347,11 +1394,6 @@ function prog_update_completion($userid, program $program = null, $courseid = nu
             $path = CERTIFPATH_STD;
         }
         $courseset_groups = $program_content->get_courseset_groups($path);
-
-        // First check if the program is already marked as complete for this user and do nothing if it is.
-        if (prog_is_complete($program->id, $userid)) {
-            continue;
-        }
 
         $courseset_group_completed = false;
 
@@ -1382,7 +1424,7 @@ function prog_update_completion($userid, program $program = null, $courseid = nu
             $completionsettings = array(
                 'status'        => STATUS_PROGRAM_COMPLETE,
                 'timecompleted' => $coursesetcompletion->timecompleted
-                );
+            );
             $program->update_program_complete($userid, $completionsettings);
         }
     }
@@ -1392,7 +1434,7 @@ function prog_update_completion($userid, program $program = null, $courseid = nu
  * Check if a courseset group is completed and optionally update courseset completion.
  *
  * @throws ProgramException
- * @param array $courseset_group a group of coursesets, as returned by get_courseset_groups
+ * @param course_set[] $courseset_group a group of coursesets, as returned by get_courseset_groups
  * @param int $userid of the user for which completion should be checked/updated
  * @param boolean $updatecomplete also update courseset completion
  *
@@ -1567,19 +1609,62 @@ function prog_get_courses_associated_with_programs($courses = null) {
     return $DB->get_records_sql($sql, $params);
 }
 
+/**
+ * Serves the folder files.
+ *
+ * @package  mod_folder
+ * @category files
+ * @param int $course course object
+ * @param stdClass $cm course module
+ * @param stdClass $context context object
+ * @param string $filearea file area
+ * @param array $args extra arguments
+ * @param bool $forcedownload whether or not force download
+ * @param array $options additional options affecting the file serving
+ * @return bool false if file not found, does not return if found - just send the file
+ */
 function totara_program_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, $options=array()) {
+    global $USER;
+
+    $programid = $context->instanceid;
     $component = 'totara_program';
     $itemid = $args[0];
     $filename = $args[1];
-    $fs = get_file_storage();
 
+    if (!isloggedin() && !isguestuser()) {
+        send_file_not_found();
+    }
+
+    if (!has_capability("totara/program:viewprogram", $context) && $filearea !== 'images') {
+        send_file_not_found();
+    }
+
+    $program = new program($programid);
+    // If the file is in summary, overview, user is site admin or user has capability to edit the program don't worry
+    // if they are assigned to the program.
+    if (!(is_siteadmin($USER) ||
+        has_capability('totara/program:configuredetails', $context)) &&
+        $filearea != 'summary' &&
+        $filearea != 'overviewfiles' &&
+        $filearea != 'images')
+    {
+        if (!$program->user_is_assigned($USER->id)) {
+            send_file_not_found();
+        }
+    }
+
+    if (!$program->is_viewable($USER)) {
+        send_file_not_found();
+    }
+
+    $fs = get_file_storage();
     $file = $fs->get_file($context->id, $component, $filearea, $itemid, '/', $filename);
 
     if (empty($file)) {
         send_file_not_found();
     }
 
-    send_stored_file($file, 60*60*24, 0, false, $options); //enable long cache and disable forcedownload
+    send_stored_file($file, 60*60*24, 0, false, $options); // Enable long cache and disable forcedownload
 }
 
 /**
@@ -1735,12 +1820,11 @@ class program_in_list implements IteratorAggregate {
     public function has_program_overviewfiles() {
         global $CFG;
         if (empty($CFG->courseoverviewfileslimit)) {
-            return 0;
+            return false;
         }
-        require_once($CFG->libdir. '/filestorage/file_storage.php');
         $fs = get_file_storage();
         $context = context_program::instance($this->id);
-        return $fs->is_area_empty($context->id, 'program', 'overviewfiles');
+        return !$fs->is_area_empty($context->id, 'program', 'overviewfiles');
     }
 
     /**
@@ -1885,37 +1969,45 @@ function prog_format_seconds($seconds, $timeonly = false) {
  * and re-enrol students if the program is available again.
  *
  * @param enrol_totara_program_plugin $program_plugin
- * @param int $programid
- * @param boolean debugging
+ * @param int $programid If no programid is provided, then this is done for all programs - use only from cron
+ * @param boolean $debugging
+ * @return bool true if no problems, else false
  */
-function prog_update_available_enrolments(enrol_totara_program_plugin $program_plugin, $programid, $debugging = false) {
+function prog_update_available_enrolments(enrol_totara_program_plugin $program_plugin, $programid = null, $debugging = false) {
     global $DB;
 
-    // Get all the courses in all the coursesets of the program.
-    $coursesql = "SELECT c.*
-                    FROM {course} c
-                   WHERE c.id IN (SELECT DISTINCT pcc.courseid
-                                    FROM {prog_courseset_course} pcc
-                                    JOIN {prog_courseset} pc
-                                      ON pcc.coursesetid = pc.id
-                                   WHERE pc.programid = :pid1
-                                     AND pc.competencyid = 0
-                                  UNION
-                                  SELECT DISTINCT cc.iteminstance as courseid
-                                    FROM {prog_courseset} pc
-                                    JOIN {comp_criteria} cc
-                                      ON cc.competencyid = pc.competencyid AND cc.itemtype = :itemtype
-                                   WHERE pc.programid = :pid2
-                                     AND pc.competencyid != 0
-                                 )";
-    $courseparams = array('pid1' => $programid, 'itemtype' => 'coursecompletion', 'pid2' => $programid);
-    $courses = $DB->get_records_sql($coursesql, $courseparams);
+    // Get the default role that users will be put in if their assignment is unsuspended.
+    $defaultrole = $program_plugin->get_config('roleid');
+    if (empty($defaultrole)) {
+        mtrace("No default role, not processing enrolment suspension!!!");
+        return false;
+    }
 
-    foreach ($courses as $course) {
+    // Get all the courses in all the coursesets of the program.
+    $courseparams = array('itemtype' => 'coursecompletion');
+
+    if (!empty($programid)) {
+        $programsql1 = "AND pc.programid = :programid1";
+        $programsql2 = "AND pc.programid = :programid2";
+        $courseparams['programid1'] = $programid;
+        $courseparams['programid2'] = $programid;
+    } else {
+        $programsql1 = $programsql2 = "";
+    }
+
+    $coursesql = "SELECT pcc.courseid
+                    FROM {prog_courseset_course} pcc
+                    JOIN {prog_courseset} pc ON pcc.coursesetid = pc.id
+                   WHERE pc.competencyid = 0 {$programsql1}
+                   UNION
+                  SELECT cc.iteminstance AS courseid
+                    FROM {prog_courseset} pc
+                    JOIN {comp_criteria} cc ON cc.competencyid = pc.competencyid AND cc.itemtype = :itemtype
+                   WHERE pc.competencyid != 0 {$programsql2}";
+    $courseids = $DB->get_fieldset_sql($coursesql, $courseparams);
+
+    foreach ($courseids as $courseid) {
         $userstosuspend = array();
-        if (CLI_SCRIPT && $debugging) {
-            mtrace("Checking enrolments for Course-{$course->id}...");
-        }
 
         // Get all the users enrolled in the course through the program enrolment plugin.
         $enrolsql = "SELECT ue.*
@@ -1924,34 +2016,95 @@ function prog_update_available_enrolments(enrol_totara_program_plugin $program_p
                         ON ue.enrolid = e.id
                      WHERE e.courseid = :cid
                        AND e.enrol = 'totara_program'";
-        $enrolparams = array('cid' => $course->id);
+        $enrolparams = array('cid' => $courseid);
         $enrolments = $DB->get_records_sql($enrolsql, $enrolparams);
-        $instance = $program_plugin->get_instance_for_course($course->id);
+        $instance = $program_plugin->get_instance_for_course($courseid);
 
         foreach ($enrolments as $enrolment) {
             // Check to see if the user should still be able to access the course.
-            if (CLI_SCRIPT && $debugging) {
-                mtrace("Checking enrolment-{$enrolment->id}");
-            }
+            $userid = $enrolment->userid;
 
-            $user = $DB->get_record('user', array('id' => $enrolment->userid));
-
-            // NOTE: This function enrols the user in the course if he has access
-            $access = prog_can_enter_course($user, $course);
-            if (!$access->enroled) {
-                // If they can't, then add the user to the list of users to suspend.
-                if (CLI_SCRIPT && $debugging) {
-                    mtrace("suspending enrolment for user-{$enrolment->userid}");
-                }
-                $userstosuspend[] = $enrolment->userid;
-            } else if (CLI_SCRIPT && $debugging) {
-                mtrace("user-{$enrolment->userid} can still access the course");
+            $sql = "SELECT ppa.programid
+                      FROM {dp_plan_program_assign} ppa
+                      JOIN {prog} p ON p.id = ppa.programid AND p.available = :progisavailable1
+                      JOIN {dp_plan} pln ON pln.id = ppa.planid
+                      JOIN {prog_courseset} pcs ON ppa.programid = pcs.programid
+                      JOIN {prog_courseset_course} pcsc ON pcs.id = pcsc.coursesetid AND pcsc.courseid = :courseid1
+                     WHERE ppa.approved >= :ppaapproved1
+                       AND pln.userid = :userid1
+                       AND pln.status >= :plnstatusapproved1
+                     UNION
+                    SELECT ppa.programid
+                      FROM {dp_plan_program_assign} ppa
+                      JOIN {prog} p ON p.id = ppa.programid AND p.available = :progisavailable2
+                      JOIN {dp_plan} pln ON pln.id = ppa.planid
+                      JOIN {prog_courseset} pcs ON ppa.programid = pcs.programid
+                      JOIN {comp_criteria} cc ON cc.competencyid = pcs.competencyid AND cc.iteminstance = :courseid2
+                     WHERE ppa.approved >= :ppaapproved2
+                       AND pln.userid = :userid2
+                       AND pln.status >= :plnstatusapproved2
+                     UNION
+                    SELECT pua.programid
+                      FROM {prog_user_assignment} pua
+                      JOIN {prog} p ON p.id = pua.programid AND p.available = :progisavailable3
+                      JOIN {prog_completion} pc ON pua.programid = pc.programid AND pua.userid = pc.userid
+                      JOIN {prog_courseset} pcs ON pua.programid = pcs.programid
+                      JOIN {prog_courseset_course} pcsc ON pcs.id = pcsc.coursesetid AND pcsc.courseid = :courseid3
+                     WHERE pua.userid = :userid3
+                       AND pc.coursesetid = 0
+                     UNION
+                    SELECT pua.programid
+                      FROM {prog_user_assignment} pua
+                      JOIN {prog} p ON p.id = pua.programid AND p.available = :progisavailable4
+                      JOIN {prog_completion} pc ON pua.programid = pc.programid AND pua.userid = pc.userid
+                      JOIN {prog_courseset} pcs ON pua.programid = pcs.programid
+                      JOIN {comp_criteria} cc ON cc.competencyid = pcs.competencyid AND cc.iteminstance = :courseid4
+                     WHERE pua.userid = :userid4
+                       AND pc.coursesetid = 0";
+            $params = array(
+                'progisavailable1' => AVAILABILITY_TO_STUDENTS,
+                'courseid1'  => $courseid,
+                'ppaapproved1'  => DP_APPROVAL_APPROVED,
+                'userid1'  => $userid,
+                'plnstatusapproved1' => DP_PLAN_STATUS_APPROVED,
+                'progisavailable2' => AVAILABILITY_TO_STUDENTS,
+                'courseid2'  => $courseid,
+                'ppaapproved2'  => DP_APPROVAL_APPROVED,
+                'userid2'  => $userid,
+                'plnstatusapproved2' => DP_PLAN_STATUS_APPROVED,
+                'progisavailable3' => AVAILABILITY_TO_STUDENTS,
+                'courseid3' => $courseid,
+                'userid3' => $userid,
+                'progisavailable4' => AVAILABILITY_TO_STUDENTS,
+                'courseid4' => $courseid,
+                'userid4' => $userid,
+            );
+            $result = $DB->get_records_sql($sql, $params);
+            if (empty($result)) {
+                // The user is not assigned to any program which contains the course.
+                if ($enrolment->status == ENROL_USER_ACTIVE) {
+                    $userstosuspend[] = $enrolment->userid;
+                    if (CLI_SCRIPT && $debugging) {
+                        mtrace("suspending enrolment for user-{$userid}");
+                    }
+                } // Else the enrolment is already suspended, so nothing to do.
+            } else {
+                // The user has an active assignment to a program which contains the course.
+                if ($enrolment->status == ENROL_USER_SUSPENDED) {
+                    // Not using bulk here, because we want to keep the timestart and timeend from before.
+                    $program_plugin->enrol_user($instance, $userid, $defaultrole, $enrolment->timestart, $enrolment->timeend, ENROL_USER_ACTIVE);
+                    if (CLI_SCRIPT && $debugging) {
+                        mtrace("unsuspending enrolment for user-{$userid}");
+                    }
+                } // Else the enrolment is allready active, so nothing to do.
             }
         }
         if (!empty($userstosuspend)) {
             $program_plugin->process_program_unassignments($instance, $userstosuspend);
         }
     }
+
+    return true;
 }
 
 /**
@@ -2034,11 +2187,13 @@ function prog_required_for_user($progid, $userid) {
 /**
  * Generates the HTML to display a program icon that links to a page to view the program
  *
+ * @deprecated Since Totara 12.0
  * @param int $progid               The id of a program
  * @param int $userid   optional    The id of a user, defaults to $USER if not set
  * @return html
  */
 function prog_display_link_icon($progid, $userid = null) {
+    debugging('The function prog_display_link_icon has been deprecated since Totara 12.0', DEBUG_DEVELOPER);
     global $OUTPUT, $USER, $DB;
 
     $prog = new program($progid);
@@ -2139,42 +2294,43 @@ function prog_display_duedate($duedate, $progid, $userid, $certifpath = null, $c
     return $out;
 }
 
-
 /**
  * Determines and displays the progress of this program for a specified user.
  *
  * Progress is determined by course set completion statuses.
  *
+ * This function returns "Not assigned" if no completion data exists. This isn't an accurate criteria. Complete programs
+ * will still have a completion record when unassigned, and certifications keep their prog_completion record when a user
+ * is deleted in all states other than "Newly assigned".
+ *
  * @access  public
  * @param int $programid
  * @param int $userid
  * @param int $certifpath (defaults to cert for programs)
- * @return  string
+ * @param bool $percentageonly
+ * @return int|string|false
  */
-function prog_display_progress($programid, $userid, $certifpath = CERTIFPATH_CERT, $export = false) {
-    global $DB, $PAGE;
+function prog_display_progress($programid, $userid, $certifpath = null, $percentageonly = false) {
+    global $PAGE;
 
-    $prog_completion = $DB->get_record('prog_completion', array('programid' => $programid, 'userid' => $userid, 'coursesetid' => 0));
-
-    if (!$prog_completion) {
-        $out = get_string('notassigned', 'totara_program');
-        return $out;
-    } else if ($prog_completion->status == STATUS_PROGRAM_COMPLETE) {
-        $overall_progress = 100;
+    if ($certifpath) {
+        $percentage = totara_certification_get_current_percentage_complete($programid, $userid);
     } else {
-        $program = new program($programid);
-        $overall_progress = $program->get_progress($userid);
+        $percentage = totara_program_get_user_percentage_complete($programid, $userid);
     }
 
-    if ($export) {
-        return $overall_progress;
+    if ($percentage === null) {
+        // You get here if you are not assigned OR if the program has not coursesets/courses.
+        return get_string('notassigned', 'totara_program');
+    }
+    if ($percentageonly) {
+        return $percentage;
     }
 
-    $tooltipstr = 'DEFAULTTOOLTIP';
-
-    // Get relevant progress bar and return for display.
+    /** @var totara_core_renderer $renderer */
     $renderer = $PAGE->get_renderer('totara_core');
-    return $renderer->progressbar($overall_progress, 'medium', false, $tooltipstr);
+
+    return $renderer->progressbar($percentage, 'medium', false);
 }
 
 /**
@@ -2258,18 +2414,33 @@ function prog_is_inprogress($progid, $userid) {
 /**
  * Snippet to determine if a program is available based on the available fields.
  *
- * @param string $fieldalias Alias for the program table used in the query
+ * @param string $prog_table_alias Alias for the program table used in the query
  * @param string $separator Character separator between the alias and the field name
- * @param int|null $userid The user ID that wants to see the program (Unused)
+ * @param null $unused Originally the user ID that wants to see the program
  * @return array
  */
-function get_programs_availability_sql($fieldalias, $separator, $userid = null) {
+function get_programs_availability_sql($prog_table_alias, $separator, $unused = null) {
+    global $DB;
+
     $now = time();
 
-    $availabilitysql = " (({$fieldalias}{$separator}available = :available) AND
-                          ({$fieldalias}{$separator}availablefrom = 0 OR {$fieldalias}{$separator}availablefrom < :timefrom) AND
-                          ({$fieldalias}{$separator}availableuntil = 0 OR {$fieldalias}{$separator}availableuntil > :timeuntil))";
-    $availabilityparams = array('available' => AVAILABILITY_TO_STUDENTS, 'timefrom' => $now, 'timeuntil' => $now);
+    $param_available = $DB->get_unique_param('available');
+    $param_timefrom = $DB->get_unique_param('timefrom');
+    $param_timeuntil = $DB->get_unique_param('timeuntil');
+
+    $field_available = $prog_table_alias . $separator . 'available';
+    $field_timefrom = $prog_table_alias . $separator . 'availablefrom';
+    $field_timeuntil = $prog_table_alias . $separator . 'availableuntil';
+
+    $availabilitysql = " (({$field_available} = :{$param_available}) AND
+                          ({$field_timefrom} = 0 OR {$field_timefrom} < :{$param_timefrom}) AND
+                          ({$field_timeuntil} = 0 OR {$field_timeuntil} > :{$param_timeuntil}))";
+
+    $availabilityparams = [
+        $param_available => AVAILABILITY_TO_STUDENTS,
+        $param_timefrom => $now,
+        $param_timeuntil => $now
+    ];
 
     return array($availabilitysql, $availabilityparams);
 }
@@ -2438,7 +2609,32 @@ function prog_get_completion_error_solution($problemkey, $programid = 0, $userid
     switch ($problemkey) {
         // See certs for examples of automated fixes. Remove this when a fix is implemented.
         case 'error:timedueunknown':
-            $html = get_string('error:info_timedueunknown', 'totara_program');
+            $url = clone($baseurl);
+            $url->param('fixkey', 'fixassignedtimedueunknown');
+            $html = get_string('error:info_fixtimedueunknown', 'totara_program') . '<br>' .
+                html_writer::link($url, get_string('clicktofixcompletions', 'totara_program'));
+            break;
+        case 'error:missingprogcompletion':
+            $url = clone($baseurl);
+            $url->param('fixkey', 'fixmissingcompletionrecords');
+            $html = get_string('error:info_fixmissingprogcompletion', 'totara_program') . '<br>' .
+                html_writer::link($url, get_string('clicktofixcompletions', 'totara_program'));
+            break;
+        case 'error:unassignedincompleteprogcompletion':
+            $url = clone($baseurl);
+            $url->param('fixkey', 'fixunassignedincompletecompletionrecords');
+            $html = get_string('error:info_fixunassignedincompletecompletionrecord', 'totara_program') . '<br>' .
+                html_writer::link($url, get_string('clicktofixcompletions', 'totara_program'));
+            break;
+        case 'error:orphanedexception':
+            $url1 = clone($baseurl);
+            $url1->param('fixkey', 'fixorphanedexceptionassign');
+            $html = get_string('error:info_fixorphanedexceptionassign', 'totara_program') . '<br>' .
+                html_writer::link($url1, get_string('clicktofixcompletions', 'totara_program'));
+            $url2 = clone($baseurl);
+            $url2->param('fixkey', 'fixorphanedexceptionrecalculate');
+            $html .= '<br>' . get_string('error:info_fixorphanedexceptionrecalculate', 'totara_program') . '<br>' .
+                html_writer::link($url2, get_string('clicktofixcompletions', 'totara_program'));
             break;
         default:
             $html = get_string('error:info_unknowncombination', 'totara_program');
@@ -2457,6 +2653,28 @@ function prog_get_completion_error_solution($problemkey, $programid = 0, $userid
  */
 function prog_fix_completions($fixkey, $programid = 0, $userid = 0) {
     global $DB;
+
+    // Creating missing program completion records is handled in a separate function, just to keep things tidy.
+    if ($fixkey == 'fixmissingcompletionrecords') {
+        prog_fix_missing_completions($programid, $userid);
+        return;
+    }
+
+    // Deleting unassigned incomplete program completion records is handled in a separate function, just to keep things tidy.
+    if ($fixkey == 'fixunassignedincompletecompletionrecords') {
+        prog_fix_unassigned_incomplete_completions($programid, $userid);
+        return;
+    }
+
+    // Fixing orphaned exceptions is handled in a separate function, just to keep things tidy.
+    if ($fixkey == 'fixorphanedexceptionassign') {
+        prog_fix_orphaned_exceptions_assign($programid, $userid, 'program');
+        return;
+    }
+    if ($fixkey == 'fixorphanedexceptionrecalculate') {
+        prog_fix_orphaned_exceptions_recalculate($programid, $userid, 'program');
+        return;
+    }
 
     // Get all completion records, applying the specified filters.
     $sql = "SELECT pc.*
@@ -2488,17 +2706,14 @@ function prog_fix_completions($fixkey, $programid = 0, $userid = 0) {
 
         $problemkey = prog_get_completion_error_problemkey($errors);
         $result = "";
-        $ignoreproblem = "";
 
         // Only fix if this is an exact match for the specified problem.
         switch ($fixkey) {
-            // See certif_fix_completions for an example. Remove this comment when first fix is implemented.
-            // When adding the first fix here, you must also implement (copy from certs) the following tests:
-            // * test_prog_fix_completions_only_selected
-            // * test_prog_fix_completions_only_specified_state
-            // * test_prog_fix_completions_only_if_isolated_problem
-            // * test_prog_fix_completions_known_unfixed_problems
-            // Plus one test for each fix function.
+            case 'fixassignedtimedueunknown':
+                if ($problemkey == 'error:timedueunknown') {
+                    $result = prog_fix_timedue($progcompletion);
+                }
+                break;
             default:
                 break;
         }
@@ -2508,12 +2723,179 @@ function prog_fix_completions($fixkey, $programid = 0, $userid = 0) {
             continue;
         }
 
-        prog_write_completion($progcompletion, $ignoreproblem, $result);
+        prog_write_completion($progcompletion, $result);
     }
 }
 
 /**
- * Create or update prog_completion record. Checks are performed to ensure that the data is valid before it
+ * Set the timedue to COMPLETION_TIME_NOT_SET
+ *
+ * @param stdClass $progcompletion a corresponding record from prog_completion to be fixed
+ * @return string message for transaction log
+ */
+function prog_fix_timedue(&$progcompletion) {
+    $progcompletion->timedue = COMPLETION_TIME_NOT_SET;
+
+    return 'Automated fix \'prog_fix_timedue\' was applied<br>
+        <ul><li>\'Program due date\' was set to ' . COMPLETION_TIME_NOT_SET . '</li></ul>';
+}
+
+/**
+ * Creates missing program completion records, limited by the specified filters.
+ *
+ * @param int $programid if provided (non-0), only fix problems for this program
+ * @param int $userid if provided (non-0), only fix problems for this user
+ */
+function prog_fix_missing_completions($programid = 0, $userid = 0) {
+    $affectedcompletionsrs = prog_find_missing_completions($programid, $userid);
+
+    $now = time(); // Mark them all with exactly the same time, to make it easier to debug.
+    $message = 'Automated fix \'prog_fix_missing_prog_completions\' was applied - prog_completion record was created';
+
+    foreach ($affectedcompletionsrs as $progcompletion) {
+        $data = array('timecreated' => $now);
+        prog_create_completion($progcompletion->programid, $progcompletion->userid, $data, $message);
+    }
+
+    $affectedcompletionsrs->close();
+}
+
+/**
+ * Deletes prog_completion records of users who are not assigned but have incomplete completion records, limited by the specified filters.
+ *
+ * @param int $programid if provided (non-0), only fix problems for this program
+ * @param int $userid if provided (non-0), only fix problems for this user
+ */
+function prog_fix_unassigned_incomplete_completions($programid = 0, $userid = 0) {
+    $affectedcompletionsrs = prog_find_unassigned_incomplete_completions($programid, $userid);
+
+    $message = 'Automated fix \'prog_fix_unassigned_incomplete_prog_completions\' was applied - prog_completion record was deleted';
+
+    foreach ($affectedcompletionsrs as $progcompletion) {
+        prog_delete_completion($progcompletion->programid, $progcompletion->userid, $message);
+    }
+
+    $affectedcompletionsrs->close();
+}
+
+/**
+ * Fixes orphaned exceptions by resolving them, assigning the user.
+ *
+ * @param int $programid if provided (non-0), only fix problems for this program
+ * @param int $userid if provided (non-0), only fix problems for this user
+ * @param string $progorcert either 'program' or 'certification'
+ */
+function prog_fix_orphaned_exceptions_assign($programid = 0, $userid = 0, $progorcert = 'program') {
+    global $DB;
+
+    $orphanedexceptionsrs = prog_find_orphaned_exceptions($programid, $userid, $progorcert);
+
+    $message = 'Automated fix \'prog_fix_orphaned_exceptions_assign\' was applied';
+
+    foreach ($orphanedexceptionsrs as $orphanedexception) {
+        // We don't know what type of exception this is, so can't "handle" it through the prog_exception class. Just clear it.
+        $params = array(
+            'programid' => $orphanedexception->programid,
+            'userid' => $orphanedexception->userid,
+            'exceptionstatus' => PROGRAM_EXCEPTION_RAISED
+        );
+        $DB->set_field('prog_user_assignment', 'exceptionstatus', PROGRAM_EXCEPTION_RESOLVED, $params);
+
+        prog_log_completion($orphanedexception->programid, $orphanedexception->userid, $message);
+
+        // Trigger an event. This happens when resolving exceptions normally, so we'll do it here as well.
+        $event = \totara_program\event\program_assigned::create(
+            array(
+                'objectid' => $orphanedexception->programid,
+                'context' => context_program::instance($orphanedexception->programid),
+                'userid' => $orphanedexception->userid,
+            )
+        );
+        $event->trigger();
+    }
+
+    $orphanedexceptionsrs->close();
+}
+
+/**
+ * Fixes orphaned exceptions by recalculating them, assigning the user.
+ *
+ * @param int $programid if provided (non-0), only fix problems for this program
+ * @param int $userid if provided (non-0), only fix problems for this user
+ * @param string $progorcert either 'program' or 'certification'
+ */
+function prog_fix_orphaned_exceptions_recalculate($programid = 0, $userid = 0, $progorcert = 'program') {
+    global $DB;
+
+    $orphanedexceptionsrs = prog_find_orphaned_exceptions($programid, $userid, $progorcert);
+
+    $message = 'Automated fix \'prog_fix_orphaned_exceptions_recalculate\' was applied';
+
+    foreach ($orphanedexceptionsrs as $orphanedexception) {
+        $params = array(
+            'programid' => $orphanedexception->programid,
+            'userid' => $orphanedexception->userid,
+            'exceptionstatus' => PROGRAM_EXCEPTION_RAISED
+        );
+        $userassignments = $DB->get_records('prog_user_assignment', $params, '', 'id, assignmentid');
+        foreach ($userassignments as $userassignment) {
+            $program = new program($orphanedexception->programid);
+            if ($progorcert == 'program') {
+                $progcompletion = prog_load_completion($orphanedexception->programid, $orphanedexception->userid);
+            } else {
+                list($certcompletion, $progcompletion) = certif_load_completion($orphanedexception->programid, $orphanedexception->userid);
+            }
+
+            if (empty($progcompletion)) {
+                $timedue = COMPLETION_TIME_NOT_SET;
+            } else {
+
+                // Skip completed programs (includes certifications which are certified and window is not yet open).
+                if ($progcompletion->status == STATUS_PROGRAM_COMPLETE) {
+                    $userassignment->exceptionstatus = PROGRAM_EXCEPTION_NONE;
+                    $DB->update_record('prog_user_assignment', $userassignment);
+                    continue;
+                }
+
+                // Skip certifications which are on the recert path or are expired.
+                if ($progorcert == 'certification') {
+                    if ($certcompletion->certifpath == CERTIFPATH_RECERT ||
+                        $certcompletion->status == CERTIFSTATUS_EXPIRED) {
+                        $userassignment->exceptionstatus = PROGRAM_EXCEPTION_NONE;
+                        $DB->update_record('prog_user_assignment', $userassignment);
+                        continue;
+                    }
+                }
+                $timedue = $progcompletion->timedue;
+            }
+            $progassignment = new stdClass();
+            $progassignment->id = $userassignment->assignmentid;
+            if ($program->update_exceptions($orphanedexception->userid, $progassignment, $timedue)) {
+                $userassignment->exceptionstatus = PROGRAM_EXCEPTION_RAISED;
+            } else {
+                $userassignment->exceptionstatus = PROGRAM_EXCEPTION_NONE;
+            }
+            $DB->update_record('prog_user_assignment', $userassignment);
+        }
+
+        prog_log_completion($orphanedexception->programid, $orphanedexception->userid, $message);
+
+        // Trigger an event. This happens when resolving exceptions normally, so we'll do it here as well.
+        $event = \totara_program\event\program_assigned::create(
+            array(
+                'objectid' => $orphanedexception->programid,
+                'context' => context_program::instance($orphanedexception->programid),
+                'userid' => $orphanedexception->userid,
+            )
+        );
+        $event->trigger();
+    }
+
+    $orphanedexceptionsrs->close();
+}
+
+/**
+ * Insert or update prog_completion record. Checks are performed to ensure that the data is valid before it
  * can be written to the db.
  *
  * NOTE: $ignoreproblemkey should only be used by prog_fix_completions!!! If specified, the record will be
@@ -2533,33 +2915,47 @@ function prog_write_completion($progcompletion, $message = '', $ignoreproblemkey
 
     // Ensure the record matches the database records.
     if ($isinsert) {
-        $sql = "SELECT prog.id, pc.id AS pcid
+        $sql = "SELECT prog.id, prog.certifid, pc.id AS pcid
                   FROM {prog} prog
              LEFT JOIN {prog_completion} pc
                     ON pc.programid = prog.id AND pc.userid = :pcuserid AND pc.coursesetid = 0
                  WHERE prog.id = :programid";
         $params = array('programid' => $progcompletion->programid, 'pcuserid' => $progcompletion->userid);
         $prog = $DB->get_record_sql($sql, $params);
+
         if (empty($prog) || !empty($prog->pcid)) {
             print_error(get_string('error:updatinginvalidcompletionrecord', 'totara_program'));
+        }
+
+        if (!empty($prog->certifid)) {
+            throw new coding_exception("prog_write_completion was used to insert a prog_completion record relating to a certification - this must never happen!");
         }
 
         if (empty($message)) {
             $message = "Completion record created";
         }
     } else {
-        $sql = "SELECT pc.id
+        $sql = "SELECT pc.id, prog.certifid
                   FROM {prog_completion} pc
                   JOIN {prog} prog
                     ON prog.id = pc.programid
                  WHERE pc.id = :pcid
                    AND pc.programid = :programid
                    AND pc.userid = :userid
-                   AND pc.coursesetid = 0
-                   AND prog.certifid IS NULL";
+                   AND pc.coursesetid = 0";
         $params = array('pcid' => $progcompletion->id, 'programid' => $progcompletion->programid, 'userid' => $progcompletion->userid);
-        if (!$DB->record_exists_sql($sql, $params)) {
+
+        $existingrecord = $DB->record_exists_sql($sql, $params);
+        if (empty($existingrecord)) {
             print_error(get_string('error:updatinginvalidcompletionrecord', 'totara_program'));
+        }
+
+        if (!empty($existingrecord->certifid)) {
+            throw new coding_exception("prog_write_completion was used to update a prog_completion record relating to a certification - this must never happen!");
+        }
+
+        if (empty($message)) {
+            $message = "Completion record updated";
         }
     }
 
@@ -2581,6 +2977,8 @@ function prog_write_completion($progcompletion, $message = '', $ignoreproblemkey
         return true;
     } else {
         // Some error was detected, and it wasn't specified in $ignoreproblemkey.
+        prog_log_completion($progcompletion->programid, $progcompletion->userid,
+            'An attempt was made to write changes, but the data was invalid. Message of caller was:<br>' . $message);
         return false;
     }
 }
@@ -2619,10 +3017,26 @@ function prog_log_completion($programid, $userid, $description, $changeuserid = 
  * @param null $changeuserid ID of the user who triggered the event, or 0 to indicate cron or no user, assumes $USER->id if null.
  */
 function prog_write_completion_log($programid, $userid, $message = '', $changeuserid = null) {
-    global $DB;
+    $progcompletion = prog_load_completion($programid, $userid);
 
-    $progcompletion = $DB->get_record('prog_completion', array('programid' => $programid, 'userid' => $userid, 'coursesetid' => 0));
+    $description = prog_calculate_completion_description($progcompletion, $message);
 
+    prog_log_completion(
+        $programid,
+        $userid,
+        $description,
+        $changeuserid
+    );
+}
+
+/**
+ * Calculate the description string for a program completion log message.
+ *
+ * @param stdClass $progcompletion
+ * @param string $message If provided, will be added at the start of the log message (instead of "Completion record edited")
+ * @return string
+ */
+function prog_calculate_completion_description($progcompletion, $message = '') {
     $progstatus = '';
     switch ($progcompletion->status) {
         case STATUS_PROGRAM_INCOMPLETE:
@@ -2633,34 +3047,95 @@ function prog_write_completion_log($programid, $userid, $message = '', $changeus
             break;
     }
 
-    if ($progcompletion->timedue > 0) {
-        $timedue = userdate($progcompletion->timedue, '%d %B %Y, %H:%M', 0) .
-            ' (' . $progcompletion->timedue . ')';
-    } else {
-        $timedue = "Not set ({$progcompletion->timedue})";
-    }
-    if ($progcompletion->timecompleted > 0) {
-        $timecompleted = userdate($progcompletion->timecompleted, '%d %B %Y, %H:%M', 0) .
-            ' (' . $progcompletion->timecompleted . ')';
-    } else {
-        $timecompleted = "Not set ({$progcompletion->timecompleted})";
-    }
-
     if (empty($message)) {
         $message = 'Completion record edited';
     }
 
     $description = $message . '<br>' .
         '<ul><li>Status: ' . $progstatus . '</li>' .
-        '<li>Due date: ' . $timedue . '</li>' .
-        '<li>Completion date: ' . $timecompleted . '</li></ul>';
+        '<li>Time started: ' . prog_format_log_date($progcompletion->timestarted) . '</li>' .
+        '<li>Due date: ' . prog_format_log_date($progcompletion->timedue) . '</li>' .
+        '<li>Completion date: ' . prog_format_log_date($progcompletion->timecompleted) . '</li></ul>';
 
-    prog_log_completion(
-        $programid,
-        $userid,
-        $description,
-        $changeuserid
-    );
+    return $description;
+}
+
+/**
+ * Insert or update a (non-zero id) course set completion record.
+ *
+ * Do not use this function for writing course completion records (course set id 0). It will fail.
+ *
+ * @param stdClass $cscompletion A prog_completion record to be saved, including 'id' if this is an update.
+ * @param string $message If provided, will be added to the program completion log message.
+ * @return True if the record was successfully created or updated.
+ */
+function prog_write_courseset_completion($cscompletion, $message = '') {
+    global $DB;
+
+    if (empty($cscompletion->coursesetid)) {
+        print_error("Tried to use prog_write_courseset_completion with program completion data or missing course set id");
+    }
+
+    // Decide if this is an insert or update.
+    $isinsert = empty($cscompletion->id);
+
+    // Ensure the record matches the database records.
+    if ($isinsert) {
+        $sql = "SELECT pcs.id, pc.id AS pcid
+                  FROM {prog_courseset} pcs
+                  JOIN {prog} p ON p.id = pcs.programid
+             LEFT JOIN {prog_completion} pc
+                    ON pc.coursesetid = pcs.id AND pc.userid = :userid AND pc.coursesetid = pcs.id
+                 WHERE pcs.id = :coursesetid AND p.id = :programid";
+        $params = array(
+            'coursesetid' => $cscompletion->coursesetid,
+            'programid' => $cscompletion->programid,
+            'userid' => $cscompletion->userid
+        );
+        $pcs = $DB->get_record_sql($sql, $params);
+        if (empty($pcs) || !empty($pcs->pcid)) {
+            print_error('Call to prog_write_courseset_completion insert with completion record that does not match the existing record');
+        }
+
+        if (empty($message)) {
+            $message = "Course set completion record created";
+        }
+    } else {
+        $sql = "SELECT pc.id
+                  FROM {prog_completion} pc
+                 WHERE pc.id = :pcid
+                   AND pc.programid = :programid
+                   AND pc.userid = :userid
+                   AND pc.coursesetid = :coursesetid";
+        $params = array(
+            'pcid' => $cscompletion->id,
+            'coursesetid' => $cscompletion->coursesetid,
+            'programid' => $cscompletion->programid,
+            'userid' => $cscompletion->userid
+        );
+        if (!$DB->record_exists_sql($sql, $params)) {
+            print_error('Call to prog_write_courseset_completion update with completion record that does not match the existing record');
+        }
+
+        if (empty($message)) {
+            $message = "Course set completion record updated";
+        }
+    }
+
+    if (!in_array($cscompletion->status, array(STATUS_COURSESET_COMPLETE, STATUS_COURSESET_INCOMPLETE))) {
+        prog_log_completion($cscompletion->programid, $cscompletion->userid,
+            'An attempt was made to write changes, but the data was invalid. Message of caller was:<br>' . $message);
+        return false;
+    }
+
+    if ($isinsert) {
+        $DB->insert_record('prog_completion', $cscompletion);
+    } else {
+        $DB->update_record('prog_completion', $cscompletion);
+    }
+
+    prog_log_completion($cscompletion->programid, $cscompletion->userid, $message);
+    return true;
 }
 
 /**
@@ -2773,4 +3248,627 @@ function prog_load_completion($programid, $userid, $mustexist = true) {
     }
 
     return $progcompletion;
+}
+
+/**
+ * Load a (non-zero id) course set completion record out of the db.
+ *
+ * Use this function to make sure you get the correct course set completion record.
+ *
+ * @param int $coursesetid
+ * @param int $userid
+ * @param bool $mustexist If records are missing, default true causes an error, false returns false
+ * @return mixed
+ */
+function prog_load_courseset_completion($coursesetid, $userid, $mustexist = true) {
+    global $DB;
+
+    if ($coursesetid == 0) {
+        print_error("Tried to use prog_load_courseset_completion to load a program completion record");
+    }
+
+    $cscompletion = $DB->get_record('prog_completion', array('coursesetid' => $coursesetid, 'userid' => $userid));
+
+    if (empty($cscompletion)) {
+        if ($mustexist) {
+            print_error("Tried to load course set completion record which doesn't exist for coursesetid: {$coursesetid}, userid: {$userid}");
+        } else {
+            return false;
+        }
+    }
+
+    return $cscompletion;
+}
+
+/**
+ * Create a (non-zero id) course set completion record for the user in the program.
+ *
+ * $data keys can contain status, timestarted, timecreated, timedue, timecompleted, organisationid, positionid
+ * Any other data keys will prevent the record being created and will return false.
+ *
+ * If $data is specified, the resulting prog_completion record must be error-free, or else the record will
+ * not be created! Check the result of this function to ensure that the record was successfully created.
+ *
+ * @param int $coursesetid
+ * @param int $userid
+ * @param array $data containing any field => values that should be set, overriding the defaults
+ * @param string $message If provided, will override the default record creation message
+ * @return true if the record was successfully created or updated.
+ */
+function prog_create_courseset_completion($coursesetid, $userid, $data = array(), $message = '') {
+    global $DB;
+
+    if ($coursesetid == 0) {
+        print_error("Tried to use prog_create_courseset_completion to create a program completion record");
+    }
+
+    $now = time();
+
+    $programid = $DB->get_field('prog_courseset', 'programid', array('id' => $coursesetid));
+
+    $progcompletion = new stdClass();
+    $progcompletion->programid = $programid;
+    $progcompletion->userid = $userid;
+    $progcompletion->coursesetid = $coursesetid;
+    $progcompletion->status = STATUS_COURSESET_INCOMPLETE;
+    $progcompletion->timestarted = 0;
+    $progcompletion->timecreated = $now;
+    $progcompletion->timedue = COMPLETION_TIME_NOT_SET;
+    $progcompletion->timecompleted = 0;
+
+    $alloweddatafields = array(
+        'status',
+        'timestarted',
+        'timecreated',
+        'timedue',
+        'timecompleted',
+        'organisationid',
+        'positionid',
+    );
+
+    foreach ($data as $field => $value) {
+        if (!in_array($field, $alloweddatafields)) {
+            prog_log_completion($progcompletion->programid, $progcompletion->userid,
+                'prog_create_courseset_completion was provided unknown data (' . $field . '). Message of caller was:<br>' . $message);
+            return false;
+        }
+        $progcompletion->$field = $value;
+    }
+
+    prog_write_courseset_completion($progcompletion, $message);
+
+    return true;
+}
+
+/**
+ * Formats a date for the program completion log.
+ *
+ * @param int $date
+ * @return string
+ */
+function prog_format_log_date($date) {
+    if ($date > 0) {
+        return userdate($date, '%d %B %Y, %H:%M', 0) . ' (' . $date . ')';
+    } else if (is_null($date)) {
+        return "Not set (null)";
+    } else {
+        return "Not set ({$date})";
+    }
+}
+
+/**
+ * Load all prog_completion records out of the db. Excludes certifications.
+ *
+ * Use this function to make sure you get the correct records.
+ *
+ * @param int $userid
+ * @return array(stdClass)
+ */
+function prog_load_all_completions($userid) {
+    global $DB;
+
+    $sql = "SELECT pc.*
+              FROM {prog_completion} pc
+              JOIN {prog} p ON p.id = pc.programid
+             WHERE pc.userid = :userid AND pc.coursesetid = 0 AND p.certifid IS NULL
+    ";
+    $progcompletions = $DB->get_records_sql($sql, array('userid' => $userid));
+
+    return $progcompletions;
+}
+
+/**
+ * Deletes a user's program completion record, only if the user is no longer required to complete the program.
+ *
+ * This should be called after a user has been removed from a program or a program is removed from a user's learning plan.
+ *
+ * Only call this function for programs. It does NOT protect against being passed program ids belonging to certifications!!!
+ *
+ * @param int $programid
+ * @param int $userid
+ */
+function prog_conditionally_delete_completion($programid, $userid) {
+    $program = new program($programid);
+
+    // Check that the program is not still assigned to the program.
+    if ($program->assigned_to_users_required_learning($userid)) {
+        return;
+    }
+
+    // Check that the program is not still assigned to a Learning Plan.
+    if ($program->assigned_to_users_non_required_learning($userid)) {
+        return;
+    }
+
+    // Check that the program is not complete - the current prog_completion will be treated as a history record.
+    if (prog_is_complete($program->id, $userid)) {
+        return;
+    }
+
+    prog_delete_completion($programid, $userid, 'Current prog_completion conditionally deleted');
+}
+
+/**
+ * Delete a program completion record, logging it in the prog completion log.
+ *
+ * Normally you should use prog_conditionally_delete_completion, which will decide what to do with the records.
+ *
+ * !!! Only use this function if you're absolutely sure that the record needs to be deleted. !!!
+ * !!! This function should only be used by prog_conditionally_delete_completion,            !!!
+ * !!! certif_conditionally_delete_completion and by the program completion editor.          !!!
+ *
+ * @param $programid
+ * @param $userid
+ * @param string $message If provided, will override the default program completion log message.
+ */
+function prog_delete_completion($programid, $userid, $message = '') {
+    global $DB;
+
+    $DB->delete_records('prog_completion', array('programid' => $programid, 'userid' => $userid, 'coursesetid' => 0));
+
+    if (empty($message)) {
+        $message = 'Current prog_completion deleted';
+    }
+
+    // Record the change in the program completion log.
+    prog_log_completion(
+        $programid,
+        $userid,
+        $message
+    );
+}
+
+/**
+ * Find all the completion records which have problems.
+ *
+ * The results are designed to be used by totara_program_renderer::get_completion_checker_results
+ *
+ * Each stdClass item in $fulllist is indexed by the problemkey and contains:
+ *  ->problem string short explaination of what the problem is (obtained from the problemkey)
+ *  ->userfullname string the full name of the affected user
+ *  ->programname string the full name of the program
+ *  ->editcompletionurl moodle_url a link to the completion editor for this user/cert
+ *
+ * Each stdClass item in $aggregatelist is indexed by the problemkey and contains:
+ *  ->problem string short explaination of what the problem is (obtained from the problemkey)
+ *  ->category string describing the general type of problem (Files, Consistentcy, etc)
+ *  ->solution string long explanation and any info about consequences, how the problem can be manually fixed and/or links to automated fixes etc
+ *  ->count int how many records (given the specified filters) are affected by this problem
+ *
+ * $totalcount reports the total number of records that are checked given the specified filters.
+ *
+ * @param int $programid
+ * @param int $userid
+ * @return array(array $fulllist, array $aggregatelist, int $totalcount)
+ */
+function prog_get_all_completions_with_errors($programid = 0, $userid = 0) {
+    global $DB;
+
+    $aggregatelist = array();
+    $fulllist = array();
+    $totalcount = 0;
+
+    // Check existing prog_completions for inconsistency errors.
+    $sql = "SELECT pc.userid, pc.programid, pc.status, pc.timedue, pc.timecompleted, prog.fullname
+              FROM {prog_completion} pc
+              JOIN {prog} prog ON prog.id = pc.programid
+             WHERE pc.coursesetid = 0
+               AND prog.certifid IS NULL";
+    $params = array();
+    if (!empty($userid)) {
+        $sql .= " AND pc.userid = :userid";
+        $params['userid'] = $userid;
+    }
+    if (!empty($programid)) {
+        $sql .= " AND pc.programid = :programid";
+        $params['programid'] = $programid;
+    }
+    $allcompletionsrs = $DB->get_recordset_sql($sql, $params);
+
+    foreach ($allcompletionsrs as $progcompletion) {
+        $errors = prog_get_completion_errors($progcompletion);
+
+        if (!empty($errors)) {
+            // Aggregate this combination of errors.
+            $problemkey = prog_get_completion_error_problemkey($errors);
+            // If the problem key doesn't exist in the aggregate list already then create it.
+            if (!isset($aggregatelist[$problemkey])) {
+                $newaggregate = new stdClass();
+                $newaggregate->count = 0;
+
+                $errorstrings = array();
+                foreach ($errors as $errorkey => $errorfield) {
+                    $errorstrings[] = get_string($errorkey, 'totara_program');
+                }
+                $newaggregate->problem = implode('<br>', $errorstrings);
+
+                $newaggregate->category = get_string('problemcategoryconsistency', 'totara_program');
+
+                // Solution is designed to fix all records affected by this problem with the given filters.
+                $newaggregate->solution = prog_get_completion_error_solution($problemkey, $programid, $userid);
+
+                $aggregatelist[$problemkey] = $newaggregate;
+            }
+            $aggregatelist[$problemkey]->count++;
+
+            $affected = new stdClass();
+            $affected->problem = $aggregatelist[$problemkey]->problem;
+            $affected->userfullname = fullname($DB->get_record('user', array('id' => $progcompletion->userid)));
+            $affected->programname = format_string($progcompletion->fullname);
+            $affected->editcompletionurl = new moodle_url('/totara/program/edit_completion.php',
+                array('id' => $progcompletion->programid, 'userid' => $progcompletion->userid));
+            $affectedkey = $progcompletion->programid . '-' . $progcompletion->userid;
+
+            $fulllist[$affectedkey] = $affected;
+        }
+        $totalcount++;
+    }
+
+    $allcompletionsrs->close();
+
+    // Check for missing prog_completion records.
+    $missingcompletionsrs = prog_find_missing_completions($programid, $userid);
+
+    $problemkey = 'error:missingprogcompletion';
+    foreach ($missingcompletionsrs as $missingcompletion) {
+        $totalcount++;
+
+        // If the problem key doesn't exist in the aggregate list already then create it.
+        if (!isset($aggregatelist[$problemkey])) {
+            $newaggregate = new stdClass();
+            $newaggregate->count = 0;
+
+            $newaggregate->problem = get_string($problemkey, 'totara_program');
+
+            $newaggregate->category = get_string('problemcategoryfiles', 'totara_program');
+
+            // Solution is designed to fix all records affected by this problem with the given filters.
+            $newaggregate->solution = prog_get_completion_error_solution($problemkey, $programid, $userid);
+
+            $aggregatelist[$problemkey] = $newaggregate;
+        }
+        $aggregatelist[$problemkey]->count++;
+
+        $affected = new stdClass();
+        $affected->problem = $aggregatelist[$problemkey]->problem;
+        $affected->userfullname = fullname($DB->get_record('user', array('id' => $missingcompletion->userid)));
+        $affected->programname = format_string($missingcompletion->fullname);
+        $affected->editcompletionurl = new moodle_url('/totara/program/edit_completion.php',
+            array('id' => $missingcompletion->programid, 'userid' => $missingcompletion->userid));
+        $affectedkey = $missingcompletion->programid . '-' . $missingcompletion->userid;
+
+        $fulllist[$affectedkey] = $affected;
+    }
+
+    $missingcompletionsrs->close();
+
+    // Check for unassigned incomplete prog_completion records.
+    $unassignedincompletecompletionsrs = prog_find_unassigned_incomplete_completions($programid, $userid);
+
+    $problemkey = 'error:unassignedincompleteprogcompletion';
+    foreach ($unassignedincompletecompletionsrs as $unassignedincompletecompletion) {
+        // Don't increment total count, because these have already been counted earlier.
+
+        // If the problem key doesn't exist in the aggregate list already then create it.
+        if (!isset($aggregatelist[$problemkey])) {
+            $newaggregate = new stdClass();
+            $newaggregate->count = 0;
+
+            $newaggregate->problem = get_string($problemkey, 'totara_program');
+
+            $newaggregate->category = get_string('problemcategoryfiles', 'totara_program');
+
+            // Solution is designed to fix all records affected by this problem with the given filters.
+            $newaggregate->solution = prog_get_completion_error_solution($problemkey, $programid, $userid);
+
+            $aggregatelist[$problemkey] = $newaggregate;
+        }
+        $aggregatelist[$problemkey]->count++;
+
+        $affected = new stdClass();
+        $affected->problem = $aggregatelist[$problemkey]->problem;
+        $affected->userfullname = fullname($DB->get_record('user', array('id' => $unassignedincompletecompletion->userid)));
+        $affected->programname = format_string($unassignedincompletecompletion->fullname);
+        $affected->editcompletionurl = new moodle_url('/totara/program/edit_completion.php',
+            array('id' => $unassignedincompletecompletion->programid, 'userid' => $unassignedincompletecompletion->userid));
+        $affectedkey = $unassignedincompletecompletion->programid . '-' . $unassignedincompletecompletion->userid;
+
+        $fulllist[$affectedkey] = $affected;
+    }
+
+    $unassignedincompletecompletionsrs->close();
+
+    // Check for orphaned exceptions.
+    $orphanedexceptionrs = prog_find_orphaned_exceptions($programid, $userid, 'program');
+
+    $problemkey = 'error:orphanedexception';
+    foreach ($orphanedexceptionrs as $orphanedexception) {
+        // If the problem key doesn't exist in the aggregate list already then create it.
+        if (!isset($aggregatelist[$problemkey])) {
+            $newaggregate = new stdClass();
+            $newaggregate->count = 0;
+
+            $newaggregate->problem = get_string($problemkey, 'totara_program');
+
+            $newaggregate->category = get_string('problemcategoryexceptions', 'totara_program');
+
+            // Solution is designed to fix all records affected by this problem with the given filters.
+            $newaggregate->solution = prog_get_completion_error_solution($problemkey, $programid, $userid);
+
+            $aggregatelist[$problemkey] = $newaggregate;
+        }
+        $aggregatelist[$problemkey]->count++;
+
+        $affected = new stdClass();
+        $affected->problem = $aggregatelist[$problemkey]->problem;
+        $affected->userfullname = fullname($DB->get_record('user', array('id' => $orphanedexception->userid)));
+        $affected->programname = format_string($orphanedexception->fullname);
+        $affected->editcompletionurl = new moodle_url('/totara/program/edit_completion.php',
+            array('id' => $orphanedexception->programid, 'userid' => $orphanedexception->userid));
+        $affectedkey = $orphanedexception->programid . '-' . $orphanedexception->userid;
+
+        $fulllist[$affectedkey] = $affected;
+    }
+
+    $orphanedexceptionrs->close();
+
+    return array($fulllist, $aggregatelist, $totalcount);
+}
+
+/**
+ * Returns a recordset containing all users who are assigned to programs but are missing a prog_completion record.
+ * These records should exist!
+ *
+ * @param int $programid if provided (non-0), only find problems for this program
+ * @param int $userid if provided (non-0), only find problems for this user
+ * @return moodle_recordset containing programid, userid and program's fullname
+ */
+function prog_find_missing_completions($programid = 0, $userid = 0) {
+    global $DB;
+
+    $params = array();
+    $progwhere = "";
+    $dpwhere = "";
+
+    if (!empty($userid)) {
+        $progwhere .= " AND pua.userid = :userid1";
+        $dpwhere .= " AND dpp.userid = :userid2";
+        $params['userid1'] = $userid;
+        $params['userid2'] = $userid;
+    }
+
+    if (!empty($programid)) {
+        $progwhere .= " AND pua.programid = :programid1";
+        $dpwhere .= " AND dpppa.programid = :programid2";
+        $params['programid1'] = $programid;
+        $params['programid2'] = $programid;
+    }
+
+    $sql = "SELECT pua.programid, pua.userid, p.fullname
+              FROM {prog_user_assignment} pua
+              JOIN {prog} p ON p.id = pua.programid AND p.certifid IS NULL
+         LEFT JOIN {prog_completion} pc ON pc.programid = pua.programid AND pc.userid = pua.userid AND pc.coursesetid = 0
+             WHERE pc.id IS NULL {$progwhere}
+             UNION
+            SELECT dpppa.programid, dpp.userid, p.fullname
+              FROM {dp_plan_program_assign} dpppa
+              JOIN {prog} p ON p.id = dpppa.programid AND p.certifid IS NULL
+              JOIN {dp_plan} dpp ON dpp.id = dpppa.planid
+         LEFT JOIN {prog_completion} pc ON pc.programid = dpppa.programid AND pc.userid = dpp.userid AND pc.coursesetid = 0
+             WHERE pc.id IS NULL {$dpwhere}";
+
+    return $DB->get_recordset_sql($sql, $params);
+}
+
+/**
+ * Returns a recordset containing all users who are not assigned and have an incomplete prog_completion record.
+ * These records shouldn't exist!
+ *
+ * @param int $programid if provided (non-0), only find problems for this program
+ * @param int $userid if provided (non-0), only find problems for this user
+ * @return moodle_recordset containing programid, userid and program's fullname
+ */
+function prog_find_unassigned_incomplete_completions($programid = 0, $userid = 0) {
+    global $DB;
+
+    $params = array('statusincomplete' => STATUS_PROGRAM_INCOMPLETE);
+    $where = "";
+
+    if (!empty($userid)) {
+        $where .= " AND pc.userid = :userid";
+        $params['userid'] = $userid;
+    }
+
+    if (!empty($programid)) {
+        $where .= " AND pc.programid = :programid";
+        $params['programid'] = $programid;
+    }
+
+    $sql = "SELECT pc.programid, pc.userid, p.fullname
+              FROM {prog_completion} pc
+              JOIN {prog} p ON p.id = pc.programid AND p.certifid IS NULL
+         LEFT JOIN {prog_user_assignment} pua ON pua.programid = pc.programid AND pua.userid = pc.userid
+         LEFT JOIN {dp_plan} dpp ON dpp.userid = pc.userid
+         LEFT JOIN {dp_plan_program_assign} dpppa ON dpppa.planid = dpp.id AND dpppa.programid = pc.programid
+             WHERE pc.coursesetid = 0 AND pc.status = :statusincomplete {$where}
+               AND pua.id IS NULL AND dpppa.id IS NULL";
+
+    return $DB->get_recordset_sql($sql, $params);
+}
+
+/**
+ * Returns a recordset containing all users who have orphaned exceptions.
+ *
+ * These are prog_user_assignments which have an exception, but there is no matching prog_exception, not even
+ * belonging to another prog_assignment for the same user and program.
+ *
+ * @param int $programid if provided (non-0), only find problems for this program/certification
+ * @param int $userid if provided (non-0), only find problems for this user
+ * @param string $progorcert either 'program' or 'certification'
+ * @return moodle_recordset containing programid, userid and program's fullname
+ */
+function prog_find_orphaned_exceptions($programid = 0, $userid = 0, $progorcert = 'program') {
+    global $DB;
+
+    $params = array('exceptionstatusraised' => PROGRAM_EXCEPTION_RAISED);
+    $where = "";
+
+    if (!empty($userid)) {
+        $where .= " AND pua.userid = :userid";
+        $params['userid'] = $userid;
+    }
+
+    if (!empty($programid)) {
+        $where .= " AND pua.programid = :programid";
+        $params['programid'] = $programid;
+    }
+
+    if ($progorcert == 'program') {
+        $progorcertsql = 'AND p.certifid IS NULL';
+    } else {
+        $progorcertsql = 'AND p.certifid IS NOT NULL';
+    }
+
+    $sql = "SELECT DISTINCT pua.programid, pua.userid, p.fullname
+              FROM {prog_user_assignment} pua
+              JOIN {prog} p ON p.id = pua.programid {$progorcertsql}
+         LEFT JOIN {prog_exception} pe ON pe.programid = pua.programid AND pe.userid = pua.userid
+             WHERE pua.exceptionstatus = :exceptionstatusraised
+               AND pe.id IS NULL
+                   {$where}";
+
+    return $DB->get_recordset_sql($sql, $params);
+}
+
+
+/**
+ * Create a program completion record for the user in the program.
+ *
+ * $data keys can contain status, timestarted, timecreated, timedue, timecompleted, organisationid, positionid
+ * Any other data keys will prevent the record being created and will return false.
+ *
+ * If $data is specified, the resulting prog_completion record must be error-free, or else the record will
+ * not be created! Check the result of this function to ensure that the record was successfully created.
+ *
+ * @param int $programid
+ * @param int $userid
+ * @param array $data containing any field => values that should be set, overriding the defaults
+ * @param string $message If provided, will override the default record creation message
+ * @return true if the record was successfully created or updated.
+ */
+function prog_create_completion($programid, $userid, $data = array(), $message = '') {
+    $now = time();
+
+    $progcompletion = new stdClass();
+    $progcompletion->programid = $programid;
+    $progcompletion->userid = $userid;
+    $progcompletion->coursesetid = 0;
+    $progcompletion->status = STATUS_PROGRAM_INCOMPLETE;
+    $progcompletion->timestarted = 0;
+    $progcompletion->timecreated = $now;
+    $progcompletion->timedue = COMPLETION_TIME_NOT_SET;
+    $progcompletion->timecompleted = 0;
+
+    $alloweddatafields = array(
+        'status',
+        'timestarted',
+        'timecreated',
+        'timedue',
+        'timecompleted',
+        'organisationid',
+        'positionid',
+    );
+
+    foreach ($data as $field => $value) {
+        if (!in_array($field, $alloweddatafields)) {
+            return false;
+        }
+        $progcompletion->$field = $value;
+    }
+
+    return prog_write_completion($progcompletion, $message);
+}
+
+/**
+ * Returns programs tagged with a specified tag.
+ *
+ * @param core_tag_tag $tag
+ * @param bool $exclusivemode if set to true it means that no other entities tagged with this tag
+ *             are displayed on the page and the per-page limit may be bigger
+ * @param int $fromctx context id where the link was displayed, may be used by callbacks
+ *            to display items in the same context first
+ * @param int $ctx context id where to search for records
+ * @param bool $rec search in subcontexts as well
+ * @param int $page 0-based number of page being displayed
+ * @return \core_tag\output\tagindex
+ */
+function prog_get_tagged_programs($tag, $exclusivemode = false, $fromctx = 0, $ctx = 0, $rec = 1, $page = 0) {
+
+    $count = $tag->count_tagged_items('totara_program', 'prog', '', array());
+    $perpage = $exclusivemode ? 24 : 5;
+    $content = '';
+    $displaycount = 0;
+
+    if ($count) {
+        $items = array();
+        $proglist = $tag->get_tagged_items('totara_program', 'prog', $page * $perpage, $perpage, '', array());
+        foreach ($proglist as $prog) {
+            $program = new program($prog->id);
+
+            if (empty($ctx) || $ctx == context_system::instance()->id) {
+                $ctxmatch = true;
+            } else {
+                $context = $program->get_context();
+                $regex = '/^(\/\d+)*(\/'.$ctx.')(\/\d+)*$/';
+                $ctxmatch = ($context->id == $ctx || preg_match($regex, $context->path));
+            }
+
+            if ($program->is_viewable() && $ctxmatch) {
+                $displaycount++;
+                $url = new moodle_url('/totara/program/view.php', array('id' => $prog->id));
+                $items[] = html_writer::link($url, $prog->fullname);
+            }
+        }
+        $content .= html_writer::alist($items);
+    }
+    $totalpages = ceil($displaycount / $perpage);
+
+    return new core_tag\output\tagindex($tag, 'totara_program', 'prog', $content,
+            $exclusivemode, $fromctx, $ctx, $rec, $page, $totalpages);
+}
+
+/**
+ * Gets a users completion percentage for the given program + user
+ *
+ * @param program|int $programorid Program instance of program id.
+ * @param int $userid
+ * @return int|null
+ */
+function totara_program_get_user_percentage_complete($programorid, int $userid) : ?int {
+    $progressinfo = \totara_program\progress\program_progress::get_user_progressinfo_from_id($programorid, $userid);
+    $percentage = $progressinfo->get_percentagecomplete();
+    if ($percentage === false) {
+        return null;
+    }
+    return $percentage;
 }

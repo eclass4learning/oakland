@@ -17,9 +17,9 @@ Feature: Seminar sessions report overview
       | student6  | Sam6      | Student6 | student6@example.com |
       | student7  | Sam7      | Student7 | student7@example.com |
     And the following "courses" exist:
-      | fullname | shortname | category | enablecompletion | completionstartonenrol |
-      | Course 1 | C1        | 0        | 1                | 1                      |
-      | Course 2 | C2        | 0        | 1                | 1                      |
+      | fullname | shortname | category | enablecompletion |
+      | Course 1 | C1        | 0        | 1                |
+      | Course 2 | C2        | 0        | 1                |
     And the following "course enrolments" exist:
       | user     | course | role           |
       | teacher1 | C1     | editingteacher |
@@ -40,7 +40,8 @@ Feature: Seminar sessions report overview
     And I press "Save changes"
 
     # Prepare report
-    And I navigate to "Manage reports" node in "Site administration > Reports > Report builder"
+    And I navigate to "Manage user reports" node in "Site administration > Reports"
+    And I press "Create report"
     And I set the following fields to these values:
       | Report Name | Seminar Summary          |
       | Source      | Seminar Sessions |
@@ -84,25 +85,23 @@ Feature: Seminar sessions report overview
     And I press "Save changes"
 
     # 1: (1st activity of C1) Underbooked, upcoming, manager approval
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name             | Test seminar name 1      |
       | Description      | Test seminar description |
       | Manager Approval | 1                           |
     And I follow "Test seminar name 1"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 0    |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 0    |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -132,14 +131,13 @@ Feature: Seminar sessions report overview
   Scenario: Check active seminar sessions summary report
     # Prepare 4 sessions in three activities:
     # 2: (2nd activity of C1) Two dates, self approved, overbooked, 1st started, 2nd upcoming
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Test seminar name 2      |
       | Description       | Test seminar description |
     And I follow "Test seminar name 2"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I fill seminar session with relative date in form data:
       | sessiontimezone    | Pacific/Auckland |
       | timestart[day]     | -1               |
@@ -153,17 +151,17 @@ Feature: Seminar sessions report overview
       | timefinish[hour]   | 0                |
       | timefinish[minute] | +30              |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
-    And I press "Add a new date"
-    And I click on "Edit date" "link" in the ".f2fmanagedates .lastrow" "css_element"
+    And I press "Add a new session"
+    And I click on "Edit session" "link" in the ".f2fmanagedates .lastrow" "css_element"
     And I set the following fields to these values:
       | timestart[day]     | 1                |
       | timestart[month]   | 1                |
-      | timestart[year]    | 2030             |
+      | timestart[year]    | ## 2 years ## Y ## |
       | timestart[hour]    | 0                |
       | timestart[minute]  | 0                |
       | timefinish[day]    | 1                |
       | timefinish[month]  | 1                |
-      | timefinish[year]   | 2030             |
+      | timefinish[year]   | ## 2 years ## Y ## |
       | timefinish[hour]   | 0                |
       | timefinish[minute] | 30               |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -175,9 +173,9 @@ Feature: Seminar sessions report overview
     And I click on the link "Attendees" in row 1
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Sam1 Student1, student1@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I click on "Sam2 Student2, student2@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I wait "1" seconds
     And I press "Continue"
     And I press "Confirm"
@@ -185,16 +183,16 @@ Feature: Seminar sessions report overview
 
     # 3: (2nd activity of C1) Bookings available, upcoming
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I set the following fields to these values:
       | timestart[day]     | 1    |
       | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
+      | timestart[year]    | ## next year ## Y ## |
       | timestart[hour]    | 11   |
       | timestart[minute]  | 00   |
       | timefinish[day]    | 1    |
       | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
+      | timefinish[year]   | ## next year ## Y ## |
       | timefinish[hour]   | 12   |
       | timefinish[minute] | 00   |
     And I click on "OK" "button" in the "Select date" "totaradialogue"
@@ -206,21 +204,20 @@ Feature: Seminar sessions report overview
     And I click on the link "Attendees" in row 1
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Sam3 Student3, student3@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I wait "1" seconds
     And I press "Continue"
     And I press "Confirm"
 
     # 4: (1st activity of C2) Fully booked, ended, no one
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 2"
+    And I am on "Course 2" course homepage
     #And I turn editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Test seminar name 3      |
       | Description       | Test seminar description |
     And I follow "Test seminar name 3"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I fill seminar session with relative date in form data:
       | sessiontimezone    | Pacific/Auckland |
       | timestart[day]     | -2               |
@@ -243,20 +240,19 @@ Feature: Seminar sessions report overview
     And I follow "Attendees"
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Sam6 Student6, student6@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I wait "1" seconds
     And I press "Continue"
     And I press "Confirm"
 
     # 5: (1st activity of C2) N/A, ended, no one
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 2"
+    And I am on "Course 2" course homepage
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name              | Test seminar name 4      |
       | Description       | Test seminar description |
     And I follow "Test seminar name 4"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
+    And I click on "Edit session" "link"
     And I fill seminar session with relative date in form data:
       | sessiontimezone    | Pacific/Auckland |
       | timestart[day]     | -2               |
@@ -277,7 +273,7 @@ Feature: Seminar sessions report overview
     And I follow "Attendees"
     And I click on "Add users" "option" in the "#menuf2f-actions" "css_element"
     And I click on "Sam7 Student7, student7@example.com" "option"
-    And I press "Add"
+    And I press exact "add"
     And I wait "1" seconds
     And I press "Continue"
     And I press "Confirm"

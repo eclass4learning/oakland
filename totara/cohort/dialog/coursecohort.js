@@ -100,8 +100,7 @@ M.totara_coursecohort = M.totara_coursecohort || {
             },
             url+'cohort.php?selected=' + this.config.enrolledselected
                     + '&instancetype=' + this.config.instancetype
-                    + '&instanceid=' + this.config.instanceid
-                    + '&sesskey=' + this.config.sesskey,
+                    + '&instanceid=' + this.config.instanceid,
             ehandler
         );
     }  // init_dialogs

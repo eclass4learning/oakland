@@ -1,4 +1,4 @@
-@totara @totara_completion_upload @javascript @_file_upload
+@totara @totara_customfield @totara_completion_upload @javascript @_file_upload
 Feature: Verify certification completion data with custom fields can be successfully uploaded.
 
   Background:
@@ -30,7 +30,7 @@ Feature: Verify certification completion data with custom fields can be successf
       | Full name     | Menu of Choices 1 |
       | Short name    | menuofchoices1    |
       | Default value | Choice 1          |
-    And I set the field "Menu options (one per line)" to multiline
+    And I set the field "Menu options (one per line)" to multiline:
       """
       Choice 1
       Choice 2
@@ -82,12 +82,11 @@ Feature: Verify certification completion data with custom fields can be successf
     When I navigate to "Upload Completion Records" node in "Site administration > Courses > Upload Completion Records"
     And I upload "totara/completionimport/tests/behat/fixtures/certification_evidence_custom_fields_1.csv" file to "Choose certification file to upload" filemanager
     And I click on "Upload" "button" in the "#mform2" "css_element"
-    Then I should see "CSV import completed"
-    And I should see "Certification data imported successfully"
-    And I should see "1 Records created as evidence"
-    And I should see "1 Records in total"
+    Then I should see "Certification completion file successfully imported"
+    And I should see "1 Records imported pending processing"
+    And I run all adhoc tasks
 
-    When I navigate to "Browse list of users" node in "Site administration > Users > Accounts"
+    When I navigate to "Browse list of users" node in "Site administration > Users"
     And I follow "Bob1 Learner1"
     And I click on "Record of Learning" "link" in the ".profile_tree" "css_element"
     And I follow "Completed certification : Cert1"
@@ -100,7 +99,7 @@ Feature: Verify certification completion data with custom fields can be successf
 
   Scenario: Verify a successful certification evidence upload expecting default custom field values to be used and visible in the import report.
     Given I log in as "admin"
-    When I navigate to "Manage reports" node in "Site administration > Reports > Report builder"
+    When I navigate to "Manage embedded reports" node in "Site administration > Reports"
     And I click on "Settings" "link" in the "Completion import: Certification status" "table_row"
     And I follow "Columns"
     And I set the field "newcolumns" to "Date completed"
@@ -124,10 +123,9 @@ Feature: Verify certification completion data with custom fields can be successf
     When I navigate to "Upload Completion Records" node in "Site administration > Courses > Upload Completion Records"
     And I upload "totara/completionimport/tests/behat/fixtures/certification_evidence_custom_fields_1.csv" file to "Choose certification file to upload" filemanager
     And I click on "Upload" "button" in the "#mform2" "css_element"
-    Then I should see "CSV import completed"
-    And I should see "Certification data imported successfully"
-    And I should see "1 Records created as evidence"
-    And I should see "1 Records in total"
+    Then I should see "Certification completion file successfully imported"
+    And I should see "1 Records imported pending processing"
+    And I run all adhoc tasks
 
     When I follow "Certification import report"
     Then I should see "1 Jan 2015" in the "learner1" "table_row"
@@ -143,12 +141,10 @@ Feature: Verify certification completion data with custom fields can be successf
     When I navigate to "Upload Completion Records" node in "Site administration > Courses > Upload Completion Records"
     And I upload "totara/completionimport/tests/behat/fixtures/certification_evidence_custom_fields_2.csv" file to "Choose certification file to upload" filemanager
     And I click on "Upload" "button" in the "#mform2" "css_element"
-    Then I should see "CSV import completed"
-    And I should see "Certification data imported successfully"
-    And I should see "1 Records created as evidence"
-    And I should see "1 Records in total"
+    And I should see "1 Records imported pending processing"
+    And I run all adhoc tasks
 
-    When I navigate to "Browse list of users" node in "Site administration > Users > Accounts"
+    When I navigate to "Browse list of users" node in "Site administration > Users"
     And I follow "Bob1 Learner1"
     And I click on "Record of Learning" "link" in the ".profile_tree" "css_element"
     And I follow "Completed certification : Cert1"

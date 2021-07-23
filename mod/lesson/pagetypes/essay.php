@@ -64,10 +64,20 @@ class lesson_page_type_essay extends lesson_page {
         return $essayinfo;
     }
 
+    /**
+     * This method gets called to export user answer to the question pages
+     * @param stdClass $attempt
+     * @return mixed
+     */
+    public function export(stdClass $attempt) {
+        $essayinfo = self::extract_useranswer($attempt->useranswer);
+        return $essayinfo->answer;
+    }
+
     public function display($renderer, $attempt) {
         global $PAGE, $CFG, $USER;
 
-        $mform = new lesson_display_answer_form_essay($CFG->wwwroot.'/mod/lesson/continue.php', array('contents'=>$this->get_contents(), 'lessonid'=>$this->lesson->id));
+        $mform = new lesson_display_answer_form_essay($CFG->wwwroot.'/mod/lesson/continue.php', array('contents'=>$this->get_contents(), 'lessonid'=>$this->lesson->id, 'pagetitle'=>$this->properties->title));
 
         $data = new stdClass;
         $data->id = $PAGE->cm->id;
@@ -120,7 +130,9 @@ class lesson_page_type_essay extends lesson_page {
         require_sesskey();
 
         if (!$data) {
-            redirect(new moodle_url('/mod/lesson/view.php', array('id'=>$PAGE->cm->id, 'pageid'=>$this->properties->id)));
+            $result->inmediatejump = true;
+            $result->newpageid = $this->properties->id;
+            return $result;
         }
 
         if (is_array($data->answer)) {
@@ -321,7 +333,12 @@ class lesson_display_answer_form_essay extends moodleform {
         // Disable shortforms.
         $mform->setDisableShortforms();
 
-        $mform->addElement('header', 'pageheader');
+        $title = isset($this->_customdata['pagetitle']) ? $this->_customdata['pagetitle'] : '';
+        if (!empty($title)) {
+            $mform->addElement('header', 'pageheader', $title);
+        } else {
+            $mform->addElement('header', 'pageheader');
+        }
 
         $mform->addElement('html', $OUTPUT->container($contents, 'contents'));
 

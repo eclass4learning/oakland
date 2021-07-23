@@ -568,6 +568,7 @@ class dp_objective_component extends dp_base_component {
             $transaction = $DB->start_delegated_transaction();
 
             foreach ($stored_records as $itemid => $record) {
+                $record->timemodified = time();
                 $DB->update_record('dp_plan_objective', $record);
                 if (isset($record->scalevalueid)) {
                     $scale_value_record = $DB->get_record('dp_objective_scale_value', array('id' => $record->scalevalueid));
@@ -763,6 +764,7 @@ class dp_objective_component extends dp_base_component {
         $rec->duedate = $duedate;
         $rec->scalevalueid = $scalevalueid ? $scalevalueid : $DB->get_field('dp_objective_scale', 'defaultid', array('id' => $this->get_setting('objectivescale')));
         $rec->approved = $this->approval_status_after_update();
+        $rec->timecreated = time();
 
         $rec->id = $DB->insert_record('dp_plan_objective', $rec);
 
@@ -1163,7 +1165,7 @@ class dp_objective_component extends dp_base_component {
 
         $markup = '';
 
-        if ($this->can_delete_item($item) && dp_can_manage_users_plans($this->plan->userid)) {
+        if ($this->can_delete_item($item)) {
             $deleteurl = new moodle_url('/totara/plan/components/objective/edit.php',
                 array('id' => $this->plan->id, 'itemid' => $item->id, 'd' => 1));
             $strdelete = get_string('delete', 'totara_plan');
@@ -1190,7 +1192,8 @@ class dp_objective_component extends dp_base_component {
         }
 
         $button = $OUTPUT->single_button(new moodle_url("/totara/plan/components/objective/edit.php",
-                                            array('id' => $this->plan->id)), get_string('addnewobjective', 'totara_plan'), 'get');
+            array('id' => $this->plan->id)), get_string('addnewobjective', 'totara_plan'), 'get',
+            array('class' => 'singlebutton dp-plan-assign-button'));
 
         return $OUTPUT->container($button, "buttons plan-add-item-button-wrapper");
     }
@@ -1329,20 +1332,22 @@ class dp_objective_component extends dp_base_component {
 
         $selected = $ca->scalevalueid;
 
-        if (!$plancompleted && $cansetprof && dp_can_manage_users_plans($this->plan->userid)) {
+        if (!$plancompleted && $cansetprof && $this->plan->can_manage()) {
             // Show the menu
             $options = array();
             foreach ($proficiencyvalues as $id => $val) {
                 $options[$id] = $val->name;
             }
 
-            return html_writer::select(
+            $label = html_writer::label(get_string('statusof', 'totara_plan', format_string($ca->fullname)), "menuproficiencies{$ca->id}", true, array('class' => 'sr-only'));
+            $select = html_writer::select(
                 $options,
                 "proficiencies[{$ca->id}]",
                 $selected,
                 null,
                 array()
             );
+            return $label . $select;
 
         } else {
             // They can't change the setting, so show it as-is

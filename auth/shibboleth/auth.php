@@ -40,13 +40,16 @@ class auth_plugin_shibboleth extends auth_plugin_base {
      */
     public function __construct() {
         $this->authtype = 'shibboleth';
-        $this->config = get_config('auth/shibboleth');
+        $this->config = get_config('auth_shibboleth');
     }
 
     /**
-     * Old syntax of class constructor for backward compatibility.
+     * Old syntax of class constructor. Deprecated in PHP7.
+     *
+     * @deprecated since Moodle 3.1
      */
     public function auth_plugin_shibboleth() {
+        debugging('Use of class name as constructor is deprecated', DEBUG_DEVELOPER);
         self::__construct();
     }
 
@@ -59,7 +62,12 @@ class auth_plugin_shibboleth extends auth_plugin_base {
      * @return bool Authentication success or failure.
      */
     function user_login($username, $password) {
-       global $SESSION;
+        global $SESSION;
+
+        if (!self::validate_server_attribute_name($this->config->user_attribute)) {
+            // The user attribute appears to be invalid, likely a common $_SERVER key. Hack alert.
+            return false;
+        }
 
         // If we are in the shibboleth directory then we trust the server var
         if (!empty($_SERVER[$this->config->user_attribute])) {
@@ -100,12 +108,17 @@ class auth_plugin_shibboleth extends auth_plugin_base {
     // reads user information from shibboleth attributes and return it in array()
         global $CFG;
 
-        // Check whether we have got all the essential attributes
-        if ( empty($_SERVER[$this->config->user_attribute]) ) {
-            print_error( 'shib_not_all_attributes_error', 'auth_shibboleth' , '', "'".$this->config->user_attribute."' ('".$_SERVER[$this->config->user_attribute]."'), '".$this->config->field_map_firstname."' ('".$_SERVER[$this->config->field_map_firstname]."'), '".$this->config->field_map_lastname."' ('".$_SERVER[$this->config->field_map_lastname]."') and '".$this->config->field_map_email."' ('".$_SERVER[$this->config->field_map_email]."')");
+        $attrmap = $this->get_attributes();
+
+        // Check we have a valid user attribute setting.
+        if (!self::validate_server_attribute_names($attrmap)) {
+            print_error('shib_invalid_attributes_error', 'auth_shibboleth');
         }
 
-        $attrmap = $this->get_attributes();
+        // Check whether we have got all the essential attributes
+        if (empty($attrmap['username']) || empty($_SERVER[$attrmap['username']])) {
+            print_error( 'shib_not_all_attributes_error', 'auth_shibboleth' , '', "'".$this->config->user_attribute."' ('".$_SERVER[$this->config->user_attribute]."'), '".$this->config->field_map_firstname."' ('".$_SERVER[$this->config->field_map_firstname]."'), '".$this->config->field_map_lastname."' ('".$_SERVER[$this->config->field_map_lastname]."') and '".$this->config->field_map_email."' ('".$_SERVER[$this->config->field_map_email]."')");
+        }
 
         $result = array();
         $search_attribs = array();
@@ -175,13 +188,32 @@ class auth_plugin_shibboleth extends auth_plugin_base {
     }
 
     /**
-     * Returns true if this authentication plugin can change the user's
-     * password.
+     * Whether shibboleth users can change their password or not.
      *
-     * @return bool
+     * Shibboleth auth requires password to be changed on shibboleth server directly.
+     * So it is required to have  password change url set.
+     *
+     * @return bool true if there's a password url or false otherwise.
      */
     function can_change_password() {
-        return false;
+        if (!empty($this->config->changepasswordurl)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Get password change url.
+     *
+     * @return moodle_url|null Returns URL to change password or null otherwise.
+     */
+    function change_password_url() {
+        if (!empty($this->config->changepasswordurl)) {
+            return new moodle_url($this->config->changepasswordurl);
+        } else {
+            return null;
+        }
     }
 
      /**
@@ -222,102 +254,6 @@ class auth_plugin_shibboleth extends auth_plugin_base {
         }
     }
 
-
-
-    /**
-     * Prints a form for configuring this authentication plugin.
-     *
-     * This function is called from admin/auth.php, and outputs a full page with
-     * a form for configuring this plugin.
-     *
-     * @param array $page An object containing all the data for this page.
-     */
-    function config_form($config, $err, $user_fields) {
-        include "config.html";
-    }
-
-    /**
-     * Processes and stores configuration data for this authentication plugin.
-     *
-     *
-     * @param object $config Configuration object
-     */
-    function process_config($config) {
-        global $CFG;
-
-        // set to defaults if undefined
-        if (!isset($config->auth_instructions) or empty($config->user_attribute)) {
-            $config->auth_instructions = get_string('auth_shib_instructions', 'auth_shibboleth', $CFG->wwwroot.'/auth/shibboleth/index.php');
-        }
-        if (!isset ($config->user_attribute)) {
-            $config->user_attribute = '';
-        }
-        if (!isset ($config->convert_data)) {
-            $config->convert_data = '';
-        }
-
-        if (!isset($config->changepasswordurl)) {
-            $config->changepasswordurl = '';
-        }
-
-        if (!isset($config->login_name)) {
-            $config->login_name = 'Shibboleth Login';
-        }
-
-        // Clean idp list
-        if (isset($config->organization_selection) && !empty($config->organization_selection) && isset($config->alt_login) && $config->alt_login == 'on') {
-            $idp_list = get_idp_list($config->organization_selection);
-            if (count($idp_list) < 1){
-                return false;
-            }
-            $config->organization_selection = '';
-            foreach ($idp_list as $idp => $value){
-                $config->organization_selection .= $idp.', '.$value[0].', '.$value[1]."\n";
-            }
-        }
-
-
-        // save settings
-        set_config('user_attribute',    $config->user_attribute,    'auth/shibboleth');
-
-        if (isset($config->organization_selection) && !empty($config->organization_selection)) {
-            set_config('organization_selection',    $config->organization_selection,    'auth/shibboleth');
-        }
-        set_config('logout_handler',    $config->logout_handler,    'auth/shibboleth');
-        set_config('logout_return_url',    $config->logout_return_url,    'auth/shibboleth');
-        set_config('login_name',    $config->login_name,    'auth/shibboleth');
-        set_config('convert_data',      $config->convert_data,      'auth/shibboleth');
-        set_config('auth_instructions', $config->auth_instructions, 'auth/shibboleth');
-        set_config('changepasswordurl', $config->changepasswordurl, 'auth/shibboleth');
-
-        // Overwrite alternative login URL if integrated WAYF is used
-        if (isset($config->alt_login) && $config->alt_login == 'on'){
-            set_config('alt_login',    $config->alt_login,    'auth/shibboleth');
-            set_config('alternateloginurl', $CFG->wwwroot.'/auth/shibboleth/login.php');
-        } else {
-            // Check if integrated WAYF was enabled and is now turned off
-            // If it was and only then, reset the Moodle alternate URL
-            if (isset($this->config->alt_login) and $this->config->alt_login == 'on'){
-                set_config('alt_login',    'off',    'auth/shibboleth');
-                set_config('alternateloginurl', '');
-            }
-            $config->alt_login = 'off';
-        }
-
-        // Check values and return false if something is wrong
-        // Patch Anyware Technologies (14/05/07)
-        if (($config->convert_data != '')&&(!file_exists($config->convert_data) || !is_readable($config->convert_data))){
-            return false;
-        }
-
-        // Check if there is at least one entry in the IdP list
-        if (isset($config->organization_selection) && empty($config->organization_selection) && isset($config->alt_login) && $config->alt_login == 'on'){
-            return false;
-        }
-
-        return true;
-    }
-
     /**
      * Cleans and returns first of potential many values (multi-valued attributes)
      *
@@ -328,6 +264,199 @@ class auth_plugin_shibboleth extends auth_plugin_base {
         $clean_string = rtrim($list[0]);
 
         return $clean_string;
+    }
+
+    /**
+     * Test if settings are correct, print info to output.
+     */
+    public function test_settings() {
+        global $OUTPUT;
+
+        if (!isset($this->config->user_attribute) || empty($this->config->user_attribute)) {
+            echo $OUTPUT->notification(get_string("shib_not_set_up_error", "auth_shibboleth"), 'notifyproblem');
+            return;
+        }
+
+        $attributes = $this->get_attributes();
+        foreach ($attributes as $key => $value) {
+            if (!self::validate_server_attribute_name($value)) {
+                echo $OUTPUT->notification(get_string("shib_attribute_not_valid", "auth_shibboleth", $key), 'notifyproblem');
+                return;
+            }
+        }
+
+        if ($this->config->convert_data and $this->config->convert_data != '' and !is_readable($this->config->convert_data)) {
+            echo $OUTPUT->notification(get_string("auth_shib_convert_data_warning", "auth_shibboleth"), 'notifyproblem');
+            return;
+        }
+        if (isset($this->config->organization_selection) && empty($this->config->organization_selection) &&
+                isset($this->config->alt_login) && $this->config->alt_login == 'on') {
+
+            echo $OUTPUT->notification(get_string("auth_shib_no_organizations_warning", "auth_shibboleth"), 'notifyproblem');
+            return;
+        }
+    }
+
+    /**
+     * SSO plugins are not compatible with persistent logins.
+     *
+     * @param stdClass $user
+     * @return bool
+     */
+    public function allow_persistent_login(stdClass $user) {
+        return false;
+    }
+
+    /**
+     * Validate all config settings that use $_SERVER to ensure they appear valid.
+     *
+     * @param string[] $attributes An array where the values are names expected to come from $_SERVER
+     * @return bool True if all settings appear valid, false otherwise.
+     */
+    public static function validate_server_attribute_names($attributes) {
+        foreach ($attributes as $name => $value) {
+            if (!self::validate_server_attribute_name($value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Returns true if the attribute value appears valid.
+     *
+     * Currently this function just blacklists common $_SERVER keys that cannot be used by Shibboleth.
+     *
+     * @param string $value The name of the key expected to come from $_SERVER
+     * @return bool
+     */
+    public static function validate_server_attribute_name($value) {
+        global $CFG;
+
+        if (!empty($CFG->auth_shibboleth_disable_server_attribute_validation)) {
+            // It has specifically been disabled.
+            return true;
+        }
+
+        // Blacklist common keys from common web servers in case this is a staging environment that differs from the
+        // deployment environment. This list ins't thorough but covers the common bases which is all it is intended to do.
+        $blacklist = [
+            // General
+            'CONTENT_LENGTH',
+            'CONTENT_TYPE',
+            'DOCUMENT_ROOT',
+            'FCGI_ROLE',
+            'GATEWAY_INTERFACE',
+            'HOME',
+            'HTTPS',
+            'HTTP_ACCEPT',
+            'HTTP_ACCEPT_ENCODING',
+            'HTTP_ACCEPT_LANGUAGE',
+            'HTTP_CONNECTION',
+            'HTTP_COOKIE',
+            'HTTP_DNT',
+            'HTTP_HOST',
+            'HTTP_UPGRADE_INSECURE_REQUESTS',
+            'HTTP_USER_AGENT',
+            'PHP_SELF',
+            'QUERY_STRING',
+            'REMOTE_ADDR',
+            'REMOTE_PORT',
+            'REQUEST_METHOD',
+            'REQUEST_SCHEME',
+            'REQUEST_TIME',
+            'REQUEST_TIME_FLOAT',
+            'REQUEST_URI',
+            'SCRIPT_NAME',
+            'SCRIPT_FILENAME',
+            'SERVER_ADDR',
+            'SERVER_NAME',
+            'SERVER_PORT',
+            'SERVER_PROTOCOL',
+            'SERVER_SIGNATURE',
+            'SERVER_SOFTWARE',
+            'USER',
+
+            // Apache 2.4 specific
+            'CONTEXT_DOCUMENT_ROOT',
+            'CONTEXT_PREFIX',
+            'PATH',
+            'SERVER_ADMIN',
+            'HTTP_CACHE_CONTROL',
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_FORWARDED_HOST',
+            'HTTP_X_FORWARDED_SERVER',
+
+            // IIS specific
+            'ALLUSERSPROFILE',
+            'APPDATA',
+            'APP_POOL_CONFIG',
+            'APP_POOL_ID',
+            'APPL_MD_PATH',
+            'APPL_PHYSICAL_PATH',
+            'AUTH_PASSWORD',
+            'AUTH_TYPE',
+            'AUTH_USER',
+            'CERT_COOKIE',
+            'CERT_FLAGS',
+            'CERT_ISSUER',
+            'CERT_SERIALNUMBER',
+            'CERT_SUBJECT',
+            'CommonProgramFiles',
+            'CommonProgramFiles(x86)',
+            'CommonProgramW6432',
+            'ComSpec',
+            'COMPUTERNAME',
+            'DriverData',
+            'HTTPS_KEYSIZE',
+            'HTTPS_SECRETKEYSIZE',
+            'HTTPS_SERVER_ISSUER',
+            'HTTPS_SERVER_SUBJECT',
+            'INSTANCE_ID',
+            'INSTANCE_META_PATH',
+            'INSTANCE_NAME',
+            'LOCALAPPDATA',
+            'LOCAL_ADDR',
+            'LOGON_USER',
+            'NUMBER_OF_PROCESSORS',
+            'ORIG_PATH_INFO',
+            'OS',
+            'PATHEXT',
+            'PATH_TRANSLATED',
+            'PHPRC',
+            'PHP_FCGI_MAX_REQUESTS',
+            'PROCESSOR_ARCHITECTURE',
+            'PROCESSOR_IDENTIFIER',
+            'PROCESSOR_LEVEL',
+            'PROCESSOR_REVISION',
+            'PSModulePath',
+            'PUBLIC',
+            'Path',
+            'ProgramData',
+            'ProgramFiles',
+            'ProgramFiles(x86)',
+            'ProgramW6432',
+            'REMOTE_HOST',
+            'REMOTE_USER',
+            'SERVER_PORT_SECURE',
+            'SystemDrive',
+            'SystemRoot',
+            'TEMP',
+            'TMP',
+            'URL',
+            'USERDOMAIN',
+            'USERNAME',
+            'USERPROFILE',
+            'windir',
+            '_FCGI_X_PIPE_',
+
+            // nginx specific
+            'HTTP_CACHE_CONTROL',
+            'REDIRECT_STATUS',
+            'DOCUMENT_URI',
+            'PATH_INFO',
+        ];
+        return !in_array($value, $blacklist);
     }
 }
 
@@ -356,7 +485,7 @@ class auth_plugin_shibboleth extends auth_plugin_base {
      *
      */
     function print_idp_list(){
-        $config = get_config('auth/shibboleth');
+        $config = get_config('auth_shibboleth');
 
         $IdPs = get_idp_list($config->organization_selection);
         if (isset($_COOKIE['_saml_idp'])){

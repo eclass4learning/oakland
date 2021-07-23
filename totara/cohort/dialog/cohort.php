@@ -22,7 +22,7 @@
  * @subpackage cohort
  */
 
-require_once(dirname(dirname(dirname(dirname(__FILE__)))).'/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot .'/cohort/lib.php');
 
 $selected   = optional_param('selected', array(), PARAM_SEQUENCE);
@@ -30,12 +30,6 @@ $instancetype = required_param('instancetype', PARAM_INT);
 $instanceid   = required_param('instanceid', PARAM_INT);
 
 require_login();
-try {
-    require_sesskey();
-} catch (moodle_exception $e) {
-    echo html_writer::tag('div', $e->getMessage(), array('class' => 'notifyproblem'));
-    die();
-}
 
 // This dialog is used from many places, the permissions checks need to be a bit relaxed.
 $capable = false;
@@ -73,16 +67,20 @@ if (!$capable) {
     die();
 }
 
+$contextids = array_filter($context->get_parent_context_ids(true),
+    function($a) {return has_capability("moodle/cohort:view", context::instance_by_id($a));});
+if (empty($contextids)) {
+    echo html_writer::tag('div', get_string('error:capabilitycohortview', 'totara_cohort'), array('class' => 'notifyproblem'));
+    die();
+}
+list($contextssql, $params) = $DB->get_in_or_equal($contextids);
+
 $selectedsql = '';
 $selectedparams = array();
 if (!empty($selected)) {
     list($selectedsql, $selectedparams) = $DB->get_in_or_equal(explode(',', $selected));
     $selected = $DB->get_records_select('cohort', "id {$selectedsql}", $selectedparams, 'name, idnumber', 'id, name as fullname');
 }
-
-$contextids = array_filter($context->get_parent_context_ids(true),
-    create_function('$a', 'return has_capability("moodle/cohort:view", context::instance_by_id($a));'));
-list($contextssql, $params) = $DB->get_in_or_equal($contextids);
 
 $sql = "SELECT *
           FROM {cohort}

@@ -137,6 +137,21 @@ class core_coursecatlib_testcase extends advanced_testcase {
             $this->assertInstanceOf('moodle_exception', $e);
             $this->assertEquals('ID number is already used for another category', $e->getMessage());
         }
+        // Test that duplicates with an idnumber of 0 cannot be created.
+        coursecat::create(array('name' => 'Cat3', 'idnumber' => '0'));
+        try {
+            coursecat::create(array('name' => 'Cat4', 'idnumber' => '0'));
+            $this->fail('Duplicate idnumber "0" exception expected in coursecat::create');
+        } catch (moodle_exception $e) {
+            $this->assertInstanceOf('moodle_exception', $e);
+        }
+        // Test an update cannot make a duplicate idnumber of 0.
+        try {
+            $cat2->update(array('idnumber' => '0'));
+            $this->fail('Duplicate idnumber "0" exception expected in coursecat::update');
+        } catch (Exception $e) {
+            $this->assertInstanceOf('moodle_exception', $e);
+        }
     }
 
     public function test_visibility() {
@@ -401,6 +416,17 @@ class core_coursecatlib_testcase extends advanced_testcase {
         $this->resetAfterTest(true);
         $generator = $this->getDataGenerator();
         $category = $generator->create_category();
+
+        try {
+            // Enable the multilang filter and set it to apply to headings and content.
+            filter_manager::reset_caches();
+            filter_set_global_state('multilang', TEXTFILTER_ON);
+            filter_set_applies_to_strings('multilang', true);
+            $multilang = true;
+        } catch (coding_exception $ex) {
+            $multilang = false;
+        }
+
         $course1 = $generator->create_course(array(
             'category' => $category->id,
             'idnumber' => '006-01',
@@ -444,14 +470,12 @@ class core_coursecatlib_testcase extends advanced_testcase {
         $this->assertTrue($coursecat->resort_courses('timecreated'));
         $this->assertSame(array($c1, $c2, $c3, $c4), array_keys($coursecat->get_courses()));
 
-        try {
-            // Enable the multilang filter and set it to apply to headings and content.
-            filter_set_global_state('multilang', TEXTFILTER_ON);
-            filter_set_applies_to_strings('multilang', true);
+        if ($multilang) {
             $expected = array($c3, $c4, $c1, $c2);
-        } catch (coding_exception $ex) {
+        } else {
             $expected = array($c3, $c4, $c2, $c1);
         }
+
         $this->assertTrue($coursecat->resort_courses('fullname'));
         $this->assertSame($expected, array_keys($coursecat->get_courses()));
     }
@@ -521,6 +545,16 @@ class core_coursecatlib_testcase extends advanced_testcase {
         $res = coursecat::search_courses(array('search' => 'Математика'));
         $this->assertEquals(array($c3->id, $c6->id), array_keys($res));
         $this->assertEquals(2, coursecat::search_courses_count(array('search' => 'Математика'), array()));
+
+        $this->setUser($this->getDataGenerator()->create_user());
+
+        // Add necessary capabilities.
+        $this->assign_capability('moodle/course:create', CAP_ALLOW, context_coursecat::instance($cat2->id));
+        // Do another search with restricted capabilities.
+        $reqcaps = array('moodle/course:create');
+        $res = coursecat::search_courses(array('search' => 'test'), array(), $reqcaps);
+        $this->assertEquals(array($c8->id, $c5->id), array_keys($res));
+        $this->assertEquals(2, coursecat::search_courses_count(array('search' => 'test'), array(), $reqcaps));
     }
 
     public function test_course_contacts() {
@@ -753,5 +787,209 @@ class core_coursecatlib_testcase extends advanced_testcase {
             $fs->create_file_from_string($filerecord, $filecontents);
         }
         return $draftid;
+    }
+
+    /**
+     * Creates data to be used for the tests of coursecat::get_course_records.
+     *
+     * Several combinations of standard and audience visibility are used for each course.
+     *
+     * @return array containing generated user and courses.
+     */
+    private function set_up_data_for_coursetcat_get_course_records() {
+        $data = array();
+
+        $data['user'] =  $this->getDataGenerator()->create_user();
+        $audience = $this->getDataGenerator()->create_cohort();
+        cohort_add_member($audience->id, $data['user']->id);
+
+        $data['visible_allusers'] = $this->getDataGenerator()->create_course(
+            array('visible' => 1, 'audiencevisible' => COHORT_VISIBLE_ALL, 'fullname' => 'visible_allusers'));
+        $data['notvisible_allusers'] = $this->getDataGenerator()->create_course(
+            array('visible' => 0, 'audiencevisible' => COHORT_VISIBLE_ALL, 'fullname' => 'notvisible_allusers'));
+        $data['notvisible_audienceonly'] = $this->getDataGenerator()->create_course(
+            array('visible' => 0, 'audiencevisible' => COHORT_VISIBLE_AUDIENCE, 'fullname' => 'notvisible_audienceonly'));
+        totara_cohort_add_association(
+            $audience->id,
+            $data['notvisible_audienceonly']->id,
+            COHORT_ASSN_ITEMTYPE_COURSE,
+            COHORT_ASSN_VALUE_VISIBLE);
+        $data['visible_nousers'] = $this->getDataGenerator()->create_course(
+            array('visible' => 1, 'audiencevisible' => COHORT_VISIBLE_NOUSERS, 'fullname' => 'visible_nousers'));
+
+        return $data;
+    }
+
+    /**
+     * Tests coursecat::get_course_records() with audience visibility on, but without asking the method
+     * to check visibility. Therefore all courses should be returned.
+     */
+    public function test_coursetcat_get_course_records_audvis_on_dontcheck() {
+        global $CFG;
+
+        $CFG->audiencevisibility = 1;
+        $data = $this->set_up_data_for_coursetcat_get_course_records();
+        $this->setUser($data['user']);
+
+        $courses  = coursecat::get_course_records('1=1', array(), array(), false);
+
+        // Check the returned courses have the correct courses with their ids as keys. Check that each element
+        // does contain the correct course data by checking the fullname.
+        $this->assertArrayHasKey($data['visible_allusers']->id, $courses);
+        $this->assertEquals('visible_allusers', $courses[$data['visible_allusers']->id]->fullname);
+        $this->assertArrayHasKey($data['notvisible_allusers']->id, $courses);
+        $this->assertEquals('notvisible_allusers', $courses[$data['notvisible_allusers']->id]->fullname);
+        $this->assertArrayHasKey($data['notvisible_audienceonly']->id, $courses);
+        $this->assertEquals('notvisible_audienceonly', $courses[$data['notvisible_audienceonly']->id]->fullname);
+        $this->assertArrayHasKey($data['visible_nousers']->id, $courses);
+        $this->assertEquals('visible_nousers', $courses[$data['visible_nousers']->id]->fullname);
+    }
+
+    /**
+     * Tests coursecat::get_course_records() with audience visibility off, but without asking the method
+     * to check visibility. Therefore all courses should be returned.
+     */
+    public function test_coursetcat_get_course_records_audvis_off_dontcheck() {
+        global $CFG;
+
+        $CFG->audiencevisibility = 0;
+        $data = $this->set_up_data_for_coursetcat_get_course_records();
+        $this->setUser($data['user']);
+
+        $courses  = coursecat::get_course_records('1=1', array(), array(), false);
+
+        // Check the returned courses have the correct courses with their ids as keys. Check that each element
+        // does contain the correct course data by checking the fullname.
+        $this->assertArrayHasKey($data['visible_allusers']->id, $courses);
+        $this->assertEquals('visible_allusers', $courses[$data['visible_allusers']->id]->fullname);
+        $this->assertArrayHasKey($data['notvisible_allusers']->id, $courses);
+        $this->assertEquals('notvisible_allusers', $courses[$data['notvisible_allusers']->id]->fullname);
+        $this->assertArrayHasKey($data['notvisible_audienceonly']->id, $courses);
+        $this->assertEquals('notvisible_audienceonly', $courses[$data['notvisible_audienceonly']->id]->fullname);
+        $this->assertArrayHasKey($data['visible_nousers']->id, $courses);
+        $this->assertEquals('visible_nousers', $courses[$data['visible_nousers']->id]->fullname);
+    }
+
+    /**
+     * Tests coursecat::get_course_records() with audience visibility on and asks the method
+     * to check visibility. Therefore only courses visible to this user should be returned.
+     */
+    public function test_coursetcat_get_course_records_audvis_on_docheck() {
+        global $CFG;
+
+        $CFG->audiencevisibility = 1;
+        $data = $this->set_up_data_for_coursetcat_get_course_records();
+        $this->setUser($data['user']);
+
+        $courses  = coursecat::get_course_records('1=1', array(), array(), true);
+
+        // Check the returned courses have the correct courses with their ids as keys. Check that each element
+        // does contain the correct course data by checking the fullname.
+        $this->assertArrayHasKey($data['visible_allusers']->id, $courses);
+        $this->assertEquals('visible_allusers', $courses[$data['visible_allusers']->id]->fullname);
+        $this->assertArrayHasKey($data['notvisible_allusers']->id, $courses);
+        $this->assertEquals('notvisible_allusers', $courses[$data['notvisible_allusers']->id]->fullname);
+        $this->assertArrayHasKey($data['notvisible_audienceonly']->id, $courses);
+        $this->assertEquals('notvisible_audienceonly', $courses[$data['notvisible_audienceonly']->id]->fullname);
+        $this->assertArrayNotHasKey($data['visible_nousers']->id, $courses);
+    }
+
+    /**
+     * Tests coursecat::get_course_records() with audience visibility off and asks the method
+     * to check visibility. Therefore only courses visible to this user should be returned.
+     */
+    public function test_coursetcat_get_course_records_audvis_off_docheck() {
+        global $CFG;
+
+        $CFG->audiencevisibility = 0;
+        $data = $this->set_up_data_for_coursetcat_get_course_records();
+        $this->setUser($data['user']);
+
+        $courses  = coursecat::get_course_records('1=1', array(), array(), true);
+
+        // Check the returned courses have the correct courses with their ids as keys. Check that each element
+        // does contain the correct course data by checking the fullname.
+        $this->assertArrayHasKey($data['visible_allusers']->id, $courses);
+        $this->assertEquals('visible_allusers', $courses[$data['visible_allusers']->id]->fullname);
+        $this->assertArrayNotHasKey($data['notvisible_allusers']->id, $courses);
+        $this->assertArrayNotHasKey($data['notvisible_audienceonly']->id, $courses);
+        $this->assertArrayHasKey($data['visible_nousers']->id, $courses);
+        $this->assertEquals('visible_nousers', $courses[$data['visible_nousers']->id]->fullname);
+    }
+
+    public function test_get_many() {
+        $generator = $this->getDataGenerator();
+        $a = $generator->create_category(['parent' => 0, 'idnumber' => 'a']);
+        $a_a = $generator->create_category(['parent' => $a->id, 'idnumber' => 'a-a']);
+        $a_a_a = $generator->create_category(['parent' => $a_a->id, 'idnumber' => 'a-a-a']);
+        $a_a_b = $generator->create_category(['parent' => $a_a->id, 'idnumber' => 'a-a-b']);
+        $a_b = $generator->create_category(['parent' => $a->id, 'idnumber' => 'a-b']);
+        $a_b_a = $generator->create_category(['parent' => $a_b->id, 'idnumber' => 'a-b-a']);
+        $b = $generator->create_category(['parent' => 0, 'idnumber' => 'b']);
+        $b_a = $generator->create_category(['parent' => $b->id, 'idnumber' => 'b-a']);
+        $b_a_a = $generator->create_category(['parent' => $b_a->id, 'idnumber' => 'b-a-a']);
+
+        $getidnumbers = function ($categories) {
+            $idnumbers = array_map(function ($category) {
+                return $category->idnumber;
+            }, $categories);
+            asort($idnumbers);
+            return array_values($idnumbers);
+        };
+
+        // Test none
+        $result = \coursecat::get_many([]);
+        self::assertSame([], $result);
+
+        // Test single
+        $result = \coursecat::get_many([$b->id]);
+        self::assertSame(['b'], $getidnumbers($result));
+
+        // Test multiple
+        $result = \coursecat::get_many([$a->id, $b->id]);
+        self::assertSame(['a', 'b'], $getidnumbers($result));
+
+        // Test children without parent.
+        $result = \coursecat::get_many([$a_a_a->id]);
+        self::assertSame(['a-a-a'], $getidnumbers($result));
+        $result = \coursecat::get_many([$a_a_b->id, $a_b_a->id]);
+        self::assertSame(['a-a-b', 'a-b-a'], $getidnumbers($result));
+
+        // Test requesting a deleted category returns only existing categories.
+        \coursecat::get($a_a_b->id)->delete_full(false);
+        $result = \coursecat::get_many([$a_a_b->id, $b->id, $a_b_a->id]);
+        self::assertSame(['a-b-a', 'b'], $getidnumbers($result));
+
+        // Expand some categories
+        $cat_b = \coursecat::get($b->id);
+        $cat_a_b_a = \coursecat::get($a_b_a->id);
+        \core_course\management\helper::record_expanded_category($cat_b);
+        \core_course\management\helper::record_expanded_category($cat_a_b_a);
+        self::assertSame([(int)$b->id, (int)$a->id], \core_course\management\helper::get_expanded_categories(''));
+
+        // We need to purge the static property between the API and the cache, otherwise we test nothing.
+        $property = new ReflectionProperty(\core_course\management\helper::class, 'expandedcategories');
+        $property->setAccessible(true);
+        $property->setValue(null);
+
+        // Test the expanded cache does not get purged unnecessarily.
+        $result = \coursecat::get_many([$a_b_a->id]);
+        self::assertSame(['a-b-a'], $getidnumbers($result));
+        self::assertSame([(int)$b->id, (int)$a->id], \core_course\management\helper::get_expanded_categories(''));
+
+        $property->setValue(null); // Clear that static propery between each test.
+
+        // Test the expanded cache does not get cleared when loading.
+        cache::make('core', 'coursecatrecords')->purge();
+        $result = \coursecat::get_many([$a_b_a->id]);
+        self::assertSame(['a-b-a'], $getidnumbers($result));
+        self::assertSame([(int)$b->id, (int)$a->id], \core_course\management\helper::get_expanded_categories(''));
+
+        $property->setValue(null); // Clear that static propery between each test.
+
+        // Test the expanded cache gets cleared if we request something that does not exist.
+        $result = \coursecat::get_many([$a_a_b->id, $b->id, $a_b_a->id]);
+        self::assertSame(['a-b-a', 'b'], $getidnumbers($result));
+        self::assertSame([], \core_course\management\helper::get_expanded_categories(''));
     }
 }

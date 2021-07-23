@@ -24,7 +24,7 @@
 /**
  * View answer on feedback360
  */
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->dirroot . '/totara/feedback360/lib.php');
 require_once($CFG->dirroot . '/totara/feedback360/feedback360_forms.php');
 
@@ -48,7 +48,10 @@ if (!$isexternaluser) {
 
 // Get response assignment object, and check who is viewing the page.
 $viewasown = false;
+unset($SESSION->totara_feedback360_usertoken);
 if ($isexternaluser) {
+    // This is a hack to get around authenticating anonymous users when viewing files in feeback360.
+    $SESSION->totara_feedback360_usertoken = $token;
     // Get the user's email address from the token.
     $email = $DB->get_field('feedback360_email_assignment', 'email', array('token' => $token));
     $respassignment = feedback360_responder::by_email($email, $token);
@@ -81,8 +84,10 @@ if ($isexternaluser) {
 
     $respassignment = feedback360_responder::by_preview($feedback360id);
 } else if ($viewanswer) {
-    $responseid = required_param('responseid', PARAM_INT);
-    $respassignment = new feedback360_responder($responseid);
+    // Retrieve responses via their associated requester token rather than by id as this guards anonymity
+    // for anonymous feedback.
+    $requestertoken = required_param('requestertoken', PARAM_ALPHANUM);
+    $respassignment = feedback360_responder::get_by_requester_token($requestertoken);
 
     if ($respassignment->subjectid != $USER->id) {
         // If you arent the owner of the feedback request.
@@ -148,7 +153,7 @@ if ($isexternaluser) {
 
     $PAGE->set_title($heading);
     $PAGE->set_heading($heading);
-    $PAGE->set_totara_menu_selected('appraisals');
+    $PAGE->set_totara_menu_selected('\totara_appraisal\totara\menu\appraisal');
     $PAGE->navbar->add($heading);
     $PAGE->navbar->add(get_string('givefeedback', 'totara_feedback360'));
 } else if ($viewasown) {
@@ -156,7 +161,7 @@ if ($isexternaluser) {
 
     $PAGE->set_title($heading);
     $PAGE->set_heading($heading);
-    $PAGE->set_totara_menu_selected('appraisals');
+    $PAGE->set_totara_menu_selected('\totara_appraisal\totara\menu\appraisal');
     $PAGE->navbar->add(get_string('feedback360', 'totara_feedback360'), new moodle_url('/totara/feedback360/index.php'));
     $PAGE->navbar->add(get_string('givefeedback', 'totara_feedback360'));
 } else {
@@ -167,7 +172,7 @@ if ($isexternaluser) {
     $PAGE->set_title($userxfeedback);
     $PAGE->set_heading($userxfeedback);
     if (totara_feature_visible('myteam')) {
-        $PAGE->set_totara_menu_selected('myteam');
+        $PAGE->set_totara_menu_selected('\totara_core\totara\menu\myteam');
         $PAGE->navbar->add(get_string('team', 'totara_core'), new moodle_url('/my/teammembers.php'));
     }
     $PAGE->navbar->add($userxfeedback);
@@ -185,7 +190,7 @@ if ($viewanswer) {
             array('userid' => $viewas));
 }
 $form = new feedback360_answer_form(null, array('feedback360' => $feedback360, 'resp' => $respassignment, 'preview' => $preview,
-        'backurl' => $backurl));
+        'backurl' => $backurl), 'post', '', array('class' => 'totara-question-group'));
 
 // Process form submission.
 if ($form->is_submitted() && !$respassignment->is_completed()) {

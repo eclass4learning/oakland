@@ -44,8 +44,16 @@ class totara_program_prog_assignment_completion_type_testcase extends reportcach
 
     protected function tearDown() {
         $this->users = null;
+        $this->dates = null;
+        $this->userfields = null;
         $this->programgenerator = null;
+        $this->programs = null;
+        $this->positiongenerator = null;
+        $this->positions = null;
+        $this->courses = null;
         $this->beforesetuptime = null;
+        $this->aftersetuptime = null;
+
         parent::tearDown();
     }
 
@@ -62,7 +70,7 @@ class totara_program_prog_assignment_completion_type_testcase extends reportcach
         $this->resetAfterTest(true);
 
         $this->beforesetuptime = time();
-        sleep(1);
+        $this->waitForSecond();
 
         $this->programgenerator = $this->getDataGenerator()->get_plugin_generator('totara_program');
         $this->programs[0] = $this->programgenerator->create_program();
@@ -181,7 +189,7 @@ class totara_program_prog_assignment_completion_type_testcase extends reportcach
         // Data for prog_assigment_completion_enrollment_date.
         $this->users[1000] = $this->getDataGenerator()->create_user();
 
-        sleep(1);
+        $this->waitForSecond();
         $this->aftersetuptime = time();
 
         $this->prog_assigment_completion_first_login();
@@ -225,9 +233,11 @@ class totara_program_prog_assignment_completion_type_testcase extends reportcach
 
         $completionobject = new prog_assigment_completion_position_assigned_date();
 
-        $assignment = $DB->get_record('prog_assignment', array('programid' => $this->programs[0]->id,
+        $assignment = $DB->get_record('prog_assignment', array(
+            'programid' => $this->programs[0]->id,
             'assignmenttype' => ASSIGNTYPE_INDIVIDUAL,
-            'assignmenttypeid' => $this->users[3]->id));
+            'assignmenttypeid' => $this->users[3]->id
+        ));
         $assignment->completioninstance = $this->positions[2]->id;
         $timestamp = $completionobject->get_timestamp($this->users[3]->id, $assignment);
         $this->assertGreaterThan($this->beforesetuptime, $timestamp);
@@ -390,7 +400,7 @@ class totara_program_prog_assignment_completion_type_testcase extends reportcach
         // User who is not yet assigned.
         $assignment = new stdClass();
         $assignment->id = 0;
-        sleep(1);
+        $this->waitForSecond();
         $before = time();
         $timestamp = $completionobject->get_timestamp($this->users[1000]->id, $assignment);
         $after = time();

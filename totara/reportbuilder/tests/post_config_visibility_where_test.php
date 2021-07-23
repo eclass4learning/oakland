@@ -30,18 +30,22 @@ global $CFG;
  *
  * To test, run this from the command line from the $CFG->dirroot.
  * vendor/bin/phpunit --verbose totara_reportbuilder_post_config_visibility_where_testcase totara/reportbuilder/tests/post_config_visibility_where_test.php
+ *
+ * @group totara_reportbuilder
  */
 class totara_reportbuilder_post_config_visibility_where_testcase extends advanced_testcase {
     use totara_reportbuilder\phpunit\report_testing;
 
     public function test_post_config_visibility_where() {
         $this->resetAfterTest(true);
+        $this->setAdminUser();
 
         $user = $this->getDataGenerator()->create_user();
 
         // Create report. We use the user report, because we know it must include the visibility required columns.
         $rid = $this->create_report('program', 'Test program report 1');
-        $report = new reportbuilder($rid, null, false, null, null, true);
+        $config = (new rb_config())->set_nocache(true);
+        $report = reportbuilder::create($rid, $config);
 
         // Save a copy of all the required columns.
         $allrequiredcolumns = $report->requiredcolumns;
@@ -55,30 +59,28 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
         $this->assertEquals('base.visible', $allrequiredcolumns['visibility-visible']->field);
         $this->assertArrayHasKey('visibility-audiencevisible', $allrequiredcolumns);
         $this->assertEquals('base.audiencevisible', $allrequiredcolumns['visibility-audiencevisible']->field);
-        $this->assertArrayHasKey('base-available', $allrequiredcolumns);
-        $this->assertEquals('base.available', $allrequiredcolumns['base-available']->field);
-        $this->assertArrayHasKey('base-availablefrom', $allrequiredcolumns);
-        $this->assertEquals('base.availablefrom', $allrequiredcolumns['base-availablefrom']->field);
-        $this->assertArrayHasKey('base-availablefrom', $allrequiredcolumns);
-        $this->assertEquals('base.availablefrom', $allrequiredcolumns['base-availablefrom']->field);
+        $this->assertArrayHasKey('visibility-available', $allrequiredcolumns);
+        $this->assertEquals('base.available', $allrequiredcolumns['visibility-available']->field);
+        $this->assertArrayHasKey('visibility-availablefrom', $allrequiredcolumns);
+        $this->assertEquals('base.availablefrom', $allrequiredcolumns['visibility-availablefrom']->field);
+        $this->assertArrayHasKey('visibility-availableuntil', $allrequiredcolumns);
+        $this->assertEquals('base.availableuntil', $allrequiredcolumns['visibility-availableuntil']->field);
 
         // Call post_config_visibility_where and see that there is no problem.
         // Note that we're not really checking what the result of this function call is - that should be done
         // directly on totara_visibility_where. Just make sure that 'base' and 'available' are part of the result.
         list($wheresql, $params) = $report->post_config_visibility_where('program', 'base', $user->id); // No exception.
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.visible = :tcvwnormalvisible'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.visible = :tcvwnormalvisiblenone'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'ra.contextid = ctx.id'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.availablefrom = 0 OR base.availablefrom < :timefrom'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.availableuntil = 0 OR base.availableuntil > :timeuntil'));
+        $this->assertGreaterThan(0, strpos($wheresql, 'base.visible = 1 AND'));
+        $this->assertGreaterThan(0, strpos($wheresql, 'WHERE vh_ctx.contextlevel = 45'));
+        $this->assertGreaterThan(0, strpos($wheresql, 'base.availablefrom = 0 OR base.availablefrom < '));
+        $this->assertGreaterThan(0, strpos($wheresql, 'base.availableuntil = 0 OR base.availableuntil > '));
 
         // Check that certifications gives the same result.
         list($wheresql, $params) = $report->post_config_visibility_where('certification', 'base', $user->id);
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.visible = :tcvwnormalvisible'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.visible = :tcvwnormalvisiblenone'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'ra.contextid = ctx.id'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.availablefrom = 0 OR base.availablefrom < :timefrom'));
-        $this->assertGreaterThan(0, strpos($wheresql, 'base.availableuntil = 0 OR base.availableuntil > :timeuntil'));
+        $this->assertGreaterThan(0, strpos($wheresql, 'base.visible = 1 AND'));
+        $this->assertGreaterThan(0, strpos($wheresql, 'WHERE vh_ctx.contextlevel = 45'));
+        $this->assertGreaterThan(0, strpos($wheresql, 'base.availablefrom = 0 OR base.availablefrom < '));
+        $this->assertGreaterThan(0, strpos($wheresql, 'base.availableuntil = 0 OR base.availableuntil > '));
 
         // Change the ctx-id field and see that there is an exception.
         try {
@@ -86,7 +88,7 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column ctx id or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column ctx id or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns['ctx-id']->field = 'ctx.id'; // Restore the original value.
 
@@ -96,7 +98,7 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column ctx id or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column ctx id or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns; // Restore the original array.
 
@@ -106,7 +108,7 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column visibility id or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility id or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns['visibility-id']->field = 'base.id';
 
@@ -116,7 +118,7 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column visibility id or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility id or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
@@ -126,7 +128,7 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column visibility visible or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility visible or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns['visibility-visible']->field = 'base.visible';
 
@@ -136,7 +138,7 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column visibility visible or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility visible or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
@@ -146,7 +148,7 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column visibility audiencevisible or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility audiencevisible or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns['visibility-audiencevisible']->field = 'base.audiencevisible';
 
@@ -156,105 +158,105 @@ class totara_reportbuilder_post_config_visibility_where_testcase extends advance
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column visibility audiencevisible or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility audiencevisible or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
         // Change the base-available field and see that there is an exception.
         try {
-            $report->requiredcolumns['base-available']->field = 'ctx.id';
+            $report->requiredcolumns['visibility-available']->field = 'ctx.id';
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base available or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility available or field is incorrect', $e->getMessage());
         }
-        $report->requiredcolumns['base-available']->field = 'base.available';
+        $report->requiredcolumns['visibility-available']->field = 'base.available';
 
         // Remove the base-available required column and see that there is an exception.
         try {
-            unset($report->requiredcolumns['base-available']);
+            unset($report->requiredcolumns['visibility-available']);
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base available or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility available or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
         // Change the base-availablefrom field and see that there is an exception.
         try {
-            $report->requiredcolumns['base-availablefrom']->field = 'ctx.id';
+            $report->requiredcolumns['visibility-availablefrom']->field = 'ctx.id';
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base availablefrom or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility availablefrom or field is incorrect', $e->getMessage());
         }
-        $report->requiredcolumns['base-availablefrom']->field = 'base.availablefrom';
+        $report->requiredcolumns['visibility-availablefrom']->field = 'base.availablefrom';
 
         // Remove the base-availablefrom required column and see that there is an exception.
         try {
-            unset($report->requiredcolumns['base-availablefrom']);
+            unset($report->requiredcolumns['visibility-availablefrom']);
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base availablefrom or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility availablefrom or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
         // Change the base-availableuntil field and see that there is an exception.
         try {
-            $report->requiredcolumns['base-availableuntil']->field = 'ctx.id';
+            $report->requiredcolumns['visibility-availableuntil']->field = 'ctx.id';
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base availableuntil or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility availableuntil or field is incorrect', $e->getMessage());
         }
-        $report->requiredcolumns['base-availableuntil']->field = 'base.availableuntil';
+        $report->requiredcolumns['visibility-availableuntil']->field = 'base.availableuntil';
 
         // Remove the base-availableuntil required column and see that there is an exception.
         try {
-            unset($report->requiredcolumns['base-availableuntil']);
+            unset($report->requiredcolumns['visibility-availableuntil']);
             $report->post_config_visibility_where('program', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base availableuntil or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility availableuntil or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
         // See that post_config_visibility_where doesn't care about the "available" fields with courses.
-        unset($report->requiredcolumns['base-available']);
-        unset($report->requiredcolumns['base-availablefrom']);
-        unset($report->requiredcolumns['base-availableuntil']);
+        unset($report->requiredcolumns['visibility-available']);
+        unset($report->requiredcolumns['visibility-availablefrom']);
+        unset($report->requiredcolumns['visibility-availableuntil']);
         list($wheresql, $params) = $report->post_config_visibility_where('course', 'base', $user->id); // No exception.
 
         // Repeat some of the "available" tests with certifications.
 
         // Remove the base-available required column and see that there is an exception.
         try {
-            unset($report->requiredcolumns['base-available']);
+            unset($report->requiredcolumns['visibility-available']);
             $report->post_config_visibility_where('certification', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base available or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility available or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
         // Remove the base-availablefrom required column and see that there is an exception.
         try {
-            unset($report->requiredcolumns['base-availablefrom']);
+            unset($report->requiredcolumns['visibility-availablefrom']);
             $report->post_config_visibility_where('certification', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base availablefrom or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility availablefrom or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
 
         // Remove the base-availableuntil required column and see that there is an exception.
         try {
-            unset($report->requiredcolumns['base-availableuntil']);
+            unset($report->requiredcolumns['visibility-availableuntil']);
             $report->post_config_visibility_where('certification', 'base', $user->id);
             $this->fail('Exception not triggered!');
         } catch (Exception $e) {
-            $this->assertContains('Report is missing required column base availableuntil or field is incorrect', $e->getMessage());
+            $this->assertStringContainsString('Report is missing required column visibility availableuntil or field is incorrect', $e->getMessage());
         }
         $report->requiredcolumns = $allrequiredcolumns;
     }

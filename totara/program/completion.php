@@ -22,7 +22,7 @@
  * @subpackage totara_program
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot . '/totara/program/lib.php');
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
@@ -60,10 +60,11 @@ if (!has_capability('totara/program:editcompletion', $programcontext)) {
 
 // Set up page.
 $PAGE->set_url($url);
-$PAGE->set_context($programcontext);
+$PAGE->set_program($program);
 $PAGE->set_title($program->fullname);
 $PAGE->set_heading($program->fullname);
 
+/** @var totara_reportbuilder_renderer $renderer */
 $renderer = $PAGE->get_renderer('totara_reportbuilder');
 
 // Verify global restrictions.
@@ -71,13 +72,16 @@ $reportrecord = $DB->get_record('report_builder', array('shortname' => 'program_
 $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($reportrecord);
 
 // Load report.
-$data = array('programid' => $progid);
+$config = (new rb_config())
+    ->set_sid($sid)
+    ->set_embeddata(['programid' => $progid])
+    ->set_global_restriction_set($globalrestrictionset);
 if ($progorcert == 'certification') {
-    if (!$report = reportbuilder_get_embedded_report('certification_membership', $data, false, $sid, $globalrestrictionset)) {
+    if (!$report = reportbuilder::create_embedded('certification_membership', $config)) {
         print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
     }
 } else {
-    if (!$report = reportbuilder_get_embedded_report('program_membership', $data, false, $sid, $globalrestrictionset)) {
+    if (!$report = reportbuilder::create_embedded('program_membership', $config)) {
         print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
     }
 }
@@ -106,14 +110,11 @@ $checkallurl = new moodle_url('/totara/program/check_completion.php', array('pro
 echo html_writer::tag('ul', html_writer::tag('li', html_writer::link($checkallurl,
     get_string('checkcompletions', 'totara_program'))));
 
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $renderer->report_html($report, $debug);
+echo $debughtml;
 
 $report->display_restrictions();
-
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
 
 echo $renderer->print_description($report->description, $report->_id);
 
@@ -124,8 +125,7 @@ $report->display_sidebar_search();
 
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
-
-$report->display_table();
+echo $reporthtml;
 
 // Export button.
 $renderer->export_select($report, $sid);

@@ -92,6 +92,10 @@ class task_sent extends \core\event\base {
         $message = $DB->get_record('message', array('id' => $messageid));
         $metadata = $DB->get_record('message_metadata', array('messageid' => $messageid));
 
+        if (!isset($eventdata->msgtype)) {
+            $eventdata->msgtype = TOTARA_MSG_TYPE_UNKNOWN;
+        }
+
         self::$preventcreatecall = false;
         $event = self::create(
             array(

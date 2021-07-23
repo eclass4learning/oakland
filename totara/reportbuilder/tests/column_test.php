@@ -34,7 +34,22 @@ global $CFG;
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
 require_once($CFG->dirroot . '/totara/reportbuilder/tests/reportcache_advanced_testcase.php');
 
+/**
+ * @group totara_reportbuilder
+ */
 class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase {
+    /**
+     * @returm int
+     */
+    protected static function get_facetoface_module_id() {
+        global $DB;
+        static $id;
+        if (is_null($id)) {
+            $id = $DB->get_field('modules', 'id', ['name' => 'facetoface']);
+        }
+        return $id;
+    }
+
     // Warning: Massive amount of test data ahead.
     protected $user_info_field_data = array(
        'id' => 1, 'shortname' => 'datejoined', 'name' => 'Date Joined', 'datatype' => 'text', 'description' => '', 'categoryid' => 1,
@@ -114,17 +129,21 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
         'id' => 1, 'course_id' => 0, 'item' => 1, 'completed' => 1, 'value' => 2,
     );
 
+    protected $tag_coll_data = array(
+        'id' => 2, 'sortorder' => 1
+    );
+
     protected $tag_instance_data = array(
         'id' => 1, 'tagid' => 1, 'itemtype' => 'feedback', 'itemid' => 1,
     );
 
     protected $tag_data = array(
-        'id' => 1, 'userid' => 2, 'name' => 'Tag', 'tagtype' => 'official',
+        'id' => 1, 'userid' => 2, 'name' => 'Tag', 'isstandard' => '1', 'tagcollid' => 2
     );
 
     protected $grade_items_data = array(
-        array('id' => 1, 'courseid' => 2, 'itemtype' => 'course', 'gradepass' => 2, 'itemmodule' => 'assignment', 'iteminstance' => 1, 'scaleid' => 1),
-        array('id' => 2, 'courseid' => 2, 'itemtype' => 'mod', 'gradepass' => 0, 'itemmodule' => 'assign', 'iteminstance' => 1, 'scaleid' => 1),
+        array('id' => 1, 'courseid' => 2, 'itemtype' => 'course', 'gradepass' => 2, 'itemmodule' => 'assignment', 'iteminstance' => 1, 'scaleid' => 3),
+        array('id' => 2, 'courseid' => 2, 'itemtype' => 'mod', 'gradepass' => 0, 'itemmodule' => 'assign', 'iteminstance' => 1, 'scaleid' => 3),
     );
 
     protected $grade_grades_data = array(
@@ -268,10 +287,6 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
 
     protected $course_info_data_data = array(
         'id' => 1, 'fieldid' => 1, 'courseid' => 1, 'data' => 'test',
-    );
-
-    protected $course_modules_data = array(
-        'id' => 1, 'course' => 1, 'module' => 8, 'instance' => 1,
     );
 
     protected $block_totara_stats_data = array(
@@ -441,10 +456,10 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
 
     protected $scale_data = array(
         array(
-            'id' => 1, 'courseid' => 0, 'userid' => 2, 'name' => 'Scale 001', 'scale' => 'Bad,Average,Good', 'description' => '', 'timemodified' => 1332243112,
+            'id' => 3, 'courseid' => 0, 'userid' => 2, 'name' => 'Scale 001', 'scale' => 'Bad,Average,Good', 'description' => '', 'timemodified' => 1332243112,
         ),
         array(
-            'id' => 2, 'courseid' => 0, 'userid' => 2, 'name' => 'Scale 002', 'scale' => 'Awful,Satisfactory,Good,Excellent', 'description' => '', 'timemodified' => 1332243112,
+            'id' => 4, 'courseid' => 0, 'userid' => 2, 'name' => 'Scale 002', 'scale' => 'Awful,Satisfactory,Good,Excellent', 'description' => '', 'timemodified' => 1332243112,
         ),
     );
 
@@ -479,7 +494,7 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
     );
 
     protected $goal_personal_data = array(
-        'id' => 1, 'userid' => 2, 'name' => 'My Personal Goal', 'description' => '', 'targetdate' => 1332153671, 'scaleid' => 1, 'scalevalueid' => 1,
+        'id' => 1, 'userid' => 2, 'name' => 'My Personal Goal', 'description' => '', 'targetdate' => 1332153671, 'scaleid' => 3, 'scalevalueid' => 1,
         'assigntype' => 1, 'timecreated' => 1332153671, 'usercreated' => 2, 'timemodified' => 1332153671, 'usermodified' => 2, 'deleted' => 0,
     );
 
@@ -546,9 +561,9 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
 
     protected $logstore_standard_log_data = array('id' => 1, 'eventname' => '\core\event\user_loggedin', 'component' => 'core',
         'action' => 'loggedin', 'target' => 'user', 'objecttable' => 'user', 'objectid' => 2, 'crud' => 'r', 'edulevel' => 0,
-        'contextid' => 1, 'contextlevel' => 10, 'contextinstanceid' => 0, 'userid' => 2, 'courseid' => 0, 'relateduserid' => 0,
+        'contextid' => 1, 'contextlevel' => 10, 'contextinstanceid' => 0, 'userid' => 1, 'courseid' => 0, 'relateduserid' => 0,
         'anonymous' => 0, 'other' => 'a:1:{s:8:"username";s:5:"admin";}', 'timecreated' => 1416859984, 'origin' => 'web',
-        'ip' => '127.0.0.1'
+        'ip' => '127.0.0.1', 'realuserid' => 2
     );
 
     protected $repository_opensesame_bdls_data = array('id' => 1, 'name' => 'Some budle', 'timecreated' => 1416859984);
@@ -559,6 +574,11 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
 
     protected $repository_opensesame_bps_data = array('id' => 1, 'bundleid' => 1, 'packageid' => 1);
 
+    protected $auth_connect_servers_data = array('id' => 1, 'status' => 0, 'serveridnumber' => 'XXX', 'serversecret' => 'YYY',
+        'serverurl' => 'http://example.com/totara', 'servername' => 'Test server', 'clientidnumber' => 'xxx', 'servercomment' => '',
+        'clientsecret' => 'yyyy', 'apiversion' => 1, 'timecreated' => 1416859984, 'timemodified' => 1416859985
+    );
+
     protected $totara_connect_clients_data = array('id' => 1, 'status' => 1, 'clientidnumber' => 'xxx', 'clientsecret' => 'yyyy',
         'clientname' => 'some client', 'clienturl' => 'http://example.com/totara', 'clienttype' => 'totaralms', 'clientcomment' => '',
         'cohortid' => null, 'serversecret' => 'zzzz', 'addnewcohorts' => 0, 'addnewcourses' => 0, 'apiversion' => 1,
@@ -568,6 +588,27 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
         'master' => 'totara', 'local' => 'Totara', 'timecustomized' => 1416859984, 'timemodified' => 1416859984);
 
     protected $tool_customlang_components_data = array('id' => 1, 'name' => 'totara', 'version' => '1985031400');
+
+    // NOTE: Do not add more data above - you can now avoid core changes by defining the
+    // {@link phpunit_column_test_add_data()} method in your source instead.
+    // See totara/reportbuilder/rb_sources/rb_source_reports.php for an example.
+
+
+    public static function setUpBeforeClass() {
+        parent::setUpBeforeClass();
+        global $DB;
+        if ($DB->get_dbfamily() === 'mysql') {
+            // MySQL default size is too small for some of our reports when all columns and filters are included.
+            $sbs = $DB->get_field_sql("SELECT @@sort_buffer_size");
+            $required = 2097152;
+            if (strpos($DB->get_dbcollation(), 'utf8mb4') !== false) {
+                $required = 6291456;
+            }
+            if ($sbs < $required) {
+                $DB->execute("SET sort_buffer_size=$required");
+            }
+        }
+    }
 
     protected function tearDown() {
         $this->user_info_field_data = null;
@@ -586,6 +627,7 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
         $this->feedback_item_data = null;
         $this->feedback_completed_data = null;
         $this->feedback_value_data = null;
+        $this->tag_coll_data = null;
         $this->tag_instance_data = null;
         $this->tag_data = null;
         $this->grade_items_data = null;
@@ -610,7 +652,6 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
         $this->scorm_scoes_track_data = null;
         $this->course_info_field_data = null;
         $this->course_info_data_data = null;
-        $this->course_modules_data = null;
         $this->block_totara_stats_data = null;
         $this->message_working_data = null;
         $this->message_data = null;
@@ -669,6 +710,7 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
         $this->repository_opensesame_bdls_data = null;
         $this->repository_opensesame_pkgs_data = null;
         $this->repository_opensesame_bps_data = null;
+        $this->auth_connect_servers_data = null;
         $this->totara_connect_clients_data = null;
         $this->tool_customlang_data = null;
         $this->tool_customlang_components_data = null;
@@ -736,11 +778,12 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
             'feedback_item' => array($this->feedback_item_data),
             'feedback_completed' => array($this->feedback_completed_data),
             'feedback_value' => array($this->feedback_value_data),
+            'tag_coll' => array($this->tag_coll_data),
             'tag' => array($this->tag_data),
             'tag_instance' => array($this->tag_instance_data),
             'course_info_field' => array($this->course_info_field_data),
             'course_info_data' => array($this->course_info_data_data),
-            'course_modules' => array($this->course_modules_data),
+            'course_modules' => array(array('id' => 1, 'course' => 1, 'module' => self::get_facetoface_module_id(), 'instance' => 1)), // Module id depends on installed plugins.
             'block_totara_stats' => array($this->block_totara_stats_data),
             'message' => array($this->message_data),
             'message_working' => array($this->message_working_data),
@@ -793,6 +836,7 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
             'repository_opensesame_bdls' => array($this->repository_opensesame_bdls_data),
             'repository_opensesame_pkgs' => array($this->repository_opensesame_pkgs_data),
             'repository_opensesame_bps' => array($this->repository_opensesame_bps_data),
+            'auth_connect_servers' => array($this->auth_connect_servers_data),
             'totara_connect_clients' => array($this->totara_connect_clients_data),
             'tool_customlang' => array($this->tool_customlang_data),
             'tool_customlang_components' => array($this->tool_customlang_components_data),
@@ -819,6 +863,9 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
     /**
      * Check all reports columns and filters
      *
+     * Note for MySQL/MariaDB: Report modification can result in queries hanging in a 'statistics' state in this test. If
+     * you have this problem, the MySQL config setting "optimizer_search_depth" is likely the cause.
+     *
      * @group slowtest
      * @dataProvider data_columns_and_filters
      */
@@ -828,6 +875,9 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
         $this->resetAfterTest();
         $this->setAdminUser();
 
+        // We need to be able to calculate the total count.
+        set_config('allowtotalcount', 1, 'totara_reportbuilder');
+
         $i = 1;
         $reportname = 'Test Report';
         $filtername = 'filtering_testreport';
@@ -835,13 +885,22 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
         $src = reportbuilder::get_source_object($sourcename, true); // Caching here is completely fine.
         $src->phpunit_column_test_add_data($this);
 
-        if ($src->cacheable) {
-            // We are going to create cache tables.
-            $this->preventResetByRollback();
-        }
+        // Create a report.
+        $report = new stdClass();
+        $report->fullname = 'Big test report';
+        $report->shortname = 'bigtest';
+        $report->source = $sourcename;
+        $report->hidden = 0;
+        $report->accessmode = 0;
+        $report->contentmode = 0;
+        $report->showtotalcount = 1;
+        $bigreportid = $DB->insert_record('report_builder', $report);
 
         $sortorder = 1;
         foreach ($src->columnoptions as $column) {
+            if (isset($column->grouping) and $column->grouping !== 'none') {
+                debugging("Column option grouping was deprecated, use subqueries instead in {$sourcename} {$column->type}-{$column->value}", DEBUG_DEVELOPER);
+            }
             // Create a report.
             $report = new stdClass();
             $report->fullname = $reportname;
@@ -850,6 +909,7 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
             $report->hidden = 0;
             $report->accessmode = 0;
             $report->contentmode = 0;
+            $report->showtotalcount = 1;
             $reportid = $DB->insert_record('report_builder', $report);
             $col = new stdClass();
             $col->reportid = $reportid;
@@ -857,32 +917,23 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
             $col->value = $column->value;
             $col->heading = $column->defaultheading;
             $col->sortorder = $sortorder++;
-            $colid = $DB->insert_record('report_builder_columns', $col);
+            $DB->insert_record('report_builder_columns', $col);
 
             // Create the reportbuilder object.
-            $rb = new reportbuilder($reportid);
-            $sql = $rb->build_query();
+            $rb = reportbuilder::create($reportid);
 
-            $message = "\nReport title : {$title}\n";
-            $message .= "Report sourcename : {$sourcename}\n";
-            $message .= "Column option : Test {$column->type}_{$column->value} column\n";
-            $message .= "SQL : {$sql[0]}\n";
-            $message .= "SQL Params : " . var_export($sql[1], true) . "\n";
-
-            // Get the column option object.
-            $columnoption = reportbuilder::get_single_item($rb->columnoptions, $column->type, $column->value);
-
-            // The answer here depends on if the column we are testing.
-            $expectedcount = $src->phpunit_column_test_expected_count($columnoption);
-            $this->assertEquals($expectedcount, $rb->get_full_count(), $message);
-
-            if (!$src->cacheable) {
-                continue;
+            // We will be checking deprecated column's message for each column separately,
+            // so there is no real need to re-check it again in the big report.
+            // Therefore, we are skipping adding them to the big report with all the columns.
+            if ($column->deprecated) {
+                // Check there is a debugging message when a deprecated column is added to the report.
+                $this->assertDebuggingCalled("Column {$col->type}-{$col->value} is a deprecated column in source " . get_class($src));
+            } else {
+                // Add column to the big report with everything.
+                $col->reportid = $bigreportid;
+                $DB->insert_record('report_builder_columns', $col);
             }
 
-            // Now, test the same with report caching.
-            $this->enable_caching($reportid);
-            $rb = new reportbuilder($reportid);
             $sql = $rb->build_query();
 
             $message = "\nReport title : {$title}\n";
@@ -897,11 +948,27 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
             // The answer here depends on if the column we are testing.
             $expectedcount = $src->phpunit_column_test_expected_count($columnoption);
             $this->assertEquals($expectedcount, $rb->get_full_count(), $message);
+
+            // Remove the report again so reports report source gets expected count.
+            $DB->delete_records('report_builder_columns', ['reportid' => $reportid]);
+            $DB->delete_records('report_builder', ['id' => $reportid]);
+
+            // Make sure the type string exists.
+            $langstr = 'type_' . $column->type;
+            if (!get_string_manager()->string_exists($langstr, 'rb_source_' . $sourcename)
+                and !get_string_manager()->string_exists($langstr, 'totara_reportbuilder')
+            ) {
+                // Display in missing string format to make it obvious.
+                $type = get_string($langstr, 'rb_source_' . $sourcename);
+            }
         }
 
         $sortorder = 1;
 
         foreach ($src->filteroptions as $filter) {
+            if (isset($filter->grouping) and $filter->grouping !== 'none') {
+                debugging("Filter option grouping was deprecated, use subqueries instead in {$sourcename} {$column->type}-{$column->value}", DEBUG_DEVELOPER);
+            }
             // Create a report.
             $report = new stdClass();
             $report->fullname = $reportname;
@@ -930,6 +997,10 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
             $fil->sortorder = $sortorder++;
             $filid = $DB->insert_record('report_builder_filters', $fil);
 
+            // Add column to the big report with everything.
+            $fil->reportid = $bigreportid;
+            $DB->insert_record('report_builder_filters', $fil);
+
             // Set session to filter by this column.
             $fname = $filter->type . '-' . $filter->value;
             switch($filter->filtertype) {
@@ -947,15 +1018,149 @@ class totara_reportbuilder_column_testcase extends reportcache_advanced_testcase
             $SESSION->{$filtername}[$fname] = array($search);
 
             // Create the reportbuilder object.
-            $rb = new reportbuilder($reportid);
-            $sql = $rb->build_query(false, true);
+            $rb = reportbuilder::create($reportid);
 
+            // Just try to get the count, we cannot guess the actual number here.
+            $rb->get_filtered_count();
+
+            // Make sure the type string exists.
+            $langstr = 'type_' . $filter->type;
+            if (!get_string_manager()->string_exists($langstr, 'rb_source_' . $sourcename)
+                and !get_string_manager()->string_exists($langstr, 'totara_reportbuilder')
+            ) {
+                // Display in missing string format to make it obvious.
+                $type = get_string($langstr, 'rb_source_' . $sourcename);
+            }
+        }
+
+        // Make sure that joins are not using reserved SQL keywords.
+        $reserved = \sql_generator::getAllReservedWords();
+        foreach ($src->joinlist as $join) {
             $message = "\nReport title : {$title}\n";
             $message .= "Report sourcename : {$sourcename}\n";
-            $message .= "Filter option : Test {$filter->type}_{$filter->value} filter\n";
-            $message .= "SQL : {$sql[0]}\n";
-            $message .= "SQL Params : " . var_export($sql[1], true) . "\n";
-            $this->assertRegExp('/[012]/', (string)$rb->get_filtered_count(), $message);
+            $message .= "Join name {$join->name} is invalid, it cannot be any SQL reserved word!\n";
+            $this->assertArrayNotHasKey($join->name, $reserved, $message);
+        }
+
+        // Test filters are compatible with caching.
+        if ($src->cacheable) {
+            foreach ($src->filteroptions as $filteroption) {
+                if (isset($filteroption->filteroptions['cachingcompatible'])) {
+                    // Developer says they know, no need to test!
+                    continue;
+                }
+                if (empty($filteroption->field)) {
+                    // The filter is using column info to get the field data.
+                    continue;
+                }
+                if (reportbuilder::get_single_item($src->requiredcolumns, $filteroption->type, $filteroption->value)) {
+                    $this->fail("Filter '{$filteroption->type}-{$filteroption->value}' in '{$sourcename}' has custom field and is colliding with required column, you need to add 'cachingcompatible' to filter options");
+                }
+                if (reportbuilder::get_single_item($src->columnoptions, $filteroption->type, $filteroption->value)) {
+                    $this->fail("Filter '{$filteroption->type}-{$filteroption->value}' in '{$sourcename}' has custom field and is colliding with column option, you need to add 'cachingcompatible' to filter options");
+                }
+            }
+        }
+
+        // Test we can execute the query with all columns and filters.
+        $rb = reportbuilder::create($bigreportid);
+        $getdata = new ReflectionMethod(reportbuilder::class, 'get_data');
+        $getdata->setAccessible(true);
+        $getdata->invoke($rb);
+
+        if (!$src->cacheable) {
+            return;
+        }
+
+        if ($DB->get_dbvendor() === 'mysql') {
+            $info = $DB->get_server_info();
+            if (version_compare($info['version'], '5.7', '<')) {
+                $this->markTestSkipped('MySQL versions lower than 5.7 have severe limits, skipping source caching test');
+            }
+        }
+        if ($DB->get_dbvendor() === 'mariadb') {
+            $info = $DB->get_server_info();
+            if (version_compare($info['version'], '10.2', '<')) {
+                $this->markTestSkipped('MariaDB versions lower than 10.2 have severe limits, skipping source caching test');
+            }
+        }
+
+        if ($DB->get_dbfamily() === 'mysql') {
+            // There are way too many columns for MySQL to handle, delete jobs related stuff.
+            foreach (['user', 'manager', 'appraiser', 'tempmanager'] as $type) {
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'fullname'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'namelink'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'namelinkicon'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'email'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'emailunobscured'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'auth'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'institution'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'department'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'address'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'city'));
+                $DB->delete_records('report_builder_columns', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'idnumber'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'fullname'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'namelink'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'namelinkicon'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'email'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'emailunobscured'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'auth'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'institution'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'department'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'address'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'city'));
+                $DB->delete_records('report_builder_filters', array('reportid' => $bigreportid, 'type' => $type, 'value' => 'idnumber'));
+            }
+        }
+
+        // Remove all filters that are not compatible with caching.
+        foreach ($rb->filters as $filter) {
+            /** @var rb_filter_type $filter */
+            if ($filter->is_caching_compatible()) {
+                continue;
+            }
+            $DB->delete_records('report_builder_filters', array('reportid' => $rb->_id, 'type' => $filter->type, 'value' => $filter->value));
+        }
+
+        // Now generate the cache table and run the query.
+        $this->enable_caching($bigreportid);
+        $rb = reportbuilder::create($bigreportid);
+        if ($rb->cache) {
+            $getdata->invoke($rb);
+        }
+
+        reportbuilder_purge_cache($bigreportid, false);
+    }
+
+    public function test_embedded_reports() {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $embeddedobjects = reportbuilder_get_all_embedded_reports();
+        foreach ($embeddedobjects as $embeddedobject) {
+            $source = reportbuilder::get_source_object($embeddedobject->source, false, true, null);
+
+            foreach ($embeddedobject->columns as $column) {
+                foreach ($source->columnoptions as $option) {
+                    /** @var rb_column_option $option */
+                    if ($column['type'] === $option->type and $column['value'] === $option->value) {
+                        continue 2;
+                    }
+                }
+                $columnname = $column['type'] . '-' . $column['value'];
+                $this->fail("Invalid column {$columnname} detected in embedded report {$embeddedobject->shortname}");
+            }
+
+            foreach ($embeddedobject->filters as $filter) {
+                foreach ($source->filteroptions as $option) {
+                    /** @var rb_filter_option $option */
+                    if ($filter['type'] === $option->type and $filter['value'] === $option->value) {
+                        continue 2;
+                    }
+                }
+                $filtername = $filter['type'] . '-' . $filter['value'];
+                $this->fail("Invalid filter {$filtername} detected in embedded report {$embeddedobject->shortname}");
+            }
         }
     }
 }

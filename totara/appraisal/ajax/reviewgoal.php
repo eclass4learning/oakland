@@ -24,15 +24,23 @@
  */
 
 define('AJAX_SCRIPT', true);
-require_once(dirname(dirname(dirname(dirname(__FILE__)))).'/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
-require_once(dirname(dirname(__FILE__)) . '/lib.php');
+require_once(__DIR__ . '/../lib.php');
 
-$sytemcontext = context_system::instance();
-$PAGE->set_context($sytemcontext);
+// Check if Appraisals are enabled.
+appraisal::check_feature_enabled();
+
+$systemcontext = context_system::instance();
+$PAGE->set_context($systemcontext);
+
+require_sesskey();
+require_login(null, false, null, false, true);
 
 $id = required_param('id', PARAM_INT);
 $roleassignmentid = required_param('answerid', PARAM_INT);
+
+$PAGE->set_url(new moodle_url('/totara/appraisal/ajax/reviewgoal.php', array('id' => $id, 'answerid' => $roleassignmentid)));
 
 $goalitems = optional_param('update', null, PARAM_RAW);
 $idlist = (!$goalitems) ? array() : explode(',', $goalitems);

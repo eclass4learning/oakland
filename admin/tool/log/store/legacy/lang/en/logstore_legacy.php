@@ -28,3 +28,5 @@ $string['loglegacy_help'] = 'This plugin records log data to the legacy log tabl
 $string['pluginname'] = 'Legacy log';
 $string['pluginname_desc'] = 'A log plugin that stores log entries in the legacy log table.';
 $string['taskcleanup'] = 'Legacy log table cleanup';
+$string['userdataitemlegacy_log'] = 'Legacy log';
+$string['userdataitemlegacy_log_help'] = 'When purging, this will anonymise all log entries but won\'t delete them.';

@@ -29,6 +29,7 @@ global $CFG;
 
 require_once("HTML/QuickForm/button.php");
 require_once($CFG->dirroot.'/repository/lib.php');
+require_once('templatable_form_element.php');
 
 /**
  * Filepicker form element
@@ -40,7 +41,10 @@ require_once($CFG->dirroot.'/repository/lib.php');
  * @copyright 2009 Dongsheng Cai <dongsheng@moodle.com>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class MoodleQuickForm_filepicker extends HTML_QuickForm_input {
+class MoodleQuickForm_filepicker extends HTML_QuickForm_input implements templatable {
+    use templatable_form_element {
+        export_for_template as export_for_template_base;
+    }
     /** @var string html for help button, if empty then no help will icon will be dispalyed. */
     public $_helpbutton = '';
 
@@ -85,9 +89,12 @@ class MoodleQuickForm_filepicker extends HTML_QuickForm_input {
     }
 
     /**
-     * Old syntax of class constructor for backward compatibility.
+     * Old syntax of class constructor. Deprecated in PHP7.
+     *
+     * @deprecated since Moodle 3.1
      */
     public function MoodleQuickForm_filepicker($elementName=null, $elementLabel=null, $attributes=null, $options=null) {
+        debugging('Use of class name as constructor is deprecated', DEBUG_DEVELOPER);
         self::__construct($elementName, $elementLabel, $attributes, $options);
     }
 
@@ -160,23 +167,6 @@ class MoodleQuickForm_filepicker extends HTML_QuickForm_input {
         $module = array('name'=>'form_filepicker', 'fullpath'=>'/lib/form/filepicker.js', 'requires'=>array('core_filepicker', 'node', 'node-event-simulate', 'core_dndupload'));
         $PAGE->requires->js_init_call('M.form_filepicker.init', array($fp->options), true, $module);
 
-        $nonjsfilepicker = new moodle_url('/repository/draftfiles_manager.php', array(
-            'env'=>'filepicker',
-            'action'=>'browse',
-            'itemid'=>$draftitemid,
-            'subdirs'=>0,
-            'maxbytes'=>$options->maxbytes,
-            'maxfiles'=>1,
-            'ctx_id'=>$PAGE->context->id,
-            'course'=>$PAGE->course->id,
-            'sesskey'=>sesskey(),
-            ));
-
-        // non js file picker
-        $html .= '<noscript>';
-        $html .= "<div><object type='text/html' data='$nonjsfilepicker' height='160' width='600' style='border:1px solid #000'></object></div>";
-        $html .= '</noscript>';
-
         return $html;
     }
 
@@ -216,5 +206,11 @@ class MoodleQuickForm_filepicker extends HTML_QuickForm_input {
         }
 
         return $this->_prepareValue($draftitemid, true);
+    }
+
+    public function export_for_template(renderer_base $output) {
+        $context = $this->export_for_template_base($output);
+        $context['html'] = $this->toHtml();
+        return $context;
     }
 }

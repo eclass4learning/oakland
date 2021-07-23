@@ -30,7 +30,7 @@ require_once($CFG->dirroot.'/totara/reportbuilder/lib.php');
 $id     = optional_param('id', false, PARAM_INT);
 $sid = optional_param('sid', '0', PARAM_INT);
 $format = optional_param('format','',PARAM_TEXT); //export format
-$debug  = optional_param('debug', false, PARAM_BOOL);
+$debug  = optional_param('debug', 0, PARAM_INT); // Debug level.
 
 if (!$id) {
     $context = context_system::instance();
@@ -55,6 +55,10 @@ if (!$id) {
     if ($context->contextlevel == CONTEXT_SYSTEM) {
         admin_externalpage_setup('cohorts', '', null, $url, array('pagelayout' => 'report'));
     } else {
+        // We call require_login here instead of admin_externalpage_setup because we need the capability checks to be made
+        // in the category context, not the system context.
+        // Actual access checks will be made by rb_cohort_members_embedded::is_capable when the report is constructed.
+        require_login();
         $PAGE->set_heading($COURSE->fullname);
         $PAGE->set_pagelayout('report');
         $PAGE->set_url($url);
@@ -67,7 +71,8 @@ $shortname = 'cohort_members';
 $reportrecord = $DB->get_record('report_builder', array('shortname' => $shortname));
 $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($reportrecord);
 
-$report = reportbuilder_get_embedded_report($shortname, array('cohortid' => $id), false, $sid, $globalrestrictionset);
+$config = (new rb_config())->set_global_restriction_set($globalrestrictionset)->set_embeddata(['cohortid' => $id])->set_sid($sid);
+$report = reportbuilder::create_embedded($shortname, $config);
 
 if ($format != '') {
     $report->export_data($format);
@@ -84,12 +89,15 @@ if ($context->contextlevel == CONTEXT_COURSECAT) {
     navigation_node::override_active_url(new moodle_url('/cohort/index.php', array()));
 }
 $strheading = get_string('viewmembers', 'totara_cohort');
-totara_cohort_navlinks($cohort->id, $cohort->name, $strheading);
+totara_cohort_navlinks($cohort->id, format_string($cohort->name), $strheading);
+
+/** @var totara_reportbuilder_renderer $output */
+$output = $PAGE->get_renderer('totara_reportbuilder');
 
 echo $OUTPUT->header();
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $output->report_html($report, $debug);
+echo $debughtml;
 if (isset($id)) {
     echo $OUTPUT->heading(format_string($cohort->name));
     echo cohort_print_tabs('viewmembers', $cohort->id, $cohort->cohorttype, $cohort);
@@ -102,9 +110,7 @@ $report->display_sidebar_search();
 
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
-
-$report->display_table();
-$output = $PAGE->get_renderer('totara_reportbuilder');
+echo $reporthtml;
 $output->export_select($report, $sid);
 
 echo $OUTPUT->footer();

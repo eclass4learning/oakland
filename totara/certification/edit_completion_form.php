@@ -154,6 +154,17 @@ class certif_edit_completion_form extends moodleform {
             get_string('completiontimeexpires', 'totara_certification'),
             get_string('completiondatenotapplicable', 'totara_program'));
 
+        $mform->addElement('date_time_selector', 'baselinetimeexpires',
+            get_string('completionbaselinetimeexpires', 'totara_certification'), array('optional' => true));
+        $mform->disabledIf('baselinetimeexpires', 'state', 'eq', CERTIFCOMPLETIONSTATE_INVALID);
+        $mform->disabledIf('baselinetimeexpires',  'state', 'eqhide', CERTIFCOMPLETIONSTATE_ASSIGNED);
+        $mform->disabledIf('baselinetimeexpires', 'state', 'eqhide', CERTIFCOMPLETIONSTATE_EXPIRED);
+        $mform->addHelpButton('baselinetimeexpires', 'completionbaselinetimeexpires', 'totara_certification');
+
+        $mform->addElement('static', 'baselinetimeexpiresnotapplicable',
+            get_string('completionbaselinetimeexpires', 'totara_certification'),
+            get_string('completiondatenotapplicable', 'totara_program'));
+
         $activeperiod = explode(' ', $certification->activeperiod);
         $mform->addElement('static', 'certificationactiveperiod',
             get_string('completioncertificationactiveperiod', 'totara_certification'),
@@ -226,7 +237,7 @@ class certif_edit_completion_form extends moodleform {
             $mform->disabledIf('savechanges', 'state', 'eq', CERTIFCOMPLETIONSTATE_INVALID);
 
             $mform->addElement('hidden', 'confirmsave', 0);
-            $mform->setType('confirmsave', PARAM_ALPHA);
+            $mform->setType('confirmsave', PARAM_TEXT);
 
         } else {
             // User clicked the save button. Show the confirmation controls. Lock the form data.
@@ -239,6 +250,7 @@ class certif_edit_completion_form extends moodleform {
             $mform->freeze('timecompleted');
             $mform->freeze('timewindowopens');
             $mform->freeze('timeexpires');
+            $mform->freeze('baselinetimeexpires');
             $mform->freeze('progstatus');
 
             $mform->setExpanded('currentcompletionrecord', false); // Doesn't work, because session overrides (I think).
@@ -390,7 +402,8 @@ class certif_edit_completion_history_and_transactions_form extends moodleform {
                 }
                 $mform->addElement('html',
                     html_writer::start_tag('tr') .
-                    html_writer::tag('td', userdate($record->timemodified, get_string('strftimedatetimeshort', 'langconfig'))) .
+                    html_writer::tag('td', userdate($record->timemodified, get_string('strftimedateseconds', 'langconfig')) .
+                        " ({$record->timemodified})") .
                     html_writer::tag('td', $changeby) .
                     html_writer::tag('td', $record->description) .
                     html_writer::end_tag('tr')

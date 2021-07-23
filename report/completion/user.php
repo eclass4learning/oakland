@@ -37,8 +37,9 @@ $coursecontext   = context_course::instance($course->id);
 $personalcontext = context_user::instance($user->id);
 
 $PAGE->set_course($course);
+$PAGE->set_context($personalcontext);
 
-if (!completion_can_view_data($user->id, $course->id)) {
+if (!report_completion_can_access_user_report($user, $course)) {
     // this should never happen
     print_error('nocapability', 'report_completion');
 }
@@ -51,6 +52,10 @@ $PAGE->navigation->extend_for_user($user);
 $PAGE->navigation->set_userid_for_parent_checks($user->id); // see MDL-25805 for reasons and for full commit reference for reversal when fixed.
 $PAGE->set_title("$course->shortname: $stractivityreport");
 $PAGE->set_heading($course->fullname);
+if ($courseid == $SITE->id) {
+    $PAGE->navbar->add(get_string('viewprofile', 'core'));
+}
+$PAGE->navbar->add(get_string('coursecompletion', 'core_completion'));
 echo $OUTPUT->header();
 
 

@@ -46,12 +46,13 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
      *                          when advanced options are shown (1)
      * @param integer $region Which region this filter appears in.
      * @param reportbuilder object $report The report this filter is for
+     * @param array $defaultvalue Default value for the filter
      *
      * @return rb_filter_jobassignment_multi object
      */
-    public function __construct($type, $value, $advanced, $region, $report) {
+    public function __construct($type, $value, $advanced, $region, $report, $defaultvalue) {
         // We don't want to call parent construct because of the extra checks, so directly call the base filter.
-        rb_filter_type::__construct($type, $value, $advanced, $region, $report);
+        rb_filter_type::__construct($type, $value, $advanced, $region, $report, $defaultvalue);
 
 
         // The field in the job_assignment table that this filter refers to.
@@ -92,13 +93,58 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
      * @return array of comparison operators
      */
     function get_operators() {
-        return array(
+        global $CFG;
+        // Basic operators that we allow users to use if multiple job assignments are disabled.
+        $operators = [
             self::JOB_OPERATOR_ANY => get_string('isanyvalue', 'filters'),
             self::JOB_OPERATOR_CONTAINS => get_string('filtercontains', 'totara_reportbuilder'),
             self::JOB_OPERATOR_NOTCONTAINS => get_string('filtercontainsnot', 'totara_reportbuilder'),
-            self::JOB_OPERATOR_EQUALS => get_string('filterequals', 'totara_reportbuilder'),
-            self::JOB_OPERATOR_NOTEQUALS => get_string('filterequalsnot', 'totara_reportbuilder')
-        );
+        ];
+
+        // Operators that make sense to add only when multiple job assignments are enabled.
+        if (!empty($CFG->totara_job_allowmultiplejobs)) {
+            $operators = array_merge($operators, [
+                self::JOB_OPERATOR_EQUALS => get_string('filterequals', 'totara_reportbuilder'),
+                self::JOB_OPERATOR_NOTEQUALS => get_string('filterequalsnot', 'totara_reportbuilder')
+            ]);
+        }
+
+        return $operators;
+    }
+
+    /**
+     * Returns a human friendly description of the filter used as label.
+     * @param array $data filter settings
+     * @return string active filter label
+     */
+    function get_label($data) {
+        global $DB;
+
+        $value     = explode(',', $data['value']);
+        $label = $this->label;
+        $type = $this->options['jobjoin'];
+
+        if (empty($value)) {
+            return '';
+        }
+
+        $a = new stdClass();
+        $a->label    = $label;
+
+        $selected = array();
+        list($isql, $iparams) = $DB->get_in_or_equal($value);
+        $items = $DB->get_records_select($type, "id {$isql}", $iparams);
+        foreach ($items as $item) {
+            if ($this->shortname == 'man' || $this->shortname == 'app') {
+                $item->fullname = isset($item->fullname) ? $item->fullname : fullname($item);
+            }
+            $selected[] = '"' . format_string($item->fullname) . '"';
+        }
+
+        $orstring = get_string('or', 'totara_reportbuilder');
+        $a->value    = implode($orstring, $selected);
+
+        return get_string('selectlabelnoop', 'filters', $a);
     }
 
     /**
@@ -106,9 +152,14 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
      * @param object $mform a MoodleForm object to setup
      */
     function setupForm(&$mform) {
-        global $SESSION;
+        global $SESSION, $DB;
         $label = format_string($this->label);
         $advanced = $this->advanced;
+
+        // Get saved values.
+        if (isset($SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name])) {
+            $saved = $SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name];
+        }
 
         // Container for currently selected items.
         $objs = array();
@@ -117,6 +168,22 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
 
 
         $content = html_writer::tag('div', '', array('class' => 'list-' . $this->name));
+
+        // Create list of saved items.
+        if (isset($saved['value'])) {
+            list($insql, $inparams) = $DB->get_in_or_equal(explode(',', $saved['value']));
+            $items = $DB->get_records_select($this->jobjoin, "id {$insql}", $inparams);
+            if (!empty($items)) {
+                $list = html_writer::start_tag('div', array('class' => 'list-' . $this->name ));
+                foreach ($items as $item) {
+                    $list .= display_selected_item($this->shortname, $item, $this->name);
+                }
+                $list .= html_writer::end_tag('div');
+                $content .= $list;
+            }
+        }
+
+        // Add choose link.
         $content .= display_choose_items_link($this->name, $this->shortname);
 
         $objs['static'] = $mform->createElement('static', $this->name . '_list', null, $content);
@@ -127,7 +194,7 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
         }
 
         $grp =& $mform->addElement('group', $this->name . '_grp', $label, $objs, '', false);
-        $mform->addHelpButton($grp->_name, 'reportbuilderjobassignmentfilter', 'totara_reportbuilder');
+        $this->add_help_button($mform, $grp->_name, 'reportbuilderjobassignmentfilter', 'totara_reportbuilder');
         $mform->disabledIf($this->name . '_child', $this->name . '_op', 'eq', 0);
 
         if ($advanced) {
@@ -138,12 +205,17 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
         $mform->setType($this->name, PARAM_SEQUENCE);
         $mform->setType($this->name . '_op', PARAM_INT);
 
-        // set default values
-        if (isset($SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name])) {
-            $defaults = $SESSION->reportbuilder[$this->report->get_uniqueid()][$this->name];
+        // Set saved values.
+        if (isset($saved)) {
+            $mform->setDefault($this->name, $saved['value']);
+            $mform->setDefault($this->name . '_op', $saved['operator']);
+            $mform->setDefault($this->name . '_child', $saved['children']);
         }
-        if (isset($defaults['value'])) {
-            $mform->setDefault($this->name, $defaults['value']);
+
+        // Add maximum select value.
+        if (!empty($this->options['selectionlimit'])) {
+            $mform->addElement('hidden', $this->name . '_selection_limit', $this->options['selectionlimit']);
+            $mform->setType($this->name . '_selection_limit', PARAM_INT);
         }
     }
 
@@ -218,9 +290,8 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
         $items    = explode(',', $data['value']);
         $operator = $data['operator'];
         $children = $data['children'];
-        $query    = $this->get_field();
-        $field    = $this->options['jobfield'];
-        $usertab  = $this->joins;
+        $userfield    = $this->get_field();
+        $jobfield    = $this->jobfield;
         $unique   = rb_unique_param('uja'.$this->shortname);
 
         // don't filter if none selected
@@ -238,61 +309,43 @@ class rb_filter_grpconcat_jobassignment extends rb_filter_hierarchy_multi {
             }
             $items = array_merge($items, $DB->get_fieldset_sql($childsql, array()));
         }
+        $items = array_unique($items); // Make sure the items are unique, otherwise the counting magic later would fail.
 
-        if ($operator == self::JOB_OPERATOR_CONTAINS || $operator == self::JOB_OPERATOR_NOTCONTAINS) {
-            $not = ($operator == self::JOB_OPERATOR_NOTCONTAINS) ? 'NOT ' : '';
-            list($insql, $params) = $DB->get_in_or_equal($items, SQL_PARAMS_NAMED, $unique);
-            $subtable = $unique . 'tab';
+        $not = ($operator == self::JOB_OPERATOR_NOTCONTAINS or $operator == self::JOB_OPERATOR_NOTEQUALS) ? 'NOT ' : '';
+        list($insql, $params) = $DB->get_in_or_equal($items, SQL_PARAMS_NAMED, $unique);
+        $jobtable = $unique . 'tab';
 
-            // Build the sql statement from the filter options.
-            if (!empty($this->options['extjoin']) && !empty($this->options['extfield'])) {
+        // Build the sql statement from the filter options.
+        if (!empty($this->options['extjoin']) && !empty($this->options['extfield'])) {
 
-                // Allow for one layer of abstraction for managerjaid etc.
-                $exttable = $unique . 'ext';
-                $extjoin = $this->options['extjoin'];
-                $extfield = $this->options['extfield'];
-                $fromsql = " FROM {job_assignment} {$subtable} " .
-                           " INNER JOIN {{$extjoin}} {$exttable} " .
-                           " ON {$subtable}.{$field} = {$exttable}.id " .
-                           " WHERE {$subtable}.userid = {$usertab}.id " .
-                           " AND {$exttable}.{$extfield} {$insql}";
+            // Allow for one layer of abstraction for managerjaid etc.
+            $exttable = $unique . 'ext';
+            $extjoin = $this->options['extjoin'];
+            $extfield = $this->options['extfield'];
+            $fromsql = " FROM {job_assignment} {$jobtable} " .
+                " INNER JOIN {{$extjoin}} {$exttable} " .
+                " ON {$jobtable}.{$jobfield} = {$exttable}.id " .
+                " WHERE {$jobtable}.userid = {$userfield} " .
+                " AND {$exttable}.{$extfield} {$insql}";
+            $field = "{$exttable}.{$extfield}";
 
+        } else {
+            $fromsql = " FROM {job_assignment} {$jobtable} " .
+                " WHERE {$jobtable}.userid = {$userfield} " .
+                " AND {$jobtable}.{$jobfield} {$insql}";
+            $field = "{$jobtable}.{$jobfield}";
+        }
 
-            } else {
-                $fromsql = " FROM {job_assignment} {$subtable} " .
-                           " WHERE {$subtable}.userid = {$usertab}.id " .
-                           " AND {$subtable}.{$field} {$insql}";
-            }
+        $count = count($items);
+        if ($count === 1 || $operator == self::JOB_OPERATOR_CONTAINS || $operator == self::JOB_OPERATOR_NOTCONTAINS) {
             $query = " {$not}EXISTS (SELECT 1 " . $fromsql . ")";
+
         } else if ($operator == self::JOB_OPERATOR_EQUALS || $operator == self::JOB_OPERATOR_NOTEQUALS) {
-            $not = ($operator == self::JOB_OPERATOR_NOTEQUALS) ? 'NOT ' : '';
-            $subquery = array();
-            foreach ($items as $item) {
-                $unique   = rb_unique_param('uja'.$this->shortname);
-                $subtable = $unique . 'tab' . $item;
-
-                // Build the sql statement from the filter options.
-                if (!empty($this->options['extjoin']) && !empty($this->options['extfield'])) {
-                    $extjoin = $this->options['extjoin'];
-                    $extfield = $this->options['extfield'];
-                    $exttable = $unique . 'ext' . $item;
-
-                    // Allow for one layer of abstraction for managerjaid etc.
-                    $fromsql = " FROM {job_assignment} {$subtable} " .
-                               " INNER JOIN {{$extjoin}} {$exttable} " .
-                               " ON {$subtable}.{$field} = {$exttable}.id " .
-                               " WHERE {$subtable}.userid = {$usertab}.id " .
-                               " AND {$exttable}.{$extfield} = :{$unique}";
-                } else {
-                    $fromsql = " FROM {job_assignment} {$subtable} " .
-                               " WHERE {$subtable}.userid = {$usertab}.id " .
-                               " AND {$subtable}.{$field} = :{$unique} ";
-                }
-                $subquery[] = " {$not}EXISTS (SELECT 1 " . $fromsql . ")";
-                $params[$unique] = $item;
-            }
-
-            $query = implode(' AND ', $subquery);
+            $query = " {$not}EXISTS (
+                SELECT COUNT(DISTINCT $field)
+              $fromsql
+                HAVING COUNT(DISTINCT $field) = $count
+            )";
         }
 
         return array($query, $params);

@@ -25,11 +25,7 @@
 
 require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
 
-use Behat\Behat\Context\Step\Given as Given,
-    Behat\Gherkin\Node\TableNode as TableNode,
-    Behat\Mink\Exception\ExpectationException as ExpectationException,
-    Behat\Mink\Exception\DriverException as DriverException,
-    Behat\Mink\Exception\ElementNotFoundException as ElementNotFoundException;
+use Behat\Mink\Exception\DriverException as DriverException;
 
 class behat_completion_report extends behat_base {
 
@@ -41,22 +37,24 @@ class behat_completion_report extends behat_base {
      * @param string $rpltext
      */
     public function i_complete_course_via_rpl($users_name, $rpltext) {
+        \behat_hooks::set_step_readonly(false);
 
         if (!$this->running_javascript()) {
             throw new DriverException('Complete course via RPL step is not available with Javascript disabled');
         }
 
-        $xpath = "//tr[contains(descendant::*, '" . $users_name . "')]";
-        $tr = $this->find('xpath', $xpath);
-
-        $xpath = "//td[@class='completion-progresscell rpl-course']";
-        $td = $tr->find('xpath', $xpath);
+        $xpath = "//tr[contains(descendant::*, '" . $users_name . "')]//td[@class='completion-progresscell rpl-course']";
+        $td = $this->find('xpath', $xpath);
 
         $xpath = "//a";
         $tick = $td->find('xpath', $xpath);
         $tick->click();
+        $this->wait_for_pending_js();
 
         $input = $td->find('css', '.rplinput');
+        if (!method_exists($input, 'setValue')) {
+            throw new \Behat\Mink\Exception\ExpectationException('Cannot set RPL record for ' . $users_name, $this->getSession());
+        }
         $input->setValue($rpltext);
         $tick->click();
     }
@@ -68,6 +66,7 @@ class behat_completion_report extends behat_base {
      * @param string $users_name
      */
     public function i_delete_course_rpl($users_name) {
+        \behat_hooks::set_step_readonly(false);
 
         if (!$this->running_javascript()) {
             throw new DriverException('Delete course RPL step is not available with Javascript disabled');
@@ -82,6 +81,7 @@ class behat_completion_report extends behat_base {
         $xpath = "//a";
         $tick = $td->find('xpath', $xpath);
         $tick->click();
+        $this->wait_for_pending_js();
 
         $xpath = "//a[@title='Delete this RPL']";
         $delete = $td->find('xpath', $xpath);

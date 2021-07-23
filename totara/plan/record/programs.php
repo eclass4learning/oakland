@@ -28,7 +28,7 @@
  *
  */
 
-require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot.'/totara/reportbuilder/lib.php');
 require_once($CFG->dirroot.'/totara/plan/lib.php');
 require_once($CFG->dirroot . '/totara/program/lib.php');
@@ -81,6 +81,7 @@ $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/totara/plan/record/programs.php', $pageparams));
 $PAGE->set_pagelayout('report');
 
+/** @var totara_reportbuilder_renderer $renderer */
 $renderer = $PAGE->get_renderer('totara_reportbuilder');
 
 if ($USER->id != $userid) {
@@ -109,7 +110,8 @@ if ($history) {
     }
 }
 // Set report.
-if (!$report = reportbuilder_get_embedded_report($shortname, $data, false, $sid)) {
+$config = (new rb_config())->set_sid($sid)->set_embeddata($data);
+if (!$report = reportbuilder::create_embedded($shortname, $config)) {
     print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
 }
 
@@ -145,15 +147,15 @@ $PAGE->set_title($strheading);
 $PAGE->set_button($report->edit_button());
 $PAGE->set_heading(format_string($SITE->fullname));
 
-$menuitem = ($ownplan) ? 'recordoflearning' : 'myteam';
+$menuitem = ($ownplan) ? '\totara_plan\totara\menu\recordoflearning' : '\totara_core\totara\menu\myteam';
 $PAGE->set_totara_menu_selected($menuitem);
 dp_display_plans_menu($userid, 0, $usertype, 'programs', $rolstatus);
 
 echo $OUTPUT->header();
 
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $renderer->report_html($report, $debug);
+echo $debughtml;
 
 echo $OUTPUT->container_start('', 'dp-plan-content');
 echo $OUTPUT->heading($strheading.' : '.$strsubheading);
@@ -163,10 +165,7 @@ dp_print_rol_tabs($rolstatus, $currenttab, $userid);
 
 $report->display_restrictions();
 
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
-
-$heading = $renderer->print_result_count_string($countfiltered, $countall);
+$heading = $renderer->result_count_info($report);
 echo $OUTPUT->heading($heading);
 echo $renderer->print_description($report->description, $report->_id);
 
@@ -176,8 +175,7 @@ $report->display_sidebar_search();
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
 echo $renderer->showhide_button($report->_id, $report->shortname);
-
-$report->display_table();
+echo $reporthtml;
 // Export button.
 $renderer->export_select($report, $sid);
 

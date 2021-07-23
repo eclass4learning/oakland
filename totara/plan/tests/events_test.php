@@ -142,6 +142,9 @@ class totara_plan_events_testcase extends advanced_testcase {
     }
 
     public function test_approval_events() {
+        global $CFG;
+        require_once($CFG->dirroot . '/totara/plan/lib.php');
+
         $this->resetAfterTest();
 
         $user = $this->getDataGenerator()->create_user();
@@ -161,7 +164,7 @@ class totara_plan_events_testcase extends advanced_testcase {
 
         $plan = new development_plan($planrecord->id);
 
-        $event = \totara_plan\event\approval_requested::create_from_plan($plan, 'competency', $competency->id, $competency->fullname);
+        $event = \totara_plan\event\approval_requested::create_from_component($plan, 'competency', $competency->id, $competency->fullname);
         $event->trigger();
         $this->assertEventContextNotUsed($event);
         $this->assertNotEmpty($event->get_name());
@@ -169,7 +172,7 @@ class totara_plan_events_testcase extends advanced_testcase {
         $this->assertEquals($event::LEVEL_OTHER, $event->edulevel);
         $this->assertEquals('u', $event->crud);
 
-        $event = \totara_plan\event\approval_requested::create_from_plan($plan, 'plan', null, $plan->name);
+        $event = \totara_plan\event\approval_requested::create_from_plan($plan);
         $event->trigger();
         $this->assertEventContextNotUsed($event);
         $this->assertNotEmpty($event->get_name());
@@ -177,7 +180,7 @@ class totara_plan_events_testcase extends advanced_testcase {
         $this->assertEquals($event::LEVEL_OTHER, $event->edulevel);
         $this->assertEquals('u', $event->crud);
 
-        $event = \totara_plan\event\approval_approved::create_from_plan($plan, 'competency', $competency->id, $competency->fullname);
+        $event = \totara_plan\event\approval_approved::create_from_component($plan, 'competency', $competency->id, $competency->fullname);
         $event->trigger();
         $this->assertEventContextNotUsed($event);
         $this->assertNotEmpty($event->get_name());
@@ -185,7 +188,7 @@ class totara_plan_events_testcase extends advanced_testcase {
         $this->assertEquals($event::LEVEL_OTHER, $event->edulevel);
         $this->assertEquals('u', $event->crud);
 
-        $event = \totara_plan\event\approval_approved::create_from_plan($plan, 'plan', null, $plan->name);
+        $event = \totara_plan\event\approval_approved::create_from_plan($plan);
         $event->trigger();
         $this->assertEventContextNotUsed($event);
         $this->assertNotEmpty($event->get_name());
@@ -193,7 +196,7 @@ class totara_plan_events_testcase extends advanced_testcase {
         $this->assertEquals($event::LEVEL_OTHER, $event->edulevel);
         $this->assertEquals('u', $event->crud);
 
-        $event = \totara_plan\event\approval_declined::create_from_plan($plan, 'competency', $competency->id, $competency->fullname);
+        $event = \totara_plan\event\approval_declined::create_from_component($plan, 'competency', $competency->id, $competency->fullname);
         $event->trigger();
         $this->assertEventContextNotUsed($event);
         $this->assertNotEmpty($event->get_name());
@@ -201,7 +204,7 @@ class totara_plan_events_testcase extends advanced_testcase {
         $this->assertEquals($event::LEVEL_OTHER, $event->edulevel);
         $this->assertEquals('u', $event->crud);
 
-        $event = \totara_plan\event\approval_declined::create_from_plan($plan, 'plan', null, $plan->name);
+        $event = \totara_plan\event\approval_declined::create_from_plan($plan);
         $event->trigger();
         $this->assertEventContextNotUsed($event);
         $this->assertNotEmpty($event->get_name());

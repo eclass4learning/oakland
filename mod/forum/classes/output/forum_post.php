@@ -133,7 +133,7 @@ class forum_post implements \renderable, \templatable {
     /**
      * Export this data so it can be used as the context for a mustache template.
      *
-     * @param \base_renderer $renderer The render to be used for formatting the message and attachments
+     * @param \mod_forum_renderer $renderer The render to be used for formatting the message and attachments
      * @param bool $plaintext Whethe the target is a plaintext target
      * @return stdClass Data ready for use in a mustache template
      */
@@ -152,7 +152,7 @@ class forum_post implements \renderable, \templatable {
      * @return stdClass Data ready for use in a mustache template
      */
     protected function export_for_template_text(\mod_forum_renderer $renderer) {
-        return array(
+        $return = array(
             'id'                            => html_entity_decode($this->post->id),
             'coursename'                    => html_entity_decode($this->get_coursename()),
             'courselink'                    => html_entity_decode($this->get_courselink()),
@@ -171,11 +171,15 @@ class forum_post implements \renderable, \templatable {
             'permalink'                     => $this->get_permalink(),
             'firstpost'                     => $this->get_is_firstpost(),
             'replylink'                     => $this->get_replylink(),
+            'postmailinfolinkstring'        => '',
             'unsubscribediscussionlink'     => $this->get_unsubscribediscussionlink(),
+            'unsubscribediscussionlinkstring' => '',
             'unsubscribeforumlink'          => $this->get_unsubscribeforumlink(),
+            'unsubscribeforumlinkstring'    => '',
             'parentpostlink'                => $this->get_parentpostlink(),
 
             'forumindexlink'                => $this->get_forumindexlink(),
+            'forumindexlinkstring'          => '',
             'forumviewlink'                 => $this->get_forumviewlink(),
             'discussionlink'                => $this->get_discussionlink(),
 
@@ -183,7 +187,35 @@ class forum_post implements \renderable, \templatable {
             'authorpicture'                 => $this->get_author_picture(),
 
             'grouppicture'                  => $this->get_group_picture(),
+            'bynameonstring' => get_string (
+                'bynameondate',
+                'forum',
+                array(
+                    "name" => html_entity_decode($this->get_author_fullname()),
+                    "date" => html_entity_decode($this->get_postdate())
+                )
+            )
         );
+        if ($return['unsubscribediscussionlink'] !== null) {
+            $return['unsubscribediscussionlinkstring'] = get_string('unsubscribediscussionlink', 'forum', $return['unsubscribediscussionlink']);
+        }
+        if ($return['unsubscribeforumlink'] !== null) {
+            $return['unsubscribeforumlinkstring'] = get_string('unsubscribelink', 'forum', $return['unsubscribeforumlink']);
+        }
+        if ($return['forumindexlink'] !== null) {
+            $return['forumindexlinkstring'] = get_string('digestmailpostlink', 'forum', $return['forumindexlink']);
+        }
+        if ($return['canreply']) {
+            $return['postmailinfolinkstring'] = get_string(
+                'postmailinfolink',
+                'forum',
+                array(
+                    'coursename' => html_entity_decode($this->get_coursename()),
+                    'replylink' => $this->get_replylink()->out(false)
+                )
+            );
+        }
+        return $return;
     }
 
     /**
@@ -193,7 +225,7 @@ class forum_post implements \renderable, \templatable {
      * @return stdClass Data ready for use in a mustache template
      */
     protected function export_for_template_html(\mod_forum_renderer $renderer) {
-        return array(
+        $return = array(
             'id'                            => $this->post->id,
             'coursename'                    => $this->get_coursename(),
             'courselink'                    => $this->get_courselink(),
@@ -224,7 +256,12 @@ class forum_post implements \renderable, \templatable {
             'authorpicture'                 => $this->get_author_picture(),
 
             'grouppicture'                  => $this->get_group_picture(),
+            'bynameonstring' => get_string ('bynameondate', 'forum', array(
+                "name" => '<a href="'.$this->get_authorlink().'" target="_blank">'.s($this->get_author_fullname()).'</a>',
+                "date" => $this->get_postdate()
+            ))
         );
+        return $return;
     }
 
     /**
@@ -441,6 +478,26 @@ class forum_post implements \renderable, \templatable {
     }
 
     /**
+     * ID number of the course that the forum is in.
+     *
+     * @return string
+     */
+    public function get_courseidnumber() {
+        return s($this->course->idnumber);
+    }
+
+    /**
+     * The full name of the course that the forum is in.
+     *
+     * @return string
+     */
+    public function get_coursefullname() {
+        return format_string($this->course->fullname, true, array(
+            'context' => \context_course::instance($this->course->id),
+        ));
+    }
+
+    /**
      * The name of the course that the forum is in.
      *
      * @return string
@@ -518,7 +575,6 @@ class forum_post implements \renderable, \templatable {
         }
 
         return userdate($postmodified, "", \core_date::get_user_timezone($this->get_postto()));
-
     }
 
     /**

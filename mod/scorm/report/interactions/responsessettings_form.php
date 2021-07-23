@@ -43,12 +43,15 @@ class mod_scorm_report_interactions_settings extends moodleform {
         $mform->addElement('advcheckbox', 'qtext', '', get_string('summaryofquestiontext', 'scormreport_interactions'));
         $mform->addElement('advcheckbox', 'resp', '', get_string('summaryofresponse', 'scormreport_interactions'));
         $mform->addElement('advcheckbox', 'right', '', get_string('summaryofrightanswer', 'scormreport_interactions'));
+        $mform->addElement('advcheckbox', 'result', '', get_string('summaryofresult', 'scormreport_interactions'));
 
         // -------------------------------------------------------------------------------
         $mform->addElement('header', 'preferencesuser', get_string('preferencesuser', 'scorm'));
 
-        $mform->addElement('text', 'pagesize', get_string('pagesize', 'scorm'));
+        $mform->addElement('text', 'pagesize', get_string('pagesize', 'scorm'), array('size' => '6', 'maxlength' => 4));
         $mform->setType('pagesize', PARAM_INT);
+        $mform->addRule('pagesize', null, 'numeric', null, 'client');
+        $mform->addHelpButton('pagesize', 'pagesize', 'scorm');
 
         $this->add_action_buttons(false, get_string('savepreferences'));
     }

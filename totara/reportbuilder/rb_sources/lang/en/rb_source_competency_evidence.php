@@ -24,6 +24,7 @@
 // lang strings for report builder 'competency evidence' source
 $string['sourcetitle'] = 'Competency Status';
 // columns
+$string['proficientdate'] = 'Date Proficiency Achieved';
 $string['proficiency'] = 'Proficiency';
 $string['proficiencyid'] = 'Proficiency ID';
 $string['completion'] = 'Completion';
@@ -40,13 +41,14 @@ $string['assessororg'] = 'Assessor Organisation';
 $string['competency'] = 'Competency';
 $string['competencyname'] = 'Competency Name';
 $string['competencyshortname'] = 'Competency Short Name';
-$string['competencyid'] = 'Comptency ID Number';
+$string['competencyid'] = 'Competency ID Number';
 $string['competencylinkname'] = 'Competency Name (linked to competency page)';
 $string['competencyid'] = 'Competency ID';
 $string['competencypath'] = 'Competency Path';
 $string['options'] = 'Options';
 $string['statushistorylinkcolumn'] = 'User\'s Status History Link';
 $string['statushistorylinkheading'] = 'Status History';
+$string['timemodified'] = 'Last Modified';
 
 // filters
 $string['completeddate'] = 'Completed Date';

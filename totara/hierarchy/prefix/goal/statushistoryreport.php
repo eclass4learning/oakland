@@ -22,7 +22,7 @@
  * @subpackage totara_hierarchy
  */
 
-require_once(dirname(dirname(dirname(dirname(dirname(__FILE__))))) . '/config.php');
+require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot . '/totara/reportbuilder/lib.php');
 require_once($CFG->dirroot . '/totara/hierarchy/prefix/goal/lib.php');
@@ -51,6 +51,7 @@ $url->params($data);
 
 admin_externalpage_setup('goalreport', '', null, $url);
 
+/** @var totara_reportbuilder_renderer $renderer */
 $renderer = $PAGE->get_renderer('totara_reportbuilder');
 
 // Verify global restrictions.
@@ -58,7 +59,11 @@ $shortname = 'goal_status_history';
 $reportrecord = $DB->get_record('report_builder', array('shortname' => $shortname));
 $globalrestrictionset = rb_global_restriction_set::create_from_page_parameters($reportrecord);
 
-if (!$report = reportbuilder_get_embedded_report($shortname, $data, false, $sid, $globalrestrictionset)) {
+$config = (new rb_config())
+    ->set_sid($sid)
+    ->set_embeddata($data)
+    ->set_global_restriction_set($globalrestrictionset);
+if (!$report = reportbuilder::create_embedded($shortname, $config)) {
     print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
 }
 
@@ -70,17 +75,14 @@ if ($format != '') {
 $PAGE->set_button($report->edit_button());
 echo $renderer->header();
 
-if ($debug) {
-    $report->debug($debug);
-}
+// This must be done after the header and before any other use of the report.
+list($reporthtml, $debughtml) = $renderer->report_html($report, $debug);
+echo $debughtml;
 
 $report->display_restrictions();
 
-$countfiltered = $report->get_filtered_count();
-$countall = $report->get_full_count();
-
 $heading = get_string('goalstatushistoryreportfor', 'totara_hierarchy');
-$heading .= $renderer->print_result_count_string($countfiltered, $countall);
+$heading .= $renderer->result_count_info($report);
 echo $renderer->heading($heading);
 
 echo $renderer->print_description($report->description, $report->_id);
@@ -92,10 +94,8 @@ $report->display_sidebar_search();
 
 // Print saved search buttons if appropriate.
 echo $report->display_saved_search_options();
-
 echo $renderer->showhide_button($report->_id, $report->shortname);
-
-$report->display_table();
+echo $reporthtml;
 
 // Export button.
 $renderer->export_select($report, $sid);

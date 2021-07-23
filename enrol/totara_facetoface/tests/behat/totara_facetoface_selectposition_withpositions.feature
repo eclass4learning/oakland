@@ -1,4 +1,4 @@
-@enrol @javascript @totara @enrol_totara_facetoface
+@enrol @javascript @totara @enrol_totara_facetoface @mod_facetoface
 Feature: Users can enrol themself in courses with selected position where seminar direct enrolment is allowed
   In order to run a seminar
   As a teacher
@@ -39,45 +39,30 @@ Feature: Users can enrol themself in courses with selected position where semina
       | student1 | POS002   | jobassignment2 |
 
     And I set the following administration settings values:
-      | Enhanced catalog | 1 |
+      | catalogtype | enhanced |
     And I press "Save changes"
 
     And I log out
 
     And I log in as "teacher1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I add "Seminar direct enrolment" enrolment method with:
       | Custom instance name | Test student enrolment |
-    And I follow "Course 1"
-    And I turn editing mode on
+    And I am on "Course 1" course homepage with editing mode on
     And I add a "Seminar" to section "1" and I fill the form with:
       | Name        | Test seminar name        |
       | Description | Test seminar description |
       | Select job assignment on signup | 1             |
     And I follow "View all events"
     And I follow "Add a new event"
-    And I click on "Edit date" "link"
-    And I set the following fields to these values:
-      | timestart[day]     | 1    |
-      | timestart[month]   | 1    |
-      | timestart[year]    | 2020 |
-      | timestart[hour]    | 11   |
-      | timestart[minute]  | 00   |
-      | timefinish[day]    | 1    |
-      | timefinish[month]  | 1    |
-      | timefinish[year]   | 2020 |
-      | timefinish[hour]   | 12   |
-      | timefinish[minute] | 00   |
-    And I click on "OK" "button" in the "Select date" "totaradialogue"
     And I press "Save changes"
     And I log out
 
   Scenario: Add and configure a seminar activity with a single session and position asked for but not mandated then
   sign in as user with two positions and check attendee list reflects this and the selected position can be updated
     And I log in as "student1"
-    And I click on "Courses" "link_or_button" in the "Navigation" "block"
-    And I click on "Course 1" "link"
-    And I click on "Sign-up" "link" in the "1 January 2020" "table_row"
+    And I am on "Course 1" course homepage
+    And I click on the link "Sign-up" in row 1
     And I set the following fields to these values:
       | Select a job assignment | jobassignment2 (Position2) |
     And I press "Sign-up"
@@ -85,7 +70,7 @@ Feature: Users can enrol themself in courses with selected position where semina
     And I log out
 
     And I log in as "teacher1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "View all events"
     And I follow "Attendees"
     And I should see "Position2"
@@ -93,17 +78,16 @@ Feature: Users can enrol themself in courses with selected position where semina
   Scenario: Add and configure a seminar activity with a single session and position asked for but not mandated then
   sign in as user with two positions and check attendee list reflects this and the selected position can be updated
     And I log in as "student1"
-    And I click on "Find Learning" in the totara menu
-    And I follow "Course 1"
-    And I click on "Sign-up" "link" in the "1 January 2020" "table_row"
+    And I am on "Course 1" course homepage
+    And I click on the link "Sign-up" in row 1
     And I set the following fields to these values:
       | Select a job assignment | jobassignment2 (Position2) |
     And I press "Sign-up"
-    Then I should see "Your booking has been completed."
+    Then I should see "Your request was accepted"
     And I log out
 
     And I log in as "teacher1"
-    And I follow "Course 1"
+    And I am on "Course 1" course homepage
     And I follow "View all events"
     And I follow "Attendees"
     And I should see "Position2"

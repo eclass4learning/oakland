@@ -54,7 +54,7 @@ class block_gaccess extends block_list {
     }
 
     function get_content() {
-        global $CFG, $USER, $COURSE, $OUTPUT, $DB;
+        global $CFG, $USER, $COURSE, $OUTPUT;
 
 
         // quick and simple way to prevent block from showing up on front page
@@ -64,19 +64,7 @@ class block_gaccess extends block_list {
         }
 
         // Quick and simple way to prevent block from showing up on users My Moodle if their email does not match the Google registered domain.
-        //Begin Oakland Modifications
-        $domain = (get_config('blocks/gaccess','domainname') ? get_config('blocks/gaccess','domainname') : get_config('auth/gsaml','domainname'));
-        $id = optional_param('id',0,PARAM_INT);
-        $dashboard = $DB->get_record('totara_dashboard', array('id'=>$id));
-        if ($dashboard != null) {
-            $group = $DB->get_record('oakland_groups', array('id'=>$dashboard->oaklandgroupid));
-            if ($group != null) {
-                $g_calendar = $group->g_calendar;
-                $g_drive = $group->g_drive;
-                $g_hangouts = $group->g_hangouts;
-                $g_youtube = $group->g_youtube;
-            }
-        }
+        $domain = (get_config('blocks/gaccess','domainname') ? get_config('blocks/gaccess','domainname') : false);
 
         if ($this->content !== NULL) {
             return $this->content;
@@ -98,43 +86,32 @@ class block_gaccess extends block_list {
         // https://www.google.com/a/cpanel/mroomsdev.com/Dashboard
         // Google won't mind ;) (I hope)
         $google_services = array();
- 
-  if (get_config('blocks/gaccess','calendar') && $g_calendar != null) {
+        if (get_config('blocks/gaccess','gmail')) {
             $google_services []=
                 array(
-                    'service'   => 'Calendar',
-                    'relayurl'  => $g_calendar,
-                    'icon_name' => 'calendar'
+                        'service'   => 'Gmail',
+                        'relayurl'  => 'http://mail.google.com/a/'.$domain,
+                        'icon_name' => 'gmail'
                 );
         }
 
-        if (get_config('blocks/gaccess','docs') && $g_drive != null) {
+        if (get_config('blocks/gaccess','calendar')) {
             $google_services []=
                 array(
-                    'service'   => 'Drive',
-                    'relayurl'  => $g_drive,
-                    'icon_name' => 'gdocs'
+                        'service'   => 'Calendar',
+                        'relayurl'  => 'http://www.google.com/calendar/a/'.$domain,
+                        'icon_name' => 'calendar'
                 );
         }
 
-        if (get_config('blocks/gaccess','hangouts') && $g_hangouts != null) {
+        if (get_config('blocks/gaccess','docs')) {
             $google_services []=
                 array(
-                    'service'   => 'Hangouts',
-                    'relayurl'  => $g_hangouts,
-                    'icon_name' => 'hangouts'
+                        'service'   => 'Drive',
+                        'relayurl'  => 'http://drive.google.com/a/'.$domain,
+                        'icon_name' => 'gdocs'
                 );
         }
-
-        if (get_config('blocks/gaccess','youtube') && $g_youtube != null) {
-            $google_services []=
-                array(
-                    'service'   => 'Youtube',
-                    'relayurl'  => $g_youtube,
-                    'icon_name' => 'youtube'
-                );
-        }
-
 
         $newwinlnk = get_config('blocks/gaccess','newwinlink');
         if ($newwinlnk) {
@@ -147,19 +124,14 @@ class block_gaccess extends block_list {
         foreach ($google_services as $gs) {
 
             if (!empty($gs['icon_name'])) {
-                $icon = "<img src=\"".$OUTPUT->pix_url($gs['icon_name'], 'block_gaccess')."\" alt=\"".$gs['service']."\" />";
-            }
-            else {
+                $icon = $OUTPUT->pix_icon($gs['icon_name'], $gs['service'], 'block_gaccess');
+            } else {
                 // Default to a check graphic
-                $icon = "<img src=\"".$OUTPUT->pix_url('i/valid')."\" alt=\"$service\" />";
+                $icon = $OUTPUT->pix_icon('i/valid', $gs['service']);
             }
             $this->content->items[] = "<a ".$target.". title=\"".$gs['service']."\"  href=\"".$gs['relayurl']."\">".$icon . '&nbsp;' . $gs['service']."</a>";
         }
 
-        if (empty($google_services)) {
-            $this->content->items[0] = "No Google links configured";
-        }
-        //End Oakland Modifications
         return $this->content;
     }
 }

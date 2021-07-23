@@ -95,11 +95,15 @@ if ($editform->is_cancelled()) {
     if ($data->groupid) {
         $source['groupid'] = $data->groupid;
     }
-    $users = groups_get_potential_members($data->courseid, $data->roleid, $source, $orderby, !empty($data->notingroup));
+
+    // Display only active users if the option was selected or they do not have the capability to view suspended users.
+    $onlyactive = !empty($data->includeonlyactiveenrol) || !has_capability('moodle/course:viewsuspendedusers', $context);
+
+    $users = groups_get_potential_members($data->courseid, $data->roleid, $source, $orderby, !empty($data->notingroup),
+        $onlyactive);
     $usercnt = count($users);
 
     if ($data->allocateby == 'random') {
-        srand($data->seed);
         shuffle($users);
     }
 
@@ -158,6 +162,10 @@ if ($editform->is_cancelled()) {
             $table->head  = array(get_string('groupscount', 'group', $numgrps));
             $table->size  = array('100%');
             $table->align = array('left');
+        } else if ($data->allocateby === 'random') {
+            $table->head  = array(get_string('groupscount', 'group', $numgrps), get_string('usercounttotal', 'group', $usercnt));
+            $table->size  = array('30%', '70%');
+            $table->align = array('left', 'left');
         } else {
             $table->head  = array(get_string('groupscount', 'group', $numgrps), get_string('groupmembers', 'group'), get_string('usercounttotal', 'group', $usercnt));
             $table->size  = array('20%', '70%', '10%');
@@ -173,7 +181,9 @@ if ($editform->is_cancelled()) {
             } else {
                 $line[] = $group['name'];
             }
-            if ($data->allocateby != 'no') {
+            if ($data->allocateby === 'random') {
+                $line[] = count($group['members']);
+            } else if ($data->allocateby != 'no') {
                 $unames = array();
                 foreach ($group['members'] as $user) {
                     $unames[] = fullname($user, true);

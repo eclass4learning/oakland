@@ -61,7 +61,9 @@ class mod_facetoface_allocation_testcase extends advanced_testcase {
         $this->setUser($user1);
 
         $sink = $this->redirectEmails();
-        facetoface_allocate_spaces($session, $facetoface, $course, $user1->id, array($user2->id), 1);
+        $seminarevent = new \mod_facetoface\seminar_event($sessionid);
+        \mod_facetoface\reservations::allocate_spaces($seminarevent, $user1->id, array($user2->id));
+        $this->execute_adhoc_tasks();
         $messages = $sink->get_messages();
         $sink->close();
         $this->assertCount(2, $messages);
@@ -71,11 +73,36 @@ class mod_facetoface_allocation_testcase extends advanced_testcase {
         $this->assertSame($user2->email, $message->to);
         $this->assertStringStartsWith('Seminar booking confirmation: Test seminar', $message->subject);
         $this->assertContains('BEGIN:VCALENDAR', $message->body);
+        $description = $this->extract_description_from_ical_attachment($message->body);
+        $this->assertContains('Please arrive ten minutes before the course starts', $description);
 
         // The manager.
         $message = $messages[1];
         $this->assertSame($user1->email, $message->to);
         $this->assertStringStartsWith('Seminar booking confirmation: Test seminar', $message->subject);
         $this->assertNotContains('BEGIN:VCALENDAR', $message->body);
+    }
+
+    /**
+     * Get the DESCRIPTION property in the iCalendar attachment.
+     *
+     * @param string $body
+     * @return string
+     */
+    private function extract_description_from_ical_attachment(string $body) {
+        $body = strtr($body, "\r\n", "\n");
+        if (substr($body, -2) === "\n\n") {
+            $body = implode("\n", explode("\n\n", $body));
+        }
+        if (preg_match('/BEGIN:VCALENDAR\n.*\nDESCRIPTION:(.*)\nSUMMARY:.*\nEND:VCALENDAR/sm', $body, $matches)) {
+            $text = preg_replace('/=\\n/m', '', $matches[1]);
+            $text = implode("\n", array_map(function ($line) {
+                return quoted_printable_decode($line);
+            }, explode("\n", $text)));
+            $text = preg_replace('/\\n\\s/m', '', $text);
+            $text = strtr($text, ['\\\\' => '\\', '\\;' => ';', '\\,' => ',', '\\N' => "\n", '\\n' => "\n"]);
+            return $text;
+        }
+        $this->fail('cannot find the description property');
     }
 }

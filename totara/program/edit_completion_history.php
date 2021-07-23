@@ -21,7 +21,7 @@
  * @package totara_certification
  */
 
-require_once(dirname(dirname(dirname(__FILE__))) . '/config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir.'/adminlib.php');
 require_once($CFG->dirroot . '/totara/program/lib.php');
 require_once($CFG->dirroot . '/totara/program/edit_completion_history_form.php');
@@ -46,10 +46,10 @@ require_capability('totara/program:editcompletion', $programcontext);
 
 $user = $DB->get_record('user', array('id' => $userid), '*', MUST_EXIST);
 
-$url = new moodle_url('/totara/program/edit_completion_history.php');
+$url = new moodle_url('/totara/program/edit_completion_history.php', array('id' => $id, 'userid' => $userid, 'chid' => $chid));
 
 // Prepare the form.
-$PAGE->set_context($programcontext);
+$PAGE->set_program($program);
 $customdata = array(
     'id' => $id,
     'userid' => $userid,
@@ -80,11 +80,9 @@ if ($submitted = $form->get_data() and isset($submitted->savechanges)) {
         $DB->update_record('prog_completion_history', $updatedrecord);
 
         // Record the change in the program completion log.
-        $timecompleted = userdate($updatedrecord->timecompleted, '%d %B %Y, %I:%M %p', 99) .
-            ' (' . $updatedrecord->timecompleted . ')';
         $description = 'Completion history manually edited<br>' .
             '<ul><li>ID: ' . $chid . '</li>' .
-            '<li>Completion date: ' . $timecompleted . '</li></ul>';
+            '<li>Completion date: ' . prog_format_log_date($updatedrecord->timecompleted) . '</li></ul>';
         prog_log_completion(
             $id,
             $userid,
@@ -102,11 +100,9 @@ if ($submitted = $form->get_data() and isset($submitted->savechanges)) {
         $newchid = $DB->insert_record('prog_completion_history', $newrecord);
 
         // Record the change in the program completion log.
-        $timecompleted = userdate($newrecord->timecompleted, '%d %B %Y, %I:%M %p', 99) .
-            ' (' . $newrecord->timecompleted . ')';
         $description = 'Completion history manually added<br>' .
             '<ul><li>ID: ' . $newchid . '</li>' .
-            '<li>Completion date: ' . $timecompleted . '</li></ul>';
+            '<li>Completion date: ' . prog_format_log_date($newrecord->timecompleted) . '</li></ul>';
         prog_log_completion(
             $id,
             $userid,

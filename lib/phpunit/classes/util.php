@@ -55,14 +55,12 @@ class phpunit_util extends testing_util {
     protected static $eventsink = null;
 
     /**
-     * @var array Files to skip when resetting dataroot folder
-     */
-    protected static $datarootskiponreset = array('.', '..', 'phpunittestdir.txt', 'phpunit', '.htaccess');
-
-    /**
      * @var array Files to skip when dropping dataroot folder
      */
     protected static $datarootskipondrop = array('.', '..', 'lock', 'webrunner.xml');
+
+    /** @var phpunit_cache_factory $cachefactory */
+    protected static $cachefactory;
 
     /**
      * Load global $CFG;
@@ -216,6 +214,7 @@ class phpunit_util extends testing_util {
         get_message_processors(false, true, true);
         filter_manager::reset_caches();
         core_filetypes::reset_caches();
+        \core_useragent::phpunit_reset(); // Totara: Make sure useragent tests are properly isolated.
         if (class_exists('prog_messages_manager', false)) {
             // Program messages exists, reset its caches just in case they have been used.
             prog_messages_manager::reset_cache();
@@ -224,6 +223,14 @@ class phpunit_util extends testing_util {
             // Appraisal detail report source class exists, reset its caches just in case they have been used.
             rb_source_appraisal_detail::reset_cache();
         }
+        \totara_catalog\cache_handler::reset_all_caches();
+
+        \core_search\manager::clear_static();
+        core_user::reset_caches();
+        if (class_exists('core_media_manager', false)) {
+            core_media_manager::reset_caches();
+        }
+
         // Reset static unit test options.
         if (class_exists('\availability_date\condition', false)) {
             \availability_date\condition::set_current_time_for_test(0);
@@ -237,12 +244,23 @@ class phpunit_util extends testing_util {
         if (class_exists('totara_core\jsend', false)) {
             \totara_core\jsend::set_phpunit_testdata(null);
         }
-        session_id(''); // Totara Connect fakes the sid in tests.
+        if (session_id() !== '') {
+            // Totara Connect fakes the sid in tests.
+            if (session_status() == PHP_SESSION_ACTIVE) {
+                session_destroy();
+            }
+            session_id('');
+        }
 
         // Check if report builder has been loaded and if so reset the source object cache.
         // Don't autoload here - it won't work.
         if (class_exists('reportbuilder', false)) {
+            reportbuilder::reset_caches();
             reportbuilder::reset_source_object_cache();
+
+            // Reset source object helpers, these cache data used to create columms and filters.
+            \totara_customfield\report_builder_field_loader::reset();
+            \core_tag\report_builder_tag_loader::reset();
         }
 
         //TODO MDL-25290: add more resets here and probably refactor them to new core function
@@ -274,6 +292,19 @@ class phpunit_util extends testing_util {
 
         // purge dataroot directory
         self::reset_dataroot();
+
+        if (self::$cachefactory) {
+            // Totara: switch back to fast phpunit caches.
+            self::$cachefactory->phpunit_reset();
+        } else {
+            // Purge all data from the caches. This is required for consistency between tests.
+            // Any file caches that happened to be within the data root will have already been clearer (because we just deleted cache)
+            // and now we will purge any other caches as well.  This must be done before the cache_factory::reset() as that
+            // removes all definitions of caches and purge does not have valid caches to operate on.
+            cache_helper::purge_all();
+            // Reset the cache API so that it recreates it's required directories as well.
+            cache_factory::reset();
+        }
 
         // restore original config once more in case resetting of caches changed CFG
         $CFG = self::get_global_backup('CFG');
@@ -342,8 +373,19 @@ class phpunit_util extends testing_util {
         self::$globals['DB'] = $DB;
         self::$globals['FULLME'] = $FULLME;
 
+        if (empty($CFG->altcacheconfigpath) and !defined('TEST_CACHE_USING_ALT_CACHE_CONFIG_PATH')) {
+            require_once(__DIR__ . '/cache_factory.php');
+            self::$cachefactory = new phpunit_cache_factory();
+        }
+
         // refresh data in all tables, clear caches, etc.
+        self::$lastdbwrites = null;
         self::reset_all_data();
+
+        if (self::$cachefactory) {
+            self::$cachefactory->prime_caches();
+            self::reset_all_data();
+        }
     }
 
     /**
@@ -353,6 +395,9 @@ class phpunit_util extends testing_util {
      * @return void
      */
     public static function bootstrap_moodle_info() {
+        if (defined('PHPUNIT_PARATEST') and PHPUNIT_PARATEST) {
+            return;
+        }
         echo self::get_site_info();
     }
 
@@ -420,7 +465,7 @@ class phpunit_util extends testing_util {
      * @return void may terminate execution with exit code
      */
     public static function drop_site($displayprogress = false) {
-        global $DB, $CFG;
+        global $CFG;
 
         if (!self::is_test_site()) {
             phpunit_bootstrap_error(PHPUNIT_EXITCODE_CONFIGERROR, 'Can not drop non-test site!!');
@@ -431,12 +476,12 @@ class phpunit_util extends testing_util {
             echo "Purging dataroot:\n";
         }
 
-        self::reset_dataroot();
-        testing_initdataroot($CFG->dataroot, 'phpunit');
-        self::drop_dataroot();
-
-        // drop all tables
+        // Drop all tables.
         self::drop_database($displayprogress);
+
+        // Purge dataroot only, but keep the directory.
+        self::drop_dataroot();
+        testing_initdataroot($CFG->dataroot, 'phpunit');
     }
 
     /**
@@ -468,6 +513,11 @@ class phpunit_util extends testing_util {
         $options['shortname'] = 'phpunit';
         $options['fullname'] = 'PHPUnit test site';
 
+        // Torara: Empty dataroot and initialise it.
+        self::drop_dataroot();
+        testing_initdataroot($CFG->dataroot, 'phpunit');
+        self::reset_dataroot();
+
         install_cli_database($options, false);
 
         // Set the admin email address.
@@ -476,19 +526,39 @@ class phpunit_util extends testing_util {
         // Disable all logging for performance and sanity reasons.
         set_config('enabled_stores', '', 'tool_log');
 
+        // Disable Totara registrations.
+        set_config('registrationenabled', 0);
+        set_config('sitetype', 'development');
+        set_config('registrationcode', '');
+
         // Undo Totara changed defaults to allow upstream testing without hacks.
-        set_config('enablecompletion', 0);
+        // NOTE: completion is automatically enabled since Moodle 3.1
         set_config('forcelogin', 0);
         set_config('enrol_plugins_enabled', 'manual,guest,self,cohort');
         set_config('enableblogs', 1);
         $DB->delete_records('user_preferences', array()); // Totara admin site page default.
 
-        // We need to keep the installed dataroot filedir files.
-        // So each time we reset the dataroot before running a test, the default files are still installed.
-        self::save_original_data_files();
+        // Totara: purge log tables to speed up DB resets.
+        $DB->delete_records('config_log');
+        $DB->delete_records('log_display');
+        $DB->delete_records('upgrade_log');
+
+        // Totara: there is no need to save filedir files, we do not delete them in tests!
 
         // Store version hash in the database and in a file.
         self::store_versions_hash();
+
+        // Reset the sequences so that insert in each table returns different 'id' values.
+        if (defined('PHPUNIT_SEQUENCE_START')) {
+            // NOTE: this constant can only be defined in config.php, not in phpunit.xml!
+            $offsetstart = (int)PHPUNIT_SEQUENCE_START;
+        } else {
+            // Start a sequence between 100000 and 199000 to ensure each call to init produces
+            // different ids in the database.  This reduces the risk that hard coded values will
+            // end up being placed in phpunit test code.
+            $offsetstart = 100000 + mt_rand(0, 99) * 1000;
+        }
+        $DB->get_manager()->reset_all_sequences($offsetstart, 1000);
 
         // Store database data and structure.
         self::store_database_state();
@@ -529,16 +599,8 @@ class phpunit_util extends testing_util {
                 $suites .= $suite;
             }
         }
-        // Start a sequence between 100000 and 199000 to ensure each call to init produces
-        // different ids in the database.  This reduces the risk that hard coded values will
-        // end up being placed in phpunit or behat test code.
-        $sequencestart = 100000 + mt_rand(0, 99) * 1000;
 
         $data = preg_replace('|<!--@plugin_suites_start@-->.*<!--@plugin_suites_end@-->|s', $suites, $data, 1);
-        $data = str_replace(
-            '<const name="PHPUNIT_SEQUENCE_START" value=""/>',
-            '<const name="PHPUNIT_SEQUENCE_START" value="' . $sequencestart . '"/>',
-            $data);
 
         $result = false;
         if (is_writable($CFG->dirroot)) {
@@ -572,7 +634,15 @@ class phpunit_util extends testing_util {
             <testsuite name="@component@_testsuite">
                 <directory suffix="_test.php">.</directory>
             </testsuite>
-        </testsuites>';
+        </testsuites>
+        <filter>
+            <whitelist processUncoveredFilesFromWhitelist="false">
+                <directory suffix=".php">.</directory>
+                <exclude>
+                    <directory suffix="_test.php">.</directory>
+                </exclude>
+            </whitelist>
+        </filter>';
 
         // Start a sequence between 100000 and 199000 to ensure each call to init produces
         // different ids in the database.  This reduces the risk that hard coded values will
@@ -630,7 +700,7 @@ class phpunit_util extends testing_util {
 
         foreach ($backtrace as $bt) {
             if (isset($bt['object']) and is_object($bt['object'])
-                    && $bt['object'] instanceof PHPUnit_Framework_TestCase) {
+                    && $bt['object'] instanceof \PHPUnit\Framework\TestCase) {
                 $debug = new stdClass();
                 $debug->message = $message;
                 $debug->level   = $level;
@@ -849,5 +919,45 @@ class phpunit_util extends testing_util {
         } else {
             return 'en_AU.UTF-8';
         }
+    }
+
+    /**
+     * Executes all adhoc tasks in the queue. Useful for testing asynchronous behaviour.
+     *
+     * @return void
+     */
+    public static function run_all_adhoc_tasks() {
+        $now = time();
+        while (($task = \core\task\manager::get_next_adhoc_task($now)) !== null) {
+            try {
+                $task->execute();
+                \core\task\manager::adhoc_task_complete($task);
+            } catch (Exception $e) {
+                \core\task\manager::adhoc_task_failed($task);
+            }
+        }
+    }
+
+    /**
+     * Helper function to call a protected/private method of an object using reflection.
+     *
+     * Example 1. Calling a protected object method:
+     *   $result = call_internal_method($myobject, 'method_name', [$param1, $param2], '\my\namespace\myobjectclassname');
+     *
+     * Example 2. Calling a protected static method:
+     *   $result = call_internal_method(null, 'method_name', [$param1, $param2], '\my\namespace\myclassname');
+     *
+     * @param object|null $object the object on which to call the method, or null if calling a static method.
+     * @param string $methodname the name of the protected/private method.
+     * @param array $params the array of function params to pass to the method.
+     * @param string $classname the fully namespaced name of the class the object was created from (base in the case of mocks),
+     *        or the name of the static class when calling a static method.
+     * @return mixed the respective return value of the method.
+     */
+    public static function call_internal_method($object, $methodname, array $params = array(), $classname) {
+        $reflection = new \ReflectionClass($classname);
+        $method = $reflection->getMethod($methodname);
+        $method->setAccessible(true);
+        return $method->invokeArgs($object, $params);
     }
 }

@@ -17,7 +17,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * @author David Curry <david.curry@toraralearning.com>
  * @package totara_reportbuilder
  */
 
@@ -138,6 +137,86 @@ function totara_reportbuilder_migrate_filter_types($values, $oldtype, $newtype) 
 
 /**
  * Update the filters in any saved searches, generally used after migrating filter types.
+ *
+ * NOTE: This is a generic function suitable for general use
+ * when migrating saved search data for any filter. This should
+ * be used instead of {@link totara_reportbuilder_migrate_saved_search_filters()} which was specific to the 2.9 -> 9.0
+ * multiple jobs migration.
+ *
+ * @param string $source Name of the source or '*' to update all sources
+ * @param string $oldtype The type of the item to change
+ * @param string $oldvalue The value of the item to change
+ * @param string $newtype The new type of the item
+ * @param string $newvalue The new value of the item
+ * @return boolean True if data was updated, false otherwise.
+ *
+ */
+function totara_reportbuilder_migrate_saved_searches($source, $oldtype, $oldvalue, $newtype, $newvalue) {
+    global $DB;
+
+    $savedsearchesupdated = false;
+
+    if ($source == '*') {
+        $sourcesql = '';
+        $params = array();
+    } else {
+        $sourcesql = ' WHERE rb.source = :source';
+        $params = array('source' => $source);
+    }
+
+    // Get all saved searches for specified source.
+    $sql = "SELECT rbs.* FROM {report_builder_saved} rbs
+        JOIN {report_builder} rb
+        ON rb.id = rbs.reportid
+        {$sourcesql}";
+    $savedsearches = $DB->get_records_sql($sql, $params);
+
+    // Loop through them all and json_decode
+    foreach ($savedsearches as $saved) {
+        if (empty($saved->search)) {
+            continue;
+        }
+
+        $search = unserialize($saved->search);
+
+        if (!is_array($search)) {
+            continue;
+        }
+
+        // Check for any filters that will need to be updated.
+        $update = false;
+        foreach ($search as $oldkey => $info) {
+            list($type, $value) = explode('-', $oldkey);
+
+            if ($type == $oldtype && $value == $oldvalue) {
+                $update = true;
+
+                $newkey = "{$newtype}-{$newvalue}";
+                $search[$newkey] = $info;
+                unset($search[$oldkey]);
+            }
+        }
+
+        if ($update) {
+            // Re encode and update the database.
+            $todb = new \stdClass;
+            $todb->id = $saved->id;
+            $todb->search = serialize($search);
+            $DB->update_record('report_builder_saved', $todb);
+            $savedsearchesupdated = true;
+        }
+    }
+
+    return $savedsearchesupdated;
+}
+
+/**
+ * Update the filters in any saved searches, generally used after migrating filter types.
+ *
+ * NOTE: this function contains code specific to the migration
+ * from 2.9 to 9.0 for multiple jobs. DO NOT USE this function
+ * for generic saved search migrations, use
+ * {@link totara_reportbuilder_migrate_saved_searches()} instead.
  */
 function totara_reportbuilder_migrate_saved_search_filters($values, $oldtype, $newtype) {
     global $DB;
@@ -163,22 +242,38 @@ function totara_reportbuilder_migrate_saved_search_filters($values, $oldtype, $n
         }
 
         // Check for any filters that will need to be updated.
-        foreach ($search as $key => $info) {
-            list($type, $value) = explode('-', $key);
+        $update = false;
+        foreach ($search as $oldkey => $info) {
+            list($type, $value) = explode('-', $oldkey);
 
             // NOTE: This isn't quite as generic as the other functions.
             $value = $value == 'posstartdate' ? 'startdate' : $value;
             $value = $value == 'posenddate' ? 'enddate' : $value;
 
-            if ($type == $oldtype && in_array($value, $values)) {
-                $search[$newtype.'-'.$value] = $info;
-                unset($search[$key]);
+            if ($type == $oldtype && in_array($value, array_keys($values))) {
+                $update = true;
+
+                if ($values[$value] == 'allpositions' || $values[$value] == 'allorganisations') {
+                    if (isset($info['recursive']) && !isset($info['children'])) {
+                        $info['children'] = $info['recursive'];
+                        unset($info['recursive']);
+                    } else {
+                        $info['children'] = isset($info['children']) ? $info['children'] : 0;
+                    }
+                    $info['operator'] = isset($info['operator']) ? $info['operator'] : 1;
+                }
+
+                $newkey = "{$newtype}-{$values[$value]}";
+                $search[$newkey] = $info;
+                unset($search[$oldkey]);
             }
         }
 
-        // Re encode and update the database.
-        $saved->search = serialize($search);
-        $DB->update_record('report_builder_saved', $saved);
+        if ($update) {
+            // Re encode and update the database.
+            $saved->search = serialize($search);
+            $DB->update_record('report_builder_saved', $saved);
+        }
     }
 
     return true;
@@ -257,3 +352,19 @@ function totara_reportbuilder_delete_scheduled_reports() {
 
     return true;
 }
+
+/**
+ * Populate the "usermodified" column introduced with the new scheduled report
+ * report source implementation.
+ */
+function totara_reportbuilder_populate_scheduled_reports_usermodified() {
+    global $DB;
+
+    $table = 'report_builder_schedule';
+    $records = $DB->get_records($table, null, '', 'id,userid,usermodified');
+    foreach ($records as $record) {
+        $record->usermodified = $record->userid;
+        $DB->update_record($table, $record);
+    }
+}
+

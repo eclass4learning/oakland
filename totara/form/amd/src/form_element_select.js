@@ -71,28 +71,11 @@ define(['jquery', 'totara_form/form'], function($, Form) {
      * @param {Function} done
      */
     SelectElement.prototype.init = function(done) {
-        var id = this.id,
-            input = $('#' + id),
-            self = this,
-            deferred = $.Deferred(),
-            submitselector = 'input[type="submit"]:not([formnovalidate])';
-        this.input = input;
+        this.input =  $('#' + this.id);
         // Call the changed method when this element is changed.
         this.input.change($.proxy(this.changed, this));
 
-        if (this.input.attr('required')) {
-            require(['totara_form/modernizr'], function (mod) {
-                if (!mod.input.required) {
-                    input.change($.proxy(self.polyFillValidate, self));
-                    input.closest('form').find(submitselector).click($.proxy(self.polyFillValidate, self));
-                }
-                deferred.resolve();
-            });
-        } else {
-            deferred.resolve();
-        }
-
-        deferred.done(done);
+        done();
     };
 
     SelectElement.prototype.polyFillValidate = function(e) {
@@ -128,6 +111,14 @@ define(['jquery', 'totara_form/form'], function($, Form) {
 
     SelectElement.prototype.getValue = function() {
         return this.input.val();
+    };
+
+    SelectElement.prototype.showLoading = function() {
+        this.input.siblings('.tf_loading').show();
+    };
+
+    SelectElement.prototype.hideLoading = function () {
+        this.siblings('.tf_loading').hide();
     };
 
     return SelectElement;

@@ -58,10 +58,11 @@ M.totara_version_tracking = M.totara_version_tracking || {
         }
 
         $.ajax({
-            url: this.config.protocol + '://community.totaralms.com/admin/current_release.php',
+            url: 'https://login.totara.community/local/login/current_release.php',
             dataType: 'jsonp',
             data: {'version': this.config.totara_version},
             jsonp: 'jsonp_callback',
+            global: false,
             success: function(data) {
                 var BRANCH_UNKNOWN = 0;
                 var BRANCH_UNSUPPORTED = 1;

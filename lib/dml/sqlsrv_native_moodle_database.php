@@ -50,6 +50,9 @@ class sqlsrv_native_moodle_database extends moodle_database {
     /** @var array list of open recordsets */
     protected $recordsets = array();
 
+    /** @var array cached server information */
+    protected $serverinfo = null;
+
     /**
      * Constructor - instantiates the database, specifying if it's external (connect to other systems) or no (Moodle DB)
      *              note this has effect to decide if prefix checks must be performed or no
@@ -69,11 +72,7 @@ class sqlsrv_native_moodle_database extends moodle_database {
         // the name used by 'extension_loaded()' is case specific! The extension
         // therefore *could be* mixed case and hence not found.
         if (!function_exists('sqlsrv_num_rows')) {
-            if (stripos(PHP_OS, 'win') === 0) {
-                return get_string('nativesqlsrvnodriver', 'install');
-            } else {
-                return get_string('nativesqlsrvnonwindows', 'install');
-            }
+            return get_string('nativesqlsrvnodriver', 'install');
         }
         return true;
     }
@@ -186,7 +185,12 @@ class sqlsrv_native_moodle_database extends moodle_database {
         sqlsrv_configure("LogSeverity", SQLSRV_LOG_SEVERITY_ERROR);
 
         $this->store_settings($dbhost, $dbuser, $dbpass, $dbname, $prefix, $dboptions);
-        $this->sqlsrv = sqlsrv_connect($this->dbhost, array
+        $dbhost = $this->dbhost;
+        if (!empty($dboptions['dbport'])) {
+            $dbhost .= ','.$dboptions['dbport'];
+        }
+
+        $this->sqlsrv = sqlsrv_connect($dbhost, array
          (
           'UID' => $this->dbuser,
           'PWD' => $this->dbpass,
@@ -203,6 +207,9 @@ class sqlsrv_native_moodle_database extends moodle_database {
 
             throw new dml_connection_exception($dberr);
         }
+
+        // Disable logging until we are fully setup.
+        $this->query_log_prevent();
 
         // Allow quoted identifiers
         $sql = "SET QUOTED_IDENTIFIER ON";
@@ -255,7 +262,10 @@ class sqlsrv_native_moodle_database extends moodle_database {
 
         $serverinfo = $this->get_server_info();
         // Fetch/offset is supported staring from SQL Server 2012.
-        $this->supportsoffsetfetch = $serverinfo['version'] > '11';
+        $this->supportsoffsetfetch = version_compare($serverinfo['version'], '11', '>');
+
+        // We can enable logging now.
+        $this->query_log_allow();
 
         // Connection established and configured, going to instantiate the temptables controller
         $this->temptables = new sqlsrv_native_moodle_temptables($this);
@@ -300,21 +310,55 @@ class sqlsrv_native_moodle_database extends moodle_database {
 
     /**
      * Returns database server info array
-     * @return array Array containing 'description', 'version' and 'database' (current db) info
+     * @return array Array containing 'description' and 'version' info
      */
     public function get_server_info() {
-        static $info;
-
-        if (!$info) {
-            $server_info = sqlsrv_server_info($this->sqlsrv);
-
-            if ($server_info) {
-                $info['description'] = $server_info['SQLServerName'];
-                $info['version'] = $server_info['SQLServerVersion'];
-                $info['database'] = $server_info['CurrentDatabase'];
-            }
+        if (!$this->sqlsrv) {
+            return null;
         }
-        return $info;
+
+        if (isset($this->serverinfo)) {
+            return $this->serverinfo;
+        }
+
+        $server_info = sqlsrv_server_info($this->sqlsrv);
+        if (!$server_info) {
+            return null;
+        }
+
+        $this->serverinfo = array(
+            'description' => $server_info['SQLServerVersion'],
+            'version' => $server_info['SQLServerVersion'],
+        );
+
+        // Totara: use database compatibility overrides instead of database engine version, see
+        // https://docs.microsoft.com/en-us/sql/t-sql/statements/alter-database-transact-sql-compatibility-level?view=sql-server-ver15
+
+        $compatibility_levels = [
+            80 => '8.0',
+            90 => '9.0',
+            100 => '10.0',
+            110 => '11.0',
+            120 => '12.0',
+            130 => '13.0',
+            140 => '14.0',
+            150 => '15.0',
+        ];
+
+        // Do not use ger_record() or similar here because it might internally need the server version and end up in infinite loop.
+        $rsrc = $this->do_query("SELECT compatibility_level FROM sys.databases WHERE name=?", [$this->dbname], SQL_QUERY_AUX, false, false);
+        if ($rsrc) {
+            if ($row = sqlsrv_fetch_array($rsrc, SQLSRV_FETCH_ASSOC)) {
+                if (isset($compatibility_levels[$row['compatibility_level']])) {
+                    $this->serverinfo['version'] = $compatibility_levels[$row['compatibility_level']];
+                } else {
+                    error_log('unknown compatibility level detected in MS SQL server database: ' . $row['compatibility_level']);
+                }
+            }
+            sqlsrv_free_stmt($rsrc);
+        }
+
+        return $this->serverinfo;
     }
 
     /**
@@ -417,7 +461,7 @@ class sqlsrv_native_moodle_database extends moodle_database {
      * @return array of table names in lowercase and without prefix
      */
     public function get_tables($usecache = true) {
-        if ($usecache and count($this->tables) > 0) {
+        if ($usecache and $this->tables !== null) {
             return $this->tables;
         }
         $this->tables = array ();
@@ -444,9 +488,13 @@ class sqlsrv_native_moodle_database extends moodle_database {
             $this->free_result($result);
         }
 
+        // Separate tables cause we're going to be adding to it.
+        $tables = $this->tables;
         // Add the currently available temptables
-        $this->tables = array_merge($this->tables, $this->temptables->get_temptables());
-        return $this->tables;
+        foreach ($this->temptables->get_temptables() as $tablename => $tablenameencoded) {
+            $tables[$tablename] = $tablename;
+        }
+        return $tables;
     }
 
     /**
@@ -472,37 +520,52 @@ class sqlsrv_native_moodle_database extends moodle_database {
         $result = sqlsrv_query($this->sqlsrv, $sql);
         $this->query_end($result);
 
-        if ($result) {
-            $lastindex = '';
-            $unique = false;
-            $columns = array ();
+        if (!$result) {
+            return array();
+        }
 
-            while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
-                if ($lastindex and $lastindex != $row['index_name'])
-                    { // Save lastindex to $indexes and reset info
-                    $indexes[$lastindex] = array
-                     (
-                      'unique' => $unique,
-                      'columns' => $columns
-                     );
+        $fulltextsearch = false;
+        while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
+            if (preg_match('/^(.*)([^_]+)_fts$/', $row['index_name'], $matches)) {
+                $fulltextsearch = $matches[1];
+                continue;
 
-                    $unique = false;
-                    $columns = array ();
+            } else if (!isset($indexes[$row['index_name']])) {
+                $indexes[$row['index_name']] = array(
+                    'unique' => empty($row['is_unique']) ? false : true,
+                    'columns' => array($row['column_name']),
+                    'fulltextsearch' => false,
+                );
+
+            } else {
+                $indexes[$row['index_name']]['columns'][] = $row['column_name'];
+            }
+        }
+        $this->free_result($result);
+
+        if ($fulltextsearch !== false) {
+            // We need to find the fake full text search indices the slow way.
+            $sql = "SELECT ic.column_id, c.name AS column_name
+                            FROM sys.fulltext_indexes i
+                            JOIN sys.fulltext_index_columns ic ON i.object_id = ic.object_id
+                            JOIN sys.tables t ON i.object_id = t.object_id
+                            JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+                           WHERE t.name = '$tablename' ";
+
+            $this->query_start($sql, null, SQL_QUERY_AUX);
+            $result = sqlsrv_query($this->sqlsrv, $sql);
+            $this->query_end($result);
+
+            if ($result) {
+                while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
+                    $indexes[$fulltextsearch . $row['column_name'] . '_fts'] = array(
+                        'unique'  => false,
+                        'columns' => array($row['column_name']),
+                        'fulltextsearch'  => true,
+                    );
                 }
-                $lastindex = $row['index_name'];
-                $unique = empty($row['is_unique']) ? false : true;
-                $columns[] = $row['column_name'];
+                $this->free_result($result);
             }
-
-            if ($lastindex) { // Add the last one if exists
-                $indexes[$lastindex] = array
-                 (
-                  'unique' => $unique,
-                  'columns' => $columns
-                 );
-            }
-
-            $this->free_result($result);
         }
         return $indexes;
     }
@@ -515,10 +578,14 @@ class sqlsrv_native_moodle_database extends moodle_database {
      */
     public function get_columns($table, $usecache = true) {
         if ($usecache) {
-            $properties = array('dbfamily' => $this->get_dbfamily(), 'settings' => $this->get_settings_hash());
-            $cache = cache::make('core', 'databasemeta', $properties);
-            if ($data = $cache->get($table)) {
-                return $data;
+            if ($this->temptables->is_temptable($table)) {
+                if ($data = $this->get_temp_tables_cache()->get($table)) {
+                    return $data;
+                }
+            } else {
+                if ($data = $this->get_metacache()->get($table)) {
+                    return $data;
+                }
             }
         }
 
@@ -613,7 +680,11 @@ class sqlsrv_native_moodle_database extends moodle_database {
         $this->free_result($result);
 
         if ($usecache) {
-            $cache->set($table, $structure);
+            if ($this->temptables->is_temptable($table)) {
+                $this->get_temp_tables_cache()->set($table, $structure);
+            } else {
+                $this->get_metacache()->set($table, $structure);
+            }
         }
 
         return $structure;
@@ -723,10 +794,11 @@ class sqlsrv_native_moodle_database extends moodle_database {
     /**
      * Do NOT use in code, to be used by database_manager only!
      * @param string|array $sql query
+     * @param array|null $tablenames an array of xmldb table names affected by this request.
      * @return bool true
      * @throws ddl_change_structure_exception A DDL specific exception is thrown for any errors.
      */
-    public function change_database_structure($sql) {
+    public function change_database_structure($sql, $tablenames = null) {
         $this->get_manager(); // Includes DDL exceptions classes ;-)
         $sqls = (array)$sql;
 
@@ -737,11 +809,11 @@ class sqlsrv_native_moodle_database extends moodle_database {
                 $this->query_end($result);
             }
         } catch (ddl_change_structure_exception $e) {
-            $this->reset_caches();
+            $this->reset_caches($tablenames);
             throw $e;
         }
 
-        $this->reset_caches();
+        $this->reset_caches($tablenames);
         return true;
     }
 
@@ -984,7 +1056,11 @@ class sqlsrv_native_moodle_database extends moodle_database {
         if (empty($params)) {
             throw new coding_exception('moodle_database::insert_record_raw() no fields found.');
         }
-        $fields = implode(',', array_keys($params));
+        $fields = array();
+        foreach ($params as $field => $value) {
+            $fields[] = '"' . $field . '"'; // Totara: always quote column names to allow reserved words.
+        }
+        $fields = implode(',', $fields);
         $qms = array_fill(0, count($params), '?');
         $qms = implode(',', $qms);
         $sql = "INSERT INTO {" . $table . "} ($fields) VALUES($qms)";
@@ -1000,26 +1076,47 @@ class sqlsrv_native_moodle_database extends moodle_database {
         }
 
         if ($returnid) {
-            $id = $this->sqlsrv_fetch_id();
-            return $id;
+            return (int)$this->get_field_sql('SELECT SCOPE_IDENTITY()');
         } else {
             return true;
         }
     }
 
     /**
-     * Get the ID of the current action
+     * Find out the identity information for given table.
      *
-     * @return mixed ID
+     * @param string $tablename
+     * @return array ($identityvalue, $columnvalue, $nextid), or empty array on error
      */
-    private function sqlsrv_fetch_id() {
-        $query_id = sqlsrv_query($this->sqlsrv, 'SELECT SCOPE_IDENTITY()');
-        if ($query_id === false) {
-            $dberr = $this->get_last_error();
-            return false;
+    public function get_identity_info($tablename) {
+        // Use direct db access to get the server message reliably.
+        $result = sqlsrv_query($this->sqlsrv, "DBCC CHECKIDENT ('{$this->prefix}{$tablename}', NORESEED);");
+        if ($result === false) {
+            return array();
         }
-        $row = $this->sqlsrv_fetchrow($query_id);
-        return (int)$row[0];
+        $info = sqlsrv_errors();
+        sqlsrv_free_stmt($result);
+        if (!is_array($info)) {
+            return array();
+        }
+        foreach ($info as $data) {
+            if ($data['code'] == 7998) {
+                if (preg_match("/current identity value '([^']+)', current column value '([^']+)'/", $data['message'], $matches)) {
+                    $identityvalue = $matches[1];
+                    $columnvalue = $matches[2];
+                    if ($identityvalue === 'NULL') {
+                        // Identity is the seed - future value of the first record inserted into the table.
+                        $nextid = (int)$this->get_field_sql("SELECT IDENT_CURRENT(?)", array($this->prefix.$tablename));
+                    } else {
+                        // Something was already inserted, identity value is supposed to be already taken.
+                        $nextid = (int)$identityvalue + 1;
+                    }
+                    return array($identityvalue, $columnvalue, $nextid);
+                }
+            }
+        }
+        // We should never get here, if we do phpunit will most likely fail in some weird way...
+        return array();
     }
 
     /**
@@ -1130,7 +1227,7 @@ class sqlsrv_native_moodle_database extends moodle_database {
         $sets = array ();
 
         foreach ($params as $field => $value) {
-            $sets[] = "$field = ?";
+            $sets[] = '"' . $field .'" = ?'; // Totara: always quote column names to allow reserved words.
         }
 
         $params[] = $id; // last ? in WHERE condition
@@ -1203,9 +1300,9 @@ class sqlsrv_native_moodle_database extends moodle_database {
         $newvalue = $this->normalise_value($column, $newvalue);
 
         if (is_null($newvalue)) {
-            $newfield = "$newfield = NULL";
+            $newfield = '"' . $newfield . '" = NULL';
         } else {
-            $newfield = "$newfield = ?";
+            $newfield = '"' . $newfield . '" = ?';
             array_unshift($params, $newvalue);
         }
         $sql = "UPDATE {".$table."} SET $newfield $select";
@@ -1254,6 +1351,14 @@ class sqlsrv_native_moodle_database extends moodle_database {
         }
     }
 
+    public function sql_cast_char2float($fieldname) {
+        return ' CAST(' . $fieldname . ' AS FLOAT) ';
+    }
+
+    public function sql_cast_2char($fieldname) {
+        return ' CAST(' . $fieldname . ' AS NVARCHAR(MAX)) ';
+    }
+
     public function sql_ceil($fieldname) {
         return ' CEILING('.$fieldname.')';
     }
@@ -1294,6 +1399,24 @@ class sqlsrv_native_moodle_database extends moodle_database {
         return $this->collation;
     }
 
+    public function sql_equal($fieldname, $param, $casesensitive = true, $accentsensitive = true, $notequal = false) {
+        $equalop = $notequal ? '<>' : '=';
+        $collation = $this->get_collation();
+
+        if ($casesensitive) {
+            $collation = str_replace('_CI', '_CS', $collation);
+        } else {
+            $collation = str_replace('_CS', '_CI', $collation);
+        }
+        if ($accentsensitive) {
+            $collation = str_replace('_AI', '_AS', $collation);
+        } else {
+            $collation = str_replace('_AS', '_AI', $collation);
+        }
+
+        return "$fieldname COLLATE $collation $equalop $param";
+    }
+
     /**
      * Escape sql LIKE special characters like '_' or '%'.
      * @param string $text The string containing characters needing escaping.
@@ -1302,6 +1425,7 @@ class sqlsrv_native_moodle_database extends moodle_database {
      */
     public function sql_like_escape($text, $escapechar = '\\') {
         // Totara fix for weird [] LIKEs in SQL Server.
+        $text = str_replace($escapechar, $escapechar.$escapechar, $text);
         $text = str_replace('_', $escapechar.'_', $text);
         $text = str_replace('%', $escapechar.'%', $text);
         $text = str_replace('[', $escapechar.'[', $text);
@@ -1356,23 +1480,67 @@ class sqlsrv_native_moodle_database extends moodle_database {
     }
 
     /**
-     * TOTARA - Returns database specific SQL code similar to GROUP_CONCAT() behaviour from MySQL.
+     * Returns true if group concat supports order by.
      *
-     * NOTE: NULL values are skipped, use COALESCE if you want to include a replacement
+     * Not all databases support order by.
+     * If it is not supported the when calling sql_group_concat with an order by it will be ignored.
+     * You can call this method to check whether the database supports it in order to implement alternative solutions.
+     *
+     * @since      Totara 12
+     * @deprecated since Totara 12 This function will be removed when MSSQL 2017 is the minimum required version. All
+     *             other databases support orderby.
+     * @return bool
+     */
+    public function sql_group_concat_orderby_supported() {
+        $serverinfo = $this->get_server_info();
+        return (version_compare($serverinfo['version'], '14', '>='));
+    }
+
+    /**
+     * Returns database specific SQL code similar to GROUP_CONCAT() behaviour from MySQL.
+     *
+     * NOTE: NULL values are skipped, use COALESCE if you want to include a replacement.
+     *
+     * @since Totara 2.6.34, 2.7.17, 2.9.9
      *
      * @param string $expr      Expression to get individual values
      * @param string $separator The delimiter to separate the values, a simple string value only
-     * @param string $orderby   ORDER BY clause that determines order of rows with values - required
+     * @param string $orderby   ORDER BY clause that determines order of rows with values,
+     *                          optional since Totara 2.6.44, 2.7.27, 2.9.19, 9.7
      * @return string SQL fragment equivalent to GROUP_CONCAT()
      */
-    public function sql_group_concat($expr, $separator, $orderby) {
-        if ((string)$orderby === '') {
-            throw new coding_exception('sql_group_concat method requires $orderby parameter');
-        }
+    public function sql_group_concat($expr, $separator, $orderby = '') {
         $separator = $this->get_manager()->generator->addslashes($separator);
+        // Function string_agg() is supported from SQL Server 2017.
+        $serverinfo = $this->get_server_info();
+        if (version_compare($serverinfo['version'], '14', '>=')) {
+            if ($orderby) {
+                $orderby = "WITHIN GROUP (ORDER BY {$orderby})";
+            } else {
+                $orderby = "";
+            }
+            return " string_agg(CAST({$expr} AS NVARCHAR(MAX)), '{$separator}') {$orderby} ";
+        } else {
+            return " dbo.GROUP_CONCAT_D($expr, '{$separator}') ";
+        }
+    }
 
-        // TODO TL-9311 - change the user-defined mssql function to support $orderby.
-        return " dbo.GROUP_CONCAT_D($expr, '{$separator}') ";
+    /**
+     * Returns database specific SQL code similar to GROUP_CONCAT() behaviour from MySQL
+     * where duplicates are removed.
+     *
+     * NOTE: NULL values are skipped, use COALESCE if you want to include a replacement,
+     *       the ordering of results cannot be defined.
+     *
+     * @since Totara 2.6.44, 2.7.27, 2.9.19, 9.7
+     *
+     * @param string $expr      Expression to get individual values
+     * @param string $separator The delimiter to separate the values, a simple string value only
+     * @return string SQL fragment equivalent to GROUP_CONCAT()
+     */
+    public function sql_group_concat_unique($expr, $separator) {
+        $separator = $this->get_manager()->generator->addslashes($separator);
+        return " dbo.GROUP_CONCAT_D(DISTINCT $expr, '{$separator}') ";
     }
 
     public function sql_concat_join($separator = "' '", $elements = array ()) {
@@ -1426,7 +1594,7 @@ class sqlsrv_native_moodle_database extends moodle_database {
         }
 
         if ($length === false) {
-            return "SUBSTRING($expr, " . $this->sql_cast_char2int($start) . ", 2^31-1)";
+            return "SUBSTRING($expr, " . $this->sql_cast_char2int($start) . ", 2147483647)";
         } else {
             return "SUBSTRING($expr, " . $this->sql_cast_char2int($start) . ", " . $this->sql_cast_char2int($length) . ")";
         }
@@ -1542,5 +1710,143 @@ class sqlsrv_native_moodle_database extends moodle_database {
         $this->query_start('native sqlsrv_rollback', NULL, SQL_QUERY_AUX);
         $result = sqlsrv_rollback($this->sqlsrv);
         $this->query_end($result);
+    }
+
+    /**
+     * Do not use.
+     *
+     * @deprecated
+     *
+     * @param string $sql the SQL select query to execute.
+     * @param array $params array of sql parameters (optional)
+     * @param int $limitfrom return a subset of records, starting at this point (optional).
+     * @param int $limitnum return a subset comprising this many records (optional, required if $limitfrom is set).
+     * @param int &$count this variable will be filled with count of rows returned by select without limit statement
+     * @return counted_recordset A moodle_recordset instance.
+     * @throws dml_exception A DML specific exception is thrown for any errors.
+     * @throws coding_exception If an invalid result not containing the count is experienced
+     */
+    public function get_counted_recordset_sql($sql, array $params=null, $limitfrom = 0, $limitnum = 0, &$count = 0) {
+        global $CFG;
+        require_once($CFG->libdir.'/dml/counted_recordset.php');
+
+        if (!preg_match('/^\s*SELECT\s/is', $sql)) {
+            throw new dml_exception('dmlcountedrecordseterror', null, "Counted recordset query must start with SELECT");
+        }
+
+        $countorfield = 'dml_count_recordset_rows';
+        $sqlcnt = preg_replace('/^\s*SELECT\s/is', "SELECT COUNT('x') OVER () AS {$countorfield}, ", $sql);
+
+        $recordset = $this->get_recordset_sql($sqlcnt, $params, $limitfrom, $limitnum);
+        if ($limitfrom > 0 and !$recordset->valid()) {
+            // Bad luck, we are out of range and do not know how many are there, we need to make another query.
+            $rs2 = $this->get_recordset_sql($sqlcnt, $params, 0, 1);
+            if ($rs2->valid()) {
+                $current = $rs2->current();
+                $rs2->close();
+                if (!property_exists($current, $countorfield)) {
+                    throw new dml_exception("Expected column {$countorfield} used for counting records without limit was not found");
+                } else if (!isset($current->{$countorfield})) {
+                    throw new coding_exception("Invalid count result in {$countorfield} used for counting records without limit");
+                }
+                $recordset = new counted_recordset($recordset, (int)$current->{$countorfield});
+                $count = $recordset->get_count_without_limits();
+                return $recordset;
+            }
+            $rs2->close();
+        }
+        $recordset = new counted_recordset($recordset, $countorfield);
+        $count = $recordset->get_count_without_limits();
+
+        return $recordset;
+    }
+
+    /**
+     * Build a natural language search subquery using database specific search functions.
+     *
+     * @since Totara 12
+     *
+     * @param string $table        database table name
+     * @param array  $searchfields ['field_name'=>weight, ...] eg: ['high'=>3, 'medium'=>2, 'low'=>1]
+     * @param string $searchtext   natural language search text
+     * @return array [sql, params[]]
+     */
+    protected function build_fts_subquery(string $table, array $searchfields, string $searchtext): array {
+        $language = $this->get_ftslanguage();
+        // Microsoft is using either language code numbers or names of languages.
+        if (is_number($language)) {
+            $language = intval($language);
+        } else {
+            $language = "'$language'";
+        }
+
+        $params = array();
+        $searchjoin = array();
+        $score = array();
+
+        $defaulttb = 'FREETEXTTABLE';
+        if ($this->get_fts_mode($searchtext) === self::SEARCH_MODE_BOOLEAN) {
+            $searchtext = "\"{$searchtext}\"";
+            $defaulttb = "CONTAINSTABLE";
+        }
+
+        foreach ($searchfields as $field => $weight) {
+            $paramname = $this->get_unique_param('fts');
+            $params[$paramname] = $searchtext;
+            $searchjoin[] = "LEFT JOIN {$defaulttb}({{$table}},{$field},:{$paramname},LANGUAGE $language) AS join_{$field} ON basesearch.id = join_{$field}.[KEY]";
+            $score[] = "COALESCE(join_{$field}.RANK,0)*{$weight}";
+        }
+
+        $searchjoins = implode("\n", $searchjoin);
+        $scoresum = implode(' + ', $score);
+        $sql = "SELECT basesearch.id, {$scoresum} AS score
+                  FROM {{$table}} basesearch
+                       {$searchjoins}
+                 WHERE {$scoresum} > 0";
+
+        return array("({$sql})", $params);
+    }
+
+    /**
+     * Wait for MS SQL Server to index table with full text search data.
+     *
+     * NOTE: this is intended mainly for testing purposes
+     *
+     * @param string $tablename
+     * @param int $maxtime
+     * @return bool success, false if not indexed in $maxtime
+     */
+    public function fts_wait_for_indexing(string $tablename, int $maxtime = 10) {
+        $prefix = $this->get_prefix();
+
+        $timestart = time();
+
+        $sql = "SELECT COUNT('x')
+                  FROM sys.fulltext_indexes i
+                  JOIN sys.fulltext_catalogs c ON (c.name = :catalog AND i.fulltext_catalog_id = c.fulltext_catalog_id)
+                  JOIN sys.tables t ON i.object_id = t.object_id
+                 WHERE t.name = :table AND i.has_crawl_completed = 0";
+        $params = array('catalog' => $prefix . 'search_catalog', 'table' => $prefix . $tablename);
+
+        while($this->count_records_sql($sql, $params)) {
+            if ($timestart + $maxtime < time()) {
+                return false;
+            }
+            sleep(1);
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if accent sensitivity is currently active or not.
+     *
+     * @since Totara 12
+     * @return bool
+     */
+    public function is_fts_accent_sensitive(): bool {
+        $sql = "SELECT fulltextcatalogproperty(:catalog, 'AccentSensitivity')";
+        $params = ['catalog' => $this->get_prefix() . 'search_catalog'];
+        return !empty($this->get_field_sql($sql, $params));
     }
 }

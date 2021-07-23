@@ -42,14 +42,7 @@ class block_activity_modules extends block_list {
         $this->content->icons = array();
         $this->content->footer = '';
 
-        if (isset($_REQUEST['id'])) {
-            // Oakland will only have the block activity on a dashboard, the dashboard id will be in the request
-            $dashboard = $DB->get_record_sql('SELECT * FROM {totara_dashboard} WHERE id = ?', array($_REQUEST['id']));
-            // Now go get the course that is assigned to that group as defined in the dashboard record
-            $course = $DB->get_record_sql('SELECT * FROM {course} WHERE oaklandgroupid = ?', array($dashboard->oaklandgroupid));;
-        } else {
-            $course = $this->page->course;
-        }
+        $course = $this->page->course;
 
         require_once($CFG->dirroot.'/course/lib.php');
 

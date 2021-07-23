@@ -112,6 +112,13 @@ $capabilities = array(
             'user' => CAP_ALLOW
         )
     ),
+    'totara/appraisal:viewallappraisals' => array(
+    'riskbitmask'   => RISK_PERSONAL,
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => array(
+        )
+    ),
     'totara/appraisal:printownappraisals' => array(
     'riskbitmask'   => RISK_PERSONAL,
         'captype' => 'read',
@@ -120,6 +127,14 @@ $capabilities = array(
             'manager' => CAP_ALLOW,
             'staffmanager' => CAP_ALLOW,
             'user' => CAP_ALLOW
+        )
+    ),
+    'totara/appraisal:unlockstages' => array(
+        'riskbitmask'   => RISK_PERSONAL | RISK_DATALOSS | RISK_CONFIG,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_SYSTEM,
+        'archetypes' => array(
+            'manager' => CAP_ALLOW
         )
     ),
 );

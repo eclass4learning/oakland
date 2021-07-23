@@ -35,31 +35,50 @@
 
     Example context (json):
     {
-        "report_list":  [
-                            {
-                                "name":"My Objectives",
-                                "href": "http://example.com",
-                                "edit_href": "http://example.com"
-                            },
-                            {
-                                "name":"My Users",
-                                "href": "http://example.com",
-                                "edit_href": "http://example.com"
-                            }
-                        ]
+        "report_list": [
+            {
+                "name":"My Objectives",
+                "href": "http://example.com",
+                "edit_href": "http://example.com",
+                "icon": {
+                    "template": "core/flex_icon",
+                    "context": {
+                        "identifier" : "edit",
+                        "customdata": {
+                            "alt": "Edit report x"
+                        },
+                        "classes": "fa-edit"
+                    }
+                }
+            },
+            {
+                "name":"My Users",
+                "href": "http://example.com",
+                "edit_href": "http://example.com",
+                "icon": {
+                    "template": "core/flex_icon",
+                    "context": {
+                        "identifier" : "edit",
+                        "customdata": {
+                            "alt": "Edit report x"
+                        },
+                        "classes": "fa-edit"
+                    }
+                }
+            }
+        ]
     }
 }}
 <ul class="reportmanager">
 {{#report_list}}
     <li>
-        <a href="{{href}}" title="{{name}}">
-            {{#pix}}report_icon,totara_reportbuilder,{{name}}{{/pix}}
-            {{name}}
+        <a href="{{href}}">
+            {{#pix}}report_icon,totara_reportbuilder{{/pix}}
+            {{{name}}}
         </a>
         {{#edit_href}}
-            &nbsp;
-            <a href="{{edit_href}}" title="{{name}}">
-                {{#pix}}t/edit,moodle,{{name}}{{/pix}}
+            <a href="{{edit_href}}" title="{{#str}}edit{{/str}}">
+                {{#icon}}{{#context}}{{> &&template}}{{/context}}{{/icon}}
             </a>
         {{/edit_href}}
     </li>

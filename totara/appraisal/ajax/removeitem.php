@@ -22,13 +22,20 @@
  * @subpackage totara_appraisal
  */
 
-require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/config.php');
+require_once(__DIR__ . '/../../../config.php');
 require_once($CFG->dirroot . '/totara/appraisal/lib.php');
+
+// Check if Appraisals are enabled.
+appraisal::check_feature_enabled();
+
+$appraisalreviewdataid = required_param('id', PARAM_INT);
 
 $sytemcontext = context_system::instance();
 $PAGE->set_context($sytemcontext);
+$PAGE->set_url(new moodle_url('/totara/appraisal/ajax/removeitem.php', array('id' => $appraisalreviewdataid)));
 
-$appraisalreviewdataid = required_param('id', PARAM_INT);
+require_login(null, false, null, false, true);
+
 $reviewdata = $DB->get_record('appraisal_review_data', array('id' => $appraisalreviewdataid));
 
 if (!confirm_sesskey()) {

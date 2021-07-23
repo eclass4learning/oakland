@@ -22,14 +22,23 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+$string['anycollection'] = 'Any';
+$string['anytype'] = 'All';
 $string['configtitle'] = 'Block title';
 $string['disabledtags'] = 'Tags are disabled';
-$string['defaultdisplay'] = 'Tag type to display';
+$string['defaultdisplay'] = 'Display tags';
 $string['pluginname'] = 'Tags';
+$string['recursivecontext'] = 'Include child contexts';
+$string['recursivecontext_help'] = 'If unticked, tags of items in the context specified above will be displayed, but not tags of items in lower contexts. For example, course tags may be displayed, but not course activity tags.';
+$string['standardonly'] = 'Only standard';
+$string['tagcollection'] = 'Tag collection';
+$string['tagcollection_help'] = 'Select tag collection to display tags from. If you choose **Any** the tags from all collections except for those marked with * will be displayed.';
+$string['taggeditemscontext'] = 'Tagged items context';
+$string['taggeditemscontext_help'] = 'You can limit the tag cloud to the tags that are present in the current course category, course, or module.';
 $string['tags:addinstance'] = 'Add a new tags block';
 $string['tags:myaddinstance'] = 'Add a new tags block to My learning';
 
-// Deprecated since 3.0
+// Deprecated since 3.0.
 
 $string['add'] = 'Add';
 $string['alltags'] = 'All tags:';
@@ -73,7 +82,7 @@ $string['notagsyet'] = 'No tags yet';
 $string['please'] = 'Please';
 $string['select'] = 'Select...';
 $string['showcoursetags'] = 'Show course tags';
-$string['showcoursetagsdef'] = 'Display the course tagging features in the tags block, allowing students to tag courses.';
+$string['showcoursetagsdef'] = 'Display the course tagging features in the tags block, allowing learners to tag courses.';
 $string['suggestedtagthisunit'] = 'Suggested tag to this course:';
 $string['tags'] = 'tags';
 $string['tagthisunit'] = 'Tag this course:';

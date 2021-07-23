@@ -22,7 +22,11 @@
  * @package modules
  * @subpackage facetoface
  */
+
+use mod_facetoface\task\send_user_message_adhoc_task;
+
 defined('MOODLE_INTERNAL') || die();
+
 require_once($CFG->dirroot . '/totara/message/messagelib.php');
 require_once($CFG->dirroot . '/completion/data_object.php');
 
@@ -68,6 +72,8 @@ define('MDL_F2F_CONDITION_RESERVATION_ALL_CANCELLED',    32768);
 define('MDL_F2F_CONDITION_BOOKING_REQUEST_ROLE',         65536);
 define('MDL_F2F_CONDITION_BOOKING_REQUEST_ADMIN',        131072);
 define('MDL_F2F_CONDITION_BEFORE_REGISTRATION_ENDS',     262144);
+define('MDL_F2F_CONDITION_WAITLIST_AUTOCLEAN',           524288);
+define('MDL_F2F_CONDITION_SESSION_UNDER_CAPACITY',       1048576);
 
 /**
  * Notification sent state
@@ -75,7 +81,6 @@ define('MDL_F2F_CONDITION_BEFORE_REGISTRATION_ENDS',     262144);
 define('MDL_F2F_NOTIFICATION_STATE_NOT_SENT',       0);
 define('MDL_F2F_NOTIFICATION_STATE_PARTIALLY_SENT', 1);
 define('MDL_F2F_NOTIFICATION_STATE_FULLY_SENT',     2);
-
 
 class facetoface_notification extends data_object {
 
@@ -122,8 +127,24 @@ class facetoface_notification extends data_object {
         'templateid' => 0
     );
 
-    public $type;
+    // Required table fields.
+    public $id;
 
+    public $type = MDL_F2F_NOTIFICATION_MANUAL;
+
+    public $title;
+
+    public $body;
+
+    public $courseid;
+
+    public $facetofaceid;
+
+    public $timemodified;
+
+    public $usermodified;
+
+    // Optional table fields.
     public $conditiontype;
 
     public $scheduleunit;
@@ -136,19 +157,11 @@ class facetoface_notification extends data_object {
 
     public $managerprefix;
 
-    public $title;
-
-    public $body;
-
     public $booked;
 
     public $waitlisted;
 
     public $cancelled;
-
-    public $courseid;
-
-    public $facetofaceid;
 
     public $templateid;
 
@@ -156,15 +169,11 @@ class facetoface_notification extends data_object {
 
     public $issent;
 
-    public $timemodified;
-
-    public $usermodified;
-
     private $_event;
 
     private $_facetoface;
 
-    private $_ical_attachment;
+    private $_ical_attachment = null;
 
     /**
      * Finds and returns a data_object instance based on params.
@@ -274,41 +283,37 @@ class facetoface_notification extends data_object {
      * @return  object|false    Recordset or false on error
      */
     private function _get_recipients($sessionid = null) {
-        global $CFG, $MDL_F2F_STATUS, $DB;
+        global $DB;
 
         // Generate WHERE-clause
         $status = array();
         if ($this->booked) {
             switch ((int) $this->booked) {
                 case MDL_F2F_RECIPIENTS_ALLBOOKED:
-                    foreach ($MDL_F2F_STATUS as $key => $string) {
-                        if ($key >= MDL_F2F_STATUS_BOOKED) {
-                            $status[] = $key;
-                        }
-                    }
+                    $status = array_keys(\mod_facetoface\attendees_list_helper::get_status(true));
                     break;
 
                 case MDL_F2F_RECIPIENTS_ATTENDED:
-                    $status[] = MDL_F2F_STATUS_FULLY_ATTENDED;
+                    $status[] = \mod_facetoface\signup\state\fully_attended::get_code();
                     break;
 
                 case MDL_F2F_RECIPIENTS_NOSHOWS:
-                    $status[] = MDL_F2F_STATUS_NO_SHOW;
+                    $status[] = \mod_facetoface\signup\state\no_show::get_code();
                     break;
             }
         }
 
         if ($this->waitlisted) {
-            $status[] = MDL_F2F_STATUS_WAITLISTED;
+            $status[] = \mod_facetoface\signup\state\waitlisted::get_code();
         }
 
         if ($this->cancelled) {
-            $status[] = MDL_F2F_STATUS_USER_CANCELLED;
+            $status[] = \mod_facetoface\signup\state\user_cancelled::get_code();
         }
 
         if ($this->requested) {
-            $status[] = MDL_F2F_STATUS_REQUESTED;
-            $status[] = MDL_F2F_STATUS_REQUESTEDADMIN;
+            $status[] = \mod_facetoface\signup\state\requested::get_code();
+            $status[] = \mod_facetoface\signup\state\requestedadmin::get_code();
         }
 
         $where = 'f.id = ? ';
@@ -524,8 +529,9 @@ class facetoface_notification extends data_object {
         if (!empty(get_config(null, 'facetoface_notificationdisable'))) {
             return;
         }
-
-        mtrace(get_string('signupexpired', 'facetoface'));
+        if (!PHPUNIT_TEST) {
+            mtrace(get_string('signupexpired', 'facetoface'));
+        }
 
         if (empty($CFG->facetoface_session_rolesnotify)) {
             // No roles set.
@@ -562,16 +568,82 @@ class facetoface_notification extends data_object {
             $notice = new facetoface_notification($notificationparams);
 
             // Check notification hasn't already need sent.
-            $notificationhistory = $DB->get_record('facetoface_notification_sent', array('notificationid' => $notice->id, 'sessionid' => $notif->id, 'userid' => $user->id));
-            if ($notificationhistory != null) {
+            $notificationhistory = $DB->get_records('facetoface_notification_sent', array('notificationid' => $notice->id, 'sessionid' => $notif->id, 'userid' => $user->id));
+            if (count($notificationhistory)) {
                 // Notification has already  been sent.
-                return;
+                continue;
             }
 
             $notice->set_facetoface($facetoface);
             $notice->_sessions = facetoface_get_sessions($facetoface->id);
             $notice->set_newevent($user, $notif->id);
             $notice->send_to_user($user, $notif->id);
+        }
+    }
+
+    /**
+     * Sends the Event under capacity notification to users
+     *
+     * @param $session
+     */
+    public function send_notification_session_under_capacity($session) {
+        global $DB, $CFG;
+
+        $roles = $CFG->facetoface_session_rolesnotify;
+
+        $booked = facetoface_get_num_attendees($session->id, \mod_facetoface\signup\state\waitlisted::get_code());
+        if ($booked >= $session->mincapacity) {
+            return;
+        }
+
+        // No cutoff period means the notify bookings email checkbox was not checked.
+        if (empty($session->cutoff)) {
+            return;
+        }
+
+        // We've found a session that has not reached the minimum bookings by the cut-off - time to send out emails.
+        $facetoface = $DB->get_record('facetoface', array('id' => $session->facetoface));
+
+        if (CLI_SCRIPT && !PHPUNIT_TEST) {
+            $info = (object)array(
+                'name' => format_string($facetoface->name),
+                'capacity' => $session->capacity,
+                'mincapacity' => $session->mincapacity,
+                'booked' => $booked,
+            );
+            mtrace("Facetoface '{$info->name}' in course {$facetoface->course} is under minimum bookings - {$info->booked}/{$info->capacity} (min capacity {$info->mincapacity}) - emailing session roles.");
+        }
+
+        // Get all the users who need to receive the under capacity warning.
+        if (!$cm = get_coursemodule_from_instance('facetoface', $facetoface->id, $facetoface->course)) {
+            print_error('error:incorrectcoursemodule', 'facetoface');
+        }
+        $modcontext = context_module::instance($cm->id);
+
+        // Note: remove the true to limit to users with the roles within the module.
+        $recipients = get_role_users(explode(',', $roles), $modcontext, true, 'u.*');
+
+        $notificationparams = array(
+            "facetofaceid" => $session->facetoface,
+            "type" => MDL_F2F_NOTIFICATION_AUTO,
+            "conditiontype" => MDL_F2F_CONDITION_SESSION_UNDER_CAPACITY,
+        );
+
+        // And send them the notification.
+        foreach ($recipients as $recipient) {
+            $notice = new facetoface_notification($notificationparams);
+
+            // Check notification hasn't already need sent.
+            $notificationhistory = $DB->get_record('facetoface_notification_sent', array('notificationid' => $notice->id, 'sessionid' => $session->id, 'userid' => $recipient->id));
+            if ($notificationhistory != null) {
+                // Notification has already  been sent.
+                continue;
+            }
+
+            $notice->set_facetoface($facetoface);
+            $notice->_sessions = facetoface_get_sessions($facetoface->id);
+            $notice->set_newevent($recipient, $session->id);
+            $notice->send_to_user($recipient, $session->id);
         }
     }
 
@@ -621,9 +693,63 @@ class facetoface_notification extends data_object {
         }
     }
 
-
+    /**
+     * Set face-to-face iCal attachment object
+     *
+     * @param $ical_attachment
+     */
     public function set_ical_attachment($ical_attachment) {
         $this->_ical_attachment = $ical_attachment;
+    }
+
+    /**
+     * Generate and add face-to-face iCal attachment
+     *
+     * @param \stdClass $user User object
+     * @param \stdClass $session Session object
+     * @param int $method iCal attachment method
+     * @param \stdClass|array|null $dates Array of session dates, single session date or null to get dates from session object
+     * @param \stdClass|array $olddates Array or a single date to cancel
+     */
+    public function add_ical_attachment($user, $session, $method = MDL_F2F_INVITE, $dates = null, $olddates = []) {
+        if (is_null($dates)) {
+            $dates = $session->sessiondates;
+        }
+
+        $this->set_ical_attachment(
+            \mod_facetoface\messaging::generate_ical($this->_facetoface, $session, $method, $user, $dates, $olddates, $this->_event->fullmessagehtml));
+
+        $this->add_ical_attachment_data();
+    }
+
+    /**
+     * Add iCal attachment if set
+     */
+    private function add_ical_attachment_data() {
+        $ical_uids = null;
+        $ical_method = '';
+
+        if (!empty($this->_ical_attachment) && $this->conditiontype != MDL_F2F_CONDITION_WAITLISTED_CONFIRMATION) {
+            $this->_event->attachment = $this->_ical_attachment->file;
+
+            if ($this->conditiontype == MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION ||
+                $this->conditiontype == MDL_F2F_CONDITION_DECLINE_CONFIRMATION) {
+                $this->_event->attachname = 'cancel.ics';
+            } else {
+                $this->_event->attachname = 'invite.ics';
+            }
+
+            $ical_content = $this->_ical_attachment->content;
+
+            if (!empty($ical_content)) {
+                preg_match_all('/UID:([^\r\n ]+)/si', $ical_content, $matches);
+                $ical_uids = $matches[1];
+                preg_match('/METHOD:([a-z]+)/si', $ical_content, $matches);
+                $ical_method = $matches[1];
+            }
+        }
+        $this->_event->ical_uids  = $ical_uids;
+        $this->_event->ical_method  = $ical_method;
     }
 
     public function set_facetoface($facetoface) {
@@ -637,60 +763,51 @@ class facetoface_notification extends data_object {
     }
 
     /**
-     * Send to a single user
+     * Send to a signup user using adhoc task
      *
-     * @access  public
-     * @param   object  $user       User object
-     * @param   int     $sessionid
-     * @param   int     $sessiondate The specific sessiondate which this message is for.
-     * @return  boolean true if message sent
+     * @param stdClass $user User object
+     * @param int $sessionid
+     * @param stdClass $sessiondate The specific sessiondate which this message is for.
+     * @param array $icaldata   Additional data required to regenerate attachment in adhoc task
+     * @return boolean true if message sent
      */
-    public function send_to_user($user, $sessionid, $sessiondate = null) {
-        global $CFG, $USER, $DB;
+    public function send_to_user($user, $sessionid, $sessiondate = null, array $icaldata = []) {
+        global $CFG, $DB;
 
         // Check that the notification is enabled and that all facetoface notifications are not disabled.
         if (!$this->status || !empty($CFG->facetoface_notificationdisable)) {
             return false;
         }
 
-        $success = message_send($this->_event);
-        if ($success) {
-            if (!empty($sessiondate)) {
-                $uid = (empty($this->_event->ical_uids) ? '' : array_shift($this->_event->ical_uids));
-                $hist = new stdClass();
-                $hist->notificationid = $this->id;
-                $hist->sessionid = $sessionid;
-                $hist->userid = $user->id;
-                $hist->sessiondateid = $sessiondate->id;
-                $hist->ical_uid = $uid;
-                $hist->ical_method = $this->_event->ical_method;
-                $hist->timecreated = time();
-                $DB->insert_record('facetoface_notification_hist', $hist);
-            } else {
-                $dates = $this->_sessions[$sessionid]->sessiondates;
-                foreach ($dates as $session_date) {
-                    $uid = (empty($this->_event->ical_uids) ? '' : array_shift($this->_event->ical_uids));
-                    $hist = new stdClass();
-                    $hist->notificationid = $this->id;
-                    $hist->sessionid = $sessionid;
-                    $hist->userid = $user->id;
-                    $hist->sessiondateid = $session_date->id;
-                    $hist->ical_uid = $uid;
-                    $hist->ical_method = $this->_event->ical_method;
-                    $hist->timecreated = time();
-                    $DB->insert_record('facetoface_notification_hist', $hist);
-                }
-            }
+        $this->send_adhoc_message($this->_event, $user, $sessionid, $icaldata, $sessiondate, false);
 
-            // Mark notification as sent for user.
-            $sent = new stdClass();
-            $sent->sessionid = $sessionid;
-            $sent->notificationid = $this->id;
-            $sent->userid = $user->id;
-            $DB->insert_record('facetoface_notification_sent', $sent);
+        // Add history here to prevent double-queueing of messages.
+        if (!empty($sessiondate)) {
+            $dates = [$sessiondate];
+        } else {
+            $dates = $this->_sessions[$sessionid]->sessiondates;
+        }
+        foreach ($dates as $sessiondate) {
+            $uid = (empty($this->_event->ical_uids) ? '' : array_shift($this->_event->ical_uids));
+            $hist = new stdClass();
+            $hist->notificationid = $this->id;
+            $hist->sessionid = $sessionid;
+            $hist->userid = $user->id;
+            $hist->sessiondateid = $sessiondate->id;
+            $hist->ical_uid = $uid;
+            $hist->ical_method = $this->_event->ical_method;
+            $hist->timecreated = time();
+            $DB->insert_record('facetoface_notification_hist', $hist);
         }
 
-        return !empty($success);
+        // Mark notification as sent for user.
+        $sent = new stdClass();
+        $sent->sessionid = $sessionid;
+        $sent->notificationid = $this->id;
+        $sent->userid = $user->id;
+        $DB->insert_record('facetoface_notification_sent', $sent);
+
+        return true;
     }
 
     /**
@@ -736,10 +853,7 @@ class facetoface_notification extends data_object {
             $this->_facetoface->approvalrole = (int)$DB->get_field('facetoface', 'approvalrole', array('id' => $this->_facetoface->id));
         }
 
-        // If Facetoface from address is set, then all f2f messages should come from there.
-        if (!empty($CFG->facetoface_fromaddress)) {
-            $fromuser = \mod_facetoface\facetoface_user::get_facetoface_user();
-        }
+        $fromuser = \mod_facetoface\facetoface_user::get_facetoface_user();
         // We need a real user id to display an attendee name in task/alert report builder.
         $fromuser->realid = $user->id;
 
@@ -779,6 +893,7 @@ class facetoface_notification extends data_object {
         $this->_event = new stdClass();
         $this->_event->component   = 'totara_message';
         $this->_event->name        = 'alert';
+        $this->_event->courseid    = $this->_facetoface->course;
         $this->_event->userto      = $user;
         $this->_event->userfrom    = $fromuser;
         $this->_event->notification = 1;
@@ -819,35 +934,17 @@ class facetoface_notification extends data_object {
         $this->_event->sendemail = TOTARA_MSG_EMAIL_YES;
         $this->_event->msgtype   = TOTARA_MSG_TYPE_FACE2FACE;
         $this->_event->urgency   = TOTARA_MSG_URGENCY_NORMAL;
-        $ical_content = '';
-        $ical_uids = null;
-        $ical_method = '';
 
-        if (!empty($this->_ical_attachment) && $this->conditiontype != MDL_F2F_CONDITION_WAITLISTED_CONFIRMATION) {
-            $this->_event->attachment = $this->_ical_attachment->file;
-
-            if ($this->conditiontype == MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION ||
-                $this->conditiontype == MDL_F2F_CONDITION_DECLINE_CONFIRMATION) {
-                $this->_event->attachname = 'cancel.ics';
-            } else {
-                $this->_event->attachname = 'invite.ics';
-            }
-
-            $ical_content = $this->_ical_attachment->content;
-
-            if (!empty($ical_content)) {
-                preg_match_all('/UID:([^\r\n ]+)/si', $ical_content, $matches);
-                $ical_uids = $matches[1];
-                preg_match('/METHOD:([a-z]+)/si', $ical_content, $matches);
-                $ical_method = $matches[1];
-            }
+        // This is needed here to preserve the original behaviour of this method.
+        $this->_event->ical_uids  = null;
+        $this->_event->ical_method  = '';
+        if (!is_null($this->_ical_attachment)) {
+            $this->add_ical_attachment_data();
         }
-        $this->_event->ical_uids  = $ical_uids;
-        $this->_event->ical_method  = $ical_method;
     }
 
     /**
-     * Send to a manager
+     * Send to a manager through adhoc task
      *
      * @access  public
      * @param   object  $user       User object
@@ -872,9 +969,6 @@ class facetoface_notification extends data_object {
 
                 $event->userto = $manager;
                 $event->roleid = $CFG->managerroleid;
-                $event->fullmessage       = $event->manager->fullmessage . $event->fullmessage;
-                $event->fullmessagehtml   = $event->manager->fullmessagehtml . $event->fullmessagehtml;
-                $event->smallmessage      = $event->manager->smallmessage . $event->smallmessage;
                 // Do not send iCal attachment.
                 $event->attachment = $event->attachname = null;
 
@@ -894,10 +988,10 @@ class facetoface_notification extends data_object {
                     $event->onreject = $onreject;
 
                     $event->name = 'task';
-                    message_send($event);
+                    $this->send_adhoc_manager_message($event, $user, $sessionid);
                 } else {
                     $event->name = 'alert';
-                    message_send($event);
+                    $this->send_adhoc_manager_message($event, $user, $sessionid);
                 }
             }
         }
@@ -924,19 +1018,18 @@ class facetoface_notification extends data_object {
                 || !empty($this->_facetoface->thirdpartywaitlist))) {
             $event = clone $this->_event;
             $event->attachment = null; // Leave out the ical attachments in the third-parties notification.
-            $event->fullmessage       = $event->manager->fullmessage . $event->fullmessage;
-            $event->fullmessagehtml   = $event->manager->fullmessagehtml . $event->fullmessagehtml;
-            $event->smallmessage      = $event->manager->smallmessage . $event->smallmessage;
+
             $recipients = array_map('trim', explode(',', $this->_facetoface->thirdparty));
             foreach ($recipients as $recipient) {
                 $event->userto = \totara_core\totara_user::get_external_user($recipient);
-                message_send($event);
+                $this->send_adhoc_manager_message($event, $user, $sessionid);
             }
         }
     }
 
     /**
      * Send to users with the appropriate session role to approve
+     * @deprecated since Totara 12
      *
      * @access  public
      * @param   object     $facetoface  The facetoface object
@@ -944,6 +1037,7 @@ class facetoface_notification extends data_object {
      * @return  boolean
      */
     public function send_to_roleapprovers($facetoface, $session) {
+        debugging("Method send_to_roleapprovers is deprecated. Use send_to_roleapprovers_adhoc instead", DEBUG_DEVELOPER);
         if ($this->conditiontype != MDL_F2F_CONDITION_BOOKING_REQUEST_ROLE) {
             return false;
         }
@@ -955,7 +1049,7 @@ class facetoface_notification extends data_object {
         $event->smallmessage      = $event->manager->smallmessage . $event->smallmessage;
         $event->attachment = null; // Leave out the ical attachments for roleapprovers.
 
-        $event->name = 'alert';
+        $event->name = 'task';
 
         // Send the booking request to all users with the approvalrole set in the session.
         $sessionroles = facetoface_get_trainers($session->id, $facetoface->approvalrole);
@@ -972,13 +1066,91 @@ class facetoface_notification extends data_object {
     }
 
     /**
+     * Send to users with the appropriate session role to approve though adhoc task
+     * Rewritten send_to_roleapprovers due to incompatible signature and data duplication in that function.
+     *
+     * @param object $user User object
+     * @param int $sessionid
+     * @return boolean
+     */
+    public function send_to_roleapprovers_adhoc(stdClass $user, int $sessionid) {
+        if ($this->conditiontype != MDL_F2F_CONDITION_BOOKING_REQUEST_ROLE) {
+            return false;
+        }
+
+        $event = clone $this->_event;
+        $event->roleid = $this->_facetoface->approvalrole;
+        $event->attachment = null; // Leave out the ical attachments for roleapprovers.
+
+        $event->name = 'task';
+
+        // Send the booking request to all users with the approvalrole set in the session.
+        $sessionroles = facetoface_get_trainers($sessionid, $this->_facetoface->approvalrole);
+        if (!empty($sessionroles)) {
+            foreach ($sessionroles as $recipient) {
+                if (!empty($recipient)) {
+                    $event->userto = core_user::get_user($recipient->id);
+                    $this->send_adhoc_manager_message($event, $user, $sessionid);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Send message as adhoc task to improve performance and allow user specific formatting.
+     * @param stdClass $event Event message instance
+     * @param stdClass $signupuser User that is subject of booking
+     * @param int $sessionid Event id
+     * @param array $icaldata Additional data required to regenerate attachment in adhoc task
+     * @param stdClass
+     */
+    public function send_adhoc_message(stdClass $event, stdClass $signupuser, int $sessionid, array $icaldata = [],
+                                       stdClass $sessiondate = null, bool $addhistory = false) {
+        $data = new stdClass;
+        $data->id = $this->id;
+        $data->signupuser = $signupuser;
+        $data->sessionid = $sessionid;
+        $data->facetoface = $this->_facetoface;
+        $data->event = $event;
+        $data->sessions = $this->_sessions;
+        $data->title = $this->title;
+        $data->body = $this->body;
+        $data->managerprefix = $this->managerprefix;
+        $data->conditiontype = $this->conditiontype;
+        $data->icaldata = $icaldata;
+        $data->sessiondate = $sessiondate;
+        $data->addhistory = $addhistory;
+        $serialdata = serialize($data);
+
+        $adhocktask = new send_user_message_adhoc_task();
+        $adhocktask->set_custom_data($serialdata);
+        $adhocktask->set_component('mod_facetoface');
+        \core\task\manager::queue_adhoc_task($adhocktask);
+    }
+
+    /**
+     * Send message as adhov task with manager prefix
+     * @param stdClass $event
+     * @param stdClass $signupuser
+     * @param int $sessionid
+     */
+    public function send_adhoc_manager_message(stdClass $event, stdClass $signupuser, int $sessionid) {
+        $event->addmanagerprefix = true;
+        $this->send_adhoc_message($event, $signupuser, $sessionid);
+    }
+
+    /**
      * Send to users set as sitewide or facetoface approvers
      *
+     * @deprecated since Totara 12
      * @access  public
      * @param   object     $facetoface  The facetoface object
      * @return  boolean
      */
     public function send_to_adminapprovers($facetoface) {
+        debugging("Method send_to_adminapprovers is deprecated. Use send_to_adminapprovers_adhoc instead", DEBUG_DEVELOPER);
         if ($this->conditiontype != MDL_F2F_CONDITION_BOOKING_REQUEST_ADMIN) {
             return false;
         }
@@ -989,7 +1161,7 @@ class facetoface_notification extends data_object {
         $event->smallmessage      = $event->manager->smallmessage . $event->smallmessage;
         $event->attachment = null; // Leave out the ical attachments for adminapprovers.
 
-        $event->name = 'alert';
+        $event->name = 'task';
 
         // Send the booking request to all site & activity level adminapprovers.
         $systemapprovers = get_users_from_config(get_config(null, 'facetoface_adminapprovers'), 'mod/facetoface:approveanyrequest');
@@ -1009,6 +1181,40 @@ class facetoface_notification extends data_object {
         }
 
         return true;
+    }
+
+    /**
+     * Send to users with the appropriate session role to approve though adhoc task
+     * Rewritten send_to_adminapprovers due to incompatible signature and data duplication in that function.
+     *
+     * @param object $user User object
+     * @param int $sessionid
+     */
+    public function send_to_adminapprovers_adhoc(stdClass $user, int $sessionid) {
+        if ($this->conditiontype != MDL_F2F_CONDITION_BOOKING_REQUEST_ADMIN) {
+            return false;
+        }
+
+        $event = clone $this->_event;
+        $event->attachment = null; // Leave out the ical attachments for adminapprovers.
+        $event->name = 'task';
+
+        // Send the booking request to all site & activity level adminapprovers.
+        $systemapprovers = get_users_from_config(get_config(null, 'facetoface_adminapprovers'), 'mod/facetoface:approveanyrequest');
+        foreach ($systemapprovers as $approver) {
+            if (!empty($approver)) {
+                $event->userto = $approver;
+                $this->send_adhoc_manager_message($event, $user, $sessionid);
+            }
+        }
+
+        $activityapprovers = explode(',', $this->_facetoface->approvaladmins);
+        foreach ($activityapprovers as $approver) {
+            if (!empty($approver)) {
+                $event->userto = core_user::get_user($approver);
+                $this->send_adhoc_manager_message($event, $user, $sessionid);
+            }
+        }
     }
 
     /**
@@ -1129,10 +1335,6 @@ class facetoface_notification extends data_object {
      * @throws moodle_exception
      */
     public static function set_from_form(facetoface_notification $instance, stdClass $params) {
-        // Manually check the length of the title and throw an exception if its too long.
-        if (isset($params->title) && core_text::strlen($params->title) > 255) {
-            throw new moodle_exception('error:notificationtitletoolong', 'mod_facetoface');
-        }
         parent::set_properties($instance, $params);
     }
 
@@ -1161,6 +1363,74 @@ class facetoface_notification extends data_object {
 
         return false;
     }
+
+    /**
+     * All notification references list.
+     *
+     * @return array notification references
+     */
+    public static function get_references() {
+        return array(
+            'reminder' => MDL_F2F_CONDITION_BEFORE_SESSION,
+            'confirmation' => MDL_F2F_CONDITION_BOOKING_CONFIRMATION,
+            'cancellation' => MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION,
+            'decline' => MDL_F2F_CONDITION_DECLINE_CONFIRMATION,
+            'waitlist' => MDL_F2F_CONDITION_WAITLISTED_CONFIRMATION,
+            'request' => MDL_F2F_CONDITION_BOOKING_REQUEST_MANAGER,
+            'timechange' => MDL_F2F_CONDITION_SESSION_DATETIME_CHANGE,
+            'trainerconfirm' => MDL_F2F_CONDITION_TRAINER_CONFIRMATION,
+            'trainercancel' => MDL_F2F_CONDITION_TRAINER_SESSION_CANCELLATION,
+            'trainerunassign' => MDL_F2F_CONDITION_TRAINER_SESSION_UNASSIGNMENT,
+            'registrationexpired' => MDL_F2F_CONDITION_REGISTRATION_DATE_EXPIRED,
+            'sessioncancellation' => MDL_F2F_CONDITION_SESSION_CANCELLATION,
+            'reservationcancel' => MDL_F2F_CONDITION_RESERVATION_CANCELLED,
+            'allreservationcancel' => MDL_F2F_CONDITION_RESERVATION_ALL_CANCELLED,
+            'rolerequest' => MDL_F2F_CONDITION_BOOKING_REQUEST_ROLE,
+            'adminrequest' => MDL_F2F_CONDITION_BOOKING_REQUEST_ADMIN,
+            'registrationclosure' => MDL_F2F_CONDITION_BEFORE_REGISTRATION_ENDS,
+            'waitlistautoclean' => MDL_F2F_CONDITION_WAITLIST_AUTOCLEAN,
+            'undercapacity' => MDL_F2F_CONDITION_SESSION_UNDER_CAPACITY,
+        );
+    }
+}
+
+/**
+ * Check whether seminar notification is active
+ *
+ * @param int|\stdClass $notification Notification object or condition type
+ * @param int|\stdClass|null $f2f Required if notification passed as condition type
+ * @param bool $checkglobal A flag to check whether all notifications are disabled
+ * @return bool
+ * @throws coding_exception
+ */
+function facetoface_is_notification_active($notification, $f2f = null, $checkglobal = false) {
+    global $DB, $CFG;
+
+    if ($checkglobal && !empty($CFG->facetoface_notificationdisable)) {
+        return false;
+    }
+
+    if (!($notification instanceof facetoface_notification)) {
+
+        // If only notification type passed to the function, fetching it from the database.
+        // Facetoface object is expected here we can not enforce it.
+        if (is_object($f2f)) {
+            $f2f = $f2f->id;
+        }
+
+        if (!is_int($notification) && !(is_string($notification))) {
+            throw new coding_exception('$notification is expected to be an instance of ' .
+                '"facetoface_notification" or int, "' . gettype($notification) . '" is given.');
+        }
+
+        return !!$DB->get_field('facetoface_notification', 'status', [
+            'facetofaceid' => $f2f,
+            'conditiontype' => intval($notification)
+        ]);
+    }
+
+    return !!$notification->status;
+
 }
 
 /**
@@ -1204,9 +1474,19 @@ function facetoface_send_notice($facetoface, $session, $userid, $params, $icalat
         return false;
     }
 
-    $user = $DB->get_record('user', array('id' => $userid));
+    $user = $DB->get_record('user', array('id' => $userid, 'deleted' => 0));
     if (!$user) {
         return 'userdoesnotexist';
+    }
+
+    // If checkbox option is not present here then it means, perversely, that it was checked on the confirmation form.
+    // This matters when we arrive here via adhoc task running in cron.
+    if (!isset($session->notifyuser)) {
+        $session->notifyuser = true;
+    }
+
+    if (!isset($session->notifymanager)) {
+        $session->notifymanager = true;
     }
 
     // Make it not fail if more then one notification found. Just use one.
@@ -1223,10 +1503,12 @@ function facetoface_send_notice($facetoface, $session, $userid, $params, $icalat
     // dates and it allows people to sign up to those sessions. In this cases,
     // the sign ups still need to get email notifications; hence the checking of
     // the existence of dates before allowing the send one email per day part.
+    // Note, that's not always the case, if all dates have been deleted from a
+    // seminar event we still need to send the emails to cancel the dates,
+    // thus need to check whether old dates have been supplied.
     $session = facetoface_notification_session_dates($session);
     if (get_config(null, 'facetoface_oneemailperday')
-        && isset($session->sessiondates)
-        && count($session->sessiondates) > 0) {
+        && !(empty($session->sessiondates) && empty($olddates))) {
         return facetoface_send_oneperday_notice($facetoface, $session, $userid, $params, $icalattachmenttype, $icalattachmentmethod, $fromuser, $olddates);
     }
 
@@ -1236,22 +1518,26 @@ function facetoface_send_notice($facetoface, $session, $userid, $params, $icalat
     }
     $notice->set_facetoface($facetoface);
 
-    if (!isset($session->notifyuser)) {
-        $session->notifyuser = true;
+    $notice->set_newevent($user, $session->id, null, $fromuser);
+    $icaldata = [];
+    if ((int)$icalattachmenttype == MDL_F2F_BOTH && $notice->conditiontype != MDL_F2F_CONDITION_DECLINE_CONFIRMATION) {
+        $notice->add_ical_attachment($user, $session, $icalattachmentmethod, null, $olddates);
+        $icaldata = [
+            'dates' => $session->sessiondates,
+            'olddates' => $olddates,
+            'method' => $icalattachmentmethod
+        ];
     }
 
-    if ((int)$icalattachmenttype == MDL_F2F_BOTH) {
-        $ical_attach = facetoface_get_ical_attachment($icalattachmentmethod, $facetoface, $session, $userid, $olddates);
-        $notice->set_ical_attachment($ical_attach);
-    }
-    $notice->set_newevent($user, $session->id, null, $fromuser);
     if ($session->notifyuser) {
-        $notice->send_to_user($user, $session->id);
+        $notice->send_to_user($user, $session->id, null, $icaldata);
     }
-    $notice->send_to_manager($user, $session->id);
+    if ($session->notifymanager) {
+        $notice->send_to_manager($user, $session->id);
+    }
     $notice->send_to_thirdparty($user, $session->id);
-    $notice->send_to_roleapprovers($facetoface, $session);
-    $notice->send_to_adminapprovers($facetoface);
+    $notice->send_to_roleapprovers_adhoc($user, $session->id);
+    $notice->send_to_adminapprovers_adhoc($user, $session->id);
     $notice->delete_ical_attachment();
 
     return '';
@@ -1260,8 +1546,8 @@ function facetoface_send_notice($facetoface, $session, $userid, $params, $icalat
 /**
  * Send a notice (one message per session date).
  *
- * @param class $facetoface record from the facetoface table
- * @param class $session record from the facetoface_sessions table
+ * @param stdClass $facetoface record from the facetoface table
+ * @param stdClass $session record from the facetoface_sessions table
  * @param integer $userid ID of the recipient of the email
  * @param array $params The parameters for the notification
  * @param int $icalattachmenttype The ical attachment type, or MDL_F2F_TEXT to disable ical attachments
@@ -1270,7 +1556,7 @@ function facetoface_send_notice($facetoface, $session, $userid, $params, $icalat
  * @param array $olddates array of previous dates
  * @return string Error message (or empty string if successful)
  */
-function facetoface_send_oneperday_notice($facetoface, $session, $userid, $params, $icalattachmenttype = MDL_F2F_TEXT, $icalattachmentmethod = MDL_F2F_INVITE, $fromuser = null, array $olddates = array()) {
+function facetoface_send_oneperday_notice($facetoface, $session, $userid, $params, $icalattachmenttype = MDL_F2F_TEXT, $icalattachmentmethod = MDL_F2F_INVITE, $fromuser = null, array $olddates = []) {
     global $DB, $CFG;
 
     $notificationdisable = get_config(null, 'facetoface_notificationdisable');
@@ -1283,68 +1569,74 @@ function facetoface_send_oneperday_notice($facetoface, $session, $userid, $param
         return 'userdoesnotexist';
     }
 
-    if (!isset($session->notifyuser)) {
-        $session->notifyuser = true;
-    }
-
     $session = facetoface_notification_session_dates($session);
 
-    // Keep track of all sessiondates.
-    $sessiondates = $session->sessiondates;
-    // We need to consider old dates (cancel them if no new date exist for their dates).
-    $maxdates = max(count($sessiondates), count($olddates));
-    if ($maxdates == 0) {
-        return '';
-    }
+    // Filtering dates.
+    // "Key by" date id.
+    $get_id = function($item) {
+        return $item->id;
+    };
+    $olds = array_combine(array_map($get_id, $olddates), $olddates);
 
-    for ($i = 0; $i < $maxdates; $i++) {
-        if (isset($sessiondates[$i])) {
+    $dates = array_filter($session->sessiondates, function($date) use (&$olds) {
+        if (isset($olds[$date->id])) {
+            $old = $olds[$date->id];
+            unset($olds[$date->id]);
+            if ($old->sessiontimezone == $date->sessiontimezone &&
+                $old->timestart == $date->timestart &&
+                $old->timefinish == $date->timefinish &&
+                $old->roomid == $date->roomid) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    $send = function($dates, $cancel = false) use ($facetoface, $session, $icalattachmenttype, $icalattachmentmethod, $user, $params, $CFG) {
+        foreach ($dates as $date) {
+
+            if ($cancel) {
+                $params['conditiontype'] = MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION;
+            }
+
+            $sendical =  (int)$icalattachmenttype == MDL_F2F_BOTH &&
+                (!$cancel || ($cancel && empty($CFG->facetoface_disableicalcancel)));
+
             $notice = new facetoface_notification($params);
+
             if (isset($facetoface->ccmanager)) {
                 $notice->ccmanager = $facetoface->ccmanager;
             }
             $notice->set_facetoface($facetoface);
-            if ((int)$icalattachmenttype == MDL_F2F_BOTH) {
-                $ical_attach = facetoface_get_ical_attachment($icalattachmentmethod, $facetoface, $session, $userid, $olddates, $i);
-                $notice->set_ical_attachment($ical_attach);
+            // Send original notice for this date.
+            $notice->set_newevent($user, $session->id, $date);
+            $icaldata = [];
+            if ($sendical) {
+                $notice->add_ical_attachment($user, $session, $icalattachmentmethod, !$cancel ? $date : [], $cancel ? $date : []);
+                $icaldata = [
+                    'dates' => !$cancel ? $date : [],
+                    'olddates' => $cancel ? $date : [],
+                    'method' => $icalattachmentmethod
+                ];
             }
-            $sessiondate = $sessiondates[$i];
-            // Send original notice for this date
-            $notice->set_newevent($user, $session->id, $sessiondate);
             if ($session->notifyuser) {
-                $notice->send_to_user($user, $session->id, $sessiondate);
+                $notice->send_to_user($user, $session->id, $date, $icaldata);
+            }
+            if ($session->notifymanager) {
+                $notice->send_to_manager($user, $session->id);
             }
 
-            $notice->send_to_manager($user, $session->id);
             $notice->send_to_thirdparty($user, $session->id);
-            $notice->send_to_roleapprovers($facetoface, $session);
-            $notice->send_to_adminapprovers($facetoface);
+            $notice->send_to_roleapprovers_adhoc($user, $session->id);
+            $notice->send_to_adminapprovers_adhoc($user, $session->id);
 
             $notice->delete_ical_attachment();
-        } else {
-            // Send cancel notice.
-            $cancelparams = $params;
-            $cancelparams['conditiontype'] = MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION;
-            $cancelnotice = new facetoface_notification($cancelparams);
-            if (isset($facetoface->ccmanager)) {
-                $cancelnotice->ccmanager = $facetoface->ccmanager;
-            }
-            if ((int)$icalattachmenttype == MDL_F2F_BOTH && empty($CFG->facetoface_disableicalcancel)) {
-                $ical_attach = facetoface_get_ical_attachment($icalattachmentmethod, $facetoface, $session, $userid, $olddates, $i);
-                $cancelnotice->set_ical_attachment($ical_attach);
-            }
-            $cancelnotice->set_facetoface($facetoface);
-            $cancelnotice->set_newevent($user, $session->id);
-            if ($session->notifyuser) {
-                $cancelnotice->send_to_user($user, $session->id);
-            }
-            $cancelnotice->send_to_manager($user, $session->id);
-            $cancelnotice->send_to_thirdparty($user, $session->id);
-            $cancelnotice->send_to_roleapprovers($facetoface, $session);
-            $cancelnotice->send_to_adminapprovers($facetoface);
-            $cancelnotice->delete_ical_attachment();
         }
-    }
+    };
+
+    $send($dates);
+    $send($olds, true);
 
     return '';
 }
@@ -1353,14 +1645,17 @@ function facetoface_send_oneperday_notice($facetoface, $session, $userid, $param
  * Send a confirmation email to the user and manager regarding the
  * cancellation
  *
- * @param class $facetoface record from the facetoface table
- * @param class $session record from the facetoface_sessions table
+ * @param \stdClass $facetoface record from the facetoface table
+ * @param \stdClass $session record from the facetoface_sessions table
  * @param integer $userid ID of the recipient of the email
  * @param integer $conditiontype Optional override of the standard cancellation confirmation
+ * @param bool $invite flag whether to include iCal invitation
  * @returns string Error message (or empty string if successful)
+ * @deprecated Since Totara 12.0
  */
-function facetoface_send_cancellation_notice($facetoface, $session, $userid, $conditiontype = MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION) {
+function facetoface_send_cancellation_notice($facetoface, $session, $userid, $conditiontype = MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION, $invite = true) {
     global $CFG;
+    debugging('facetoface_send_cancellation_notice() function has been deprecated, please use notice_sender::signup_cancellation_notice() or notice_sender::event_cancellation_notice()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1368,7 +1663,7 @@ function facetoface_send_cancellation_notice($facetoface, $session, $userid, $co
         'conditiontype' => $conditiontype
     );
 
-    $includeical = empty($CFG->facetoface_disableicalcancel);
+    $includeical = empty($CFG->facetoface_disableicalcancel) && $invite;
     return facetoface_send_notice($facetoface, $session, $userid, $params, $includeical ? MDL_F2F_BOTH : MDL_F2F_TEXT, MDL_F2F_CANCEL);
 }
 
@@ -1380,9 +1675,11 @@ function facetoface_send_cancellation_notice($facetoface, $session, $userid, $co
  * @param class $session record from the facetoface_sessions table
  * @param integer $userid ID of the recipient of the email
  * @returns string Error message (or empty string if successful)
+ * @deprecated Since Totara 12.0
  */
 function facetoface_send_decline_notice($facetoface, $session, $userid) {
     global $CFG;
+    debugging('facetoface_send_decline_notice() function has been deprecated, please use notice_sender::decline()', DEBUG_DEVELOPER);
 
     $params = array(
             'facetofaceid'  => $facetoface->id,
@@ -1398,14 +1695,16 @@ function facetoface_send_decline_notice($facetoface, $session, $userid) {
  * Send a email to the user and manager regarding the
  * session date/time change
  *
- * @param class $facetoface record from the facetoface table
- * @param class $session record from the facetoface_sessions table
+ * @param \stdClass $facetoface record from the facetoface table
+ * @param \stdClass $session record from the facetoface_sessions table
  * @param integer $userid ID of the recipient of the email
  * @param array $olddates array of previous dates
+ * @param bool $invite flag whether to include iCal invitation
  * @returns string Error message (or empty string if successful)
+ * @deprecated Since Totara 12.0
  */
-function facetoface_send_datetime_change_notice($facetoface, $session, $userid, $olddates) {
-    global $DB;
+function facetoface_send_datetime_change_notice($facetoface, $session, $userid, $olddates, $invite = true) {
+    debugging('facetoface_send_datetime_change_notice() function has been deprecated, please use notice_sender::event_datetime_changed() or notice_sender::signup_datetime_changed()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1413,7 +1712,9 @@ function facetoface_send_datetime_change_notice($facetoface, $session, $userid, 
         'conditiontype' => MDL_F2F_CONDITION_SESSION_DATETIME_CHANGE
     );
 
-    return facetoface_send_notice($facetoface, $session, $userid, $params, MDL_F2F_BOTH, MDL_F2F_INVITE, null, $olddates);
+    $invite = $invite ? MDL_F2F_BOTH : MDL_F2F_TEXT;
+
+    return facetoface_send_notice($facetoface, $session, $userid, $params, $invite, MDL_F2F_INVITE, null, $olddates);
 }
 
 
@@ -1427,9 +1728,10 @@ function facetoface_send_datetime_change_notice($facetoface, $session, $userid, 
  * @param boolean $iswaitlisted If the user has been waitlisted
  * @param object $fromuser User object describing who the email is from.
  * @returns string Error message (or empty string if successful)
+ * @deprecated Since Totara 12.0
  */
 function facetoface_send_confirmation_notice($facetoface, $session, $userid, $notificationtype, $iswaitlisted, $fromuser = null) {
-    global $DB;
+    debugging('facetoface_send_confirmation_notice() function has been deprecated, please use notice_sender::confirm_booking() or notice_sender::confirm_waitlist()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1454,9 +1756,10 @@ function facetoface_send_confirmation_notice($facetoface, $session, $userid, $no
  * @param integer $userid ID of the recipient of the email
  * @param integer $notificationtype Type of notifications to be sent @see {{MDL_F2F_INVITE}}
  * @returns string Error message (or empty string if successful)
+ * @deprecated Since Totara 12.0
  */
 function facetoface_send_trainer_confirmation_notice($facetoface, $session, $userid) {
-    global $DB;
+    debugging('facetoface_send_trainer_confirmation_notice() function has been deprecated, please use notice_sender::trainer_confirmation()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1476,9 +1779,10 @@ function facetoface_send_trainer_confirmation_notice($facetoface, $session, $use
  * @param integer $userid ID of the recipient of the email
  * @param integer $notificationtype Type of notifications to be sent @see {{MDL_F2F_INVITE}}
  * @returns string Error message (or empty string if successful)
+ * @deprecated Since Totara 12.0
  */
 function facetoface_send_trainer_session_cancellation_notice($facetoface, $session, $userid) {
-    global $DB;
+    debugging('facetoface_send_trainer_session_cancellation_notice() function has been deprecated, please use notice_sender::event_trainer_cancellation()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1498,9 +1802,10 @@ function facetoface_send_trainer_session_cancellation_notice($facetoface, $sessi
  * @param integer $userid ID of the recipient of the email
  * @param integer $notificationtype Type of notifications to be sent @see {{MDL_F2F_INVITE}}
  * @returns string Error message (or empty string if successful)
+ * @deprecated Since Totara 12.0
  */
 function facetoface_send_trainer_session_unassignment_notice($facetoface, $session, $userid) {
-    global $DB;
+    debugging('facetoface_send_trainer_session_unassignment_notice() function has been deprecated, please use notice_sender::event_trainer_unassigned()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1511,7 +1816,6 @@ function facetoface_send_trainer_session_unassignment_notice($facetoface, $sessi
     return facetoface_send_notice($facetoface, $session, $userid, $params, MDL_F2F_BOTH, MDL_F2F_CANCEL);
 }
 
-
 /**
  * Send booking request notice to user and their manager
  *
@@ -1519,9 +1823,12 @@ function facetoface_send_trainer_session_unassignment_notice($facetoface, $sessi
  * @param   object  $session    Session instance
  * @param   int     $userid     ID of user requesting booking
  * @return  string  Error string, empty on success
+ * @deprecated since Totara 12.0
  */
 function facetoface_send_request_notice($facetoface, $session, $userid) {
     global $DB;
+
+    debugging('facetoface_send_request_notice() function has been deprecated, please use notice_sender::request_manager()', DEBUG_DEVELOPER);
 
     $params = array('userid' => $userid, 'sessionid' => $session->id);
     $jobassignmentid = $DB->get_field('facetoface_signups', 'jobassignmentid', $params);
@@ -1546,13 +1853,13 @@ function facetoface_send_request_notice($facetoface, $session, $userid) {
 
 /**
  * Send booking request notice to user and all users with the specified sessionrole
- *
  * @param object $facetoface    Facetoface instance
  * @param object $session       Session instance
  * @param int    $recipientid   The id of the user requesting a booking
+ * @deprecated since Totara 12.0
  */
 function facetoface_send_rolerequest_notice($facetoface, $session, $recipientid) {
-    global $DB, $USER;
+    debugging('facetoface_send_rolerequest_notice() function has been deprecated, please use notice_sender::request_role()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1570,9 +1877,10 @@ function facetoface_send_rolerequest_notice($facetoface, $session, $recipientid)
  * @param object $session       Session instance
  * @param array  $admins        An array of admin userids
  * @param int    $recipientid   The id of the user requesting a booking
+ * @deprecated Since Totara 12.0
  */
 function facetoface_send_adminrequest_notice($facetoface, $session, $recipientid) {
-    global $DB, $USER;
+    debugging('facetoface_send_adminrequest_notice() function has been deprecated, please use notice_sender::request_admin()', DEBUG_DEVELOPER);
 
     $params = array(
         'facetofaceid'  => $facetoface->id,
@@ -1612,9 +1920,6 @@ function facetoface_send_registration_closure_notice($facetoface, $session, $rec
 
     $notice = new facetoface_notification($params);
     $notice->set_newevent($recipient, $session->id, null, $USER);
-
-//    $notice->_event->name = 'alert';
-
     $notice->send_to_user($recipient, $session->id);
     $notice->send_to_manager($recipient, $session->id);
 
@@ -1647,12 +1952,20 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
         return '';
     }
 
+    // Provides facetoface_cost() and facetoface_get_num_attendees()
+    require_once($CFG->dirroot.'/mod/facetoface/lib.php');
+
     // Get timezone setting.
     $displaytimezones = get_config(null, 'facetoface_displaysessiontimezones');
     $str_unknowndate = get_string('unknowndate', 'facetoface');
     $str_unknowntime = get_string('unknowntime', 'facetoface');
 
+    // Get number booked if possible
+    $booked = facetoface_get_num_attendees($data->id, \mod_facetoface\signup\state\waitlisted::get_code());
+
     if (!empty($data->sessiondates)) {
+        // Replacing the ['eventperiod'] here to the default [starttime]-[finishtime], [sessiondate]
+        $msg = str_replace("[eventperiod]", "[starttime]-[finishtime], [sessiondate]", $msg);
         // Scheduled session
         $strftimedate = get_string('strftimedate');
         $strftimetime = get_string('strftimetime');
@@ -1671,6 +1984,9 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
         $latestfinishdate = userdate(end($data->sessiondates)->timefinish, $strftimedate, $sessiontimezone);
         $data->duration = format_time((int)$data->sessiondates[0]->timestart - (int)end($data->sessiondates)->timefinish);
     } else {
+        // If it is a waitlist session, make it as a tbd title here
+        $unknownperiod = get_string("locationtimetbd", 'facetoface');
+        $msg = str_replace("[eventperiod]", strtolower($unknownperiod), $msg);
         // Wait-listed session
         $startdate   = $str_unknowndate;
         $finishdate  = $str_unknowndate;
@@ -1684,19 +2000,15 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
         $data->duration = '';
     }
 
+    $rolename = '';
     if (!empty($approvalrole)) {
         $rolenames = role_fix_names(get_all_roles());
         $rolename = $rolenames[$approvalrole]->localname;
-        // Replace.
-        $msg = str_replace('[sessionrole]', $rolename, $msg);
-        // Legacy.
-        $msg = str_replace(get_string('placeholder:sessionrole', 'facetoface'), $rolename, $msg);
-    } else {
-        // Replace.
-        $msg = str_replace('[sessionrole]', '', $msg);
-        // Legacy.
-        $msg = str_replace(get_string('placeholder:sessionrole', 'facetoface'), '', $msg);
     }
+    // Replace.
+    $msg = str_replace('[sessionrole]', $rolename, $msg);
+    // Legacy.
+    $msg = str_replace(get_string('placeholder:sessionrole', 'facetoface'), $rolename, $msg);
 
     // Replace placeholders with values
     $msg = str_replace('[coursename]', $coursename, $msg);
@@ -1714,6 +2026,9 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
     $msg = str_replace('[latestfinishtime]', $latestfinishtime, $msg);
     $msg = str_replace('[latestfinishdate]', $latestfinishdate, $msg);
     $msg = str_replace('[duration]', $data->duration, $msg);
+    $msg = str_replace('[booked]', $booked, $msg);
+    $msg = str_replace('[capacity]', $data->capacity, $msg);
+    $msg = str_replace('[mincapacity]', $data->mincapacity, $msg);
     // Legacy.
     $msg = str_replace(get_string('placeholder:coursename', 'facetoface'), $coursename, $msg);
     $msg = str_replace(get_string('placeholder:facetofacename', 'facetoface'), $facetofacename, $msg);
@@ -1730,6 +2045,9 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
     $msg = str_replace(get_string('placeholder:latestfinishtime', 'facetoface'), $latestfinishtime, $msg);
     $msg = str_replace(get_string('placeholder:latestfinishdate', 'facetoface'), $latestfinishdate, $msg);
     $msg = str_replace(get_string('placeholder:duration', 'facetoface'), $data->duration, $msg);
+    $msg = str_replace(get_string('placeholder:booked', 'facetoface'), $booked, $msg);
+    $msg = str_replace(get_string('placeholder:capacity', 'facetoface'), $data->capacity, $msg);
+    $msg = str_replace(get_string('placeholder:mincapacity', 'facetoface'), $data->mincapacity, $msg);
 
     if (!empty($data->registrationtimefinish)) {
         $registrationcutoff = userdate($data->registrationtimefinish, get_string('strftimerecent'));
@@ -1744,14 +2062,32 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
     // Legacy.
     $msg = str_replace(get_string('placeholder:registrationcutoff', 'facetoface'), $registrationcutoff, $msg);
 
-    $rooms = facetoface_get_session_rooms($data->id);
-    // Get data for room custom fields.
-    $roomcustomfields = array();
-    foreach($rooms as $room) {
-        $roomcustomfields[$room->id] = customfield_get_data($room, 'facetoface_room', 'facetofaceroom', false);
+    $roomcf = array();
+    $roomlist = \mod_facetoface\room_list::get_event_rooms($data->id);
+    if ($roomlist->is_empty()) {
+        // If the roomlist is empty, then we start checking roomid within session dates of an event/session, because the custom
+        // room would have been removed from session date in the database at this point, whenever an event is cancelled.
+        if (isset($data->sessiondates) && is_array($data->sessiondates)) {
+            foreach ($data->sessiondates as $sessiondate) {
+                if (empty($sessiondate->roomid)) {
+                    continue;
+                }
+
+                $room = \mod_facetoface\room::find($sessiondate->roomid);
+                if (!$room->exists()) {
+                    continue;
+                }
+
+                $roomlist->add($room);
+            }
+        }
     }
-    $msg = facetoface_notification_loop_session_placeholders($msg, $data, $rooms, $roomcustomfields, $user);
-    $msg = facetoface_notification_substitute_deprecated_placeholders($msg, $data, $rooms, $roomcustomfields);
+
+    foreach ($roomlist as $room) {
+        $roomcf[$room->get_id()] = customfield_get_data($room->to_record(), 'facetoface_room', 'facetofaceroom', false);
+    }
+    $msg = facetoface_notification_loop_session_placeholders($msg, $data, $roomlist, $roomcf, $user);
+    $msg = facetoface_notification_substitute_deprecated_placeholders($msg, $data, $roomlist, $roomcf);
 
     $details = '';
     if (!empty($data->details)) {
@@ -1767,7 +2103,7 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
     $msg = str_replace(get_string('placeholder:details', 'facetoface'), $details, $msg);
 
     // Replace more meta data
-    $attendees_url = new moodle_url('/mod/facetoface/attendees.php', array('s' => $data->id, 'action' => 'approvalrequired'));
+    $attendees_url = new moodle_url('/mod/facetoface/attendees/approvalrequired.php', array('s' => $data->id));
     $link = html_writer::link($attendees_url, $attendees_url, array('title' => get_string('attendees', 'facetoface')));
     // Replace.
     $msg = str_replace('[attendeeslink]', $link, $msg);
@@ -1820,7 +2156,7 @@ function facetoface_message_substitutions($msg, $coursename, $facetofacename, $u
  * @param stdClass $user - an object of user detail information
  * @return string the message with the looped replacements added.
  */
-function facetoface_notification_loop_session_placeholders($msg, $session, $rooms = array(), $roomcustomfields = array(), $user = null) {
+function facetoface_notification_loop_session_placeholders($msg, $session, $rooms = null, $roomcustomfields = array(), $user = null) {
     global $DB;
 
     $prevendposition = 0;
@@ -1848,8 +2184,7 @@ function facetoface_notification_loop_session_placeholders($msg, $session, $room
         }
 
         if (empty($rooms)) {
-            // $rooms may be empty with value of false or null, in which case, we want to use an empty array.
-            $rooms = array();
+            $rooms = new \mod_facetoface\room_list('', ['id' => 0]);
         }
 
         // Get the segment that will be repeated for each session.
@@ -1922,14 +2257,14 @@ function facetoface_notification_loop_session_placeholders($msg, $session, $room
                         $value = format_time((int)$sessiondate->timestart - (int)$sessiondate->timefinish);
                         break;
                     case 'room:name':
-                        if (!empty($sessiondate->roomid) && isset($rooms[$sessiondate->roomid])) {
-                            $room = $rooms[$sessiondate->roomid];
-                            $value = $room->name;
+                        if (!empty($sessiondate->roomid) && $rooms->contains($sessiondate->roomid)) {
+                            $room = $rooms->get($sessiondate->roomid);
+                            $value = $room->get_name();
                         }
                         break;
                     case 'room:link':
                         if (!empty($sessiondate->roomid)) {
-                            $roomdetailsurl = new moodle_url('/mod/facetoface/room.php', ['roomid' => $sessiondate->roomid]);
+                            $roomdetailsurl = new moodle_url('/mod/facetoface/reports/rooms.php', ['roomid' => $sessiondate->roomid]);
                             $value = html_writer::link($roomdetailsurl, $roomdetailsurl, ['title' => get_string('roomdetails', 'facetoface')]);
                         }
                         break;
@@ -1944,7 +2279,7 @@ function facetoface_notification_loop_session_placeholders($msg, $session, $room
             }
             foreach ($room_cf_placeholders as $type => $room_cf_placeholder) {
                 $value = '';
-                if (!empty($sessiondate->roomid) && isset($rooms[$sessiondate->roomid])) {
+                if (!empty($sessiondate->roomid) && $rooms->contains($sessiondate->roomid)) {
                     if (!empty($roomcustomfields[$sessiondate->roomid][$type])) {
                         $value = $roomcustomfields[$sessiondate->roomid][$type];
                     }
@@ -1984,8 +2319,6 @@ function facetoface_message_substitutions_userfields($msg, $user) {
         'address' => '[address]', 'url' => '[url]', 'description' => '[description]');
     $fields = array_keys($placeholders);
 
-    // TODO: This is highly unreliable part, as placeholders are really static. We need to remove this in future versions
-    // TODO: and just replace all supported fields.
     $usernamefields = get_all_user_name_fields();
     $fields = array_merge($fields, array_values($usernamefields));
 
@@ -2088,11 +2421,12 @@ function facetoface_notification_substitute_deprecated_placeholders($msg, $sessi
 
     // Reset returns the first value in the sessiondates array.
     $firstsessiondate = reset($session->sessiondates);
-    if (!empty($firstsessiondate->roomid) && isset($rooms[$firstsessiondate->roomid])) {
-        $room = $rooms[$firstsessiondate->roomid];
-        if (isset($room->name)) {
-            $roomnamevalue = $room->name;
+    if (!empty($firstsessiondate->roomid) && $rooms->contains($firstsessiondate->roomid)) {
+        $room = $rooms->get($firstsessiondate->roomid);
+        if (!empty($room->get_name())) {
+            $roomnamevalue = $room->get_name();
         }
+
         if (isset($roomcustomfields[$firstsessiondate->roomid])) {
             $roomcf = $roomcustomfields[$firstsessiondate->roomid];
         }
@@ -2220,6 +2554,7 @@ function facetoface_get_default_notifications($facetofaceid) {
             $template->id = $rec->id;
             $template->title = $rec->title;
             $template->body = $rec->body;
+            $template->ccmanager = $rec->ccmanager;
             $template->managerprefix = $rec->managerprefix;
             $template->status = $rec->status;
             $templates[$rec->reference] = $template;
@@ -2254,7 +2589,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $confirmation->body = $template->body;
         $confirmation->managerprefix = $template->managerprefix;
         $confirmation->conditiontype = MDL_F2F_CONDITION_BOOKING_CONFIRMATION;
-        $confirmation->ccmanager = 1;
+        $confirmation->ccmanager = $template->ccmanager;
         $confirmation->status = $template->status;
         $confirmation->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_BOOKING_CONFIRMATION] = $confirmation;
@@ -2269,6 +2604,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $waitlist->body = $template->body;
         $waitlist->managerprefix = $template->managerprefix;
         $waitlist->conditiontype = MDL_F2F_CONDITION_WAITLISTED_CONFIRMATION;
+        $waitlist->ccmanager = $template->ccmanager;
         $waitlist->status = $template->status;
         $waitlist->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_WAITLISTED_CONFIRMATION] = $waitlist;
@@ -2283,7 +2619,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $cancellation->body = $template->body;
         $cancellation->managerprefix = $template->managerprefix;
         $cancellation->conditiontype = MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION;
-        $cancellation->ccmanager = 1;
+        $cancellation->ccmanager = $template->ccmanager;
         $cancellation->cancelled = 1;
         $cancellation->status = $template->status;
         $cancellation->templateid = $template->id;
@@ -2299,7 +2635,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $decline->body = $template->body;
         $decline->managerprefix = $template->managerprefix;
         $decline->conditiontype = MDL_F2F_CONDITION_DECLINE_CONFIRMATION;
-        $decline->ccmanager = 0;
+        $decline->ccmanager = $template->ccmanager;
         $decline->status = $template->status;
         $decline->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_DECLINE_CONFIRMATION] = $decline;
@@ -2316,7 +2652,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $reminder->conditiontype = MDL_F2F_CONDITION_BEFORE_SESSION;
         $reminder->scheduleunit = MDL_F2F_SCHEDULE_UNIT_DAY;
         $reminder->scheduleamount = 2;
-        $reminder->ccmanager = 1;
+        $reminder->ccmanager = $template->ccmanager;
         $reminder->booked = 1;
         $reminder->status = $template->status;
         $reminder->templateid = $template->id;
@@ -2333,7 +2669,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $request->body = $template->body;
         $request->managerprefix = $template->managerprefix;
         $request->conditiontype = MDL_F2F_CONDITION_BOOKING_REQUEST_MANAGER;
-        $request->ccmanager = 1;
+        $request->ccmanager = $template->ccmanager;
         $request->status = $template->status;
         $request->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_BOOKING_REQUEST_MANAGER] = $request;
@@ -2349,7 +2685,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $rolerequest->body = $template->body;
         $rolerequest->managerprefix = $template->managerprefix;
         $rolerequest->conditiontype = MDL_F2F_CONDITION_BOOKING_REQUEST_ROLE;
-        $rolerequest->ccmanager = 0;
+        $rolerequest->ccmanager = $template->ccmanager;
         $rolerequest->status = $template->status;
         $rolerequest->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_BOOKING_REQUEST_ROLE] = $rolerequest;
@@ -2365,7 +2701,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $adminrequest->body = $template->body;
         $adminrequest->managerprefix = $template->managerprefix;
         $adminrequest->conditiontype = MDL_F2F_CONDITION_BOOKING_REQUEST_ADMIN;
-        $adminrequest->ccmanager = 1;
+        $adminrequest->ccmanager = $template->ccmanager;
         $adminrequest->status = $template->status;
         $adminrequest->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_BOOKING_REQUEST_ADMIN] = $adminrequest;
@@ -2380,6 +2716,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $session_change->body = $template->body;
         $session_change->managerprefix = $template->managerprefix;
         $session_change->conditiontype = MDL_F2F_CONDITION_SESSION_DATETIME_CHANGE;
+        $session_change->ccmanager = $template->ccmanager;
         $session_change->booked = 1;
         $session_change->waitlisted = 1;
         $session_change->status = $template->status;
@@ -2396,6 +2733,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $trainer_confirmation->body = $template->body;
         $trainer_confirmation->managerprefix = $template->managerprefix;
         $trainer_confirmation->conditiontype = MDL_F2F_CONDITION_TRAINER_CONFIRMATION;
+        $trainer_confirmation->ccmanager = $template->ccmanager;
         $trainer_confirmation->status = $template->status;
         $trainer_confirmation->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_TRAINER_CONFIRMATION] = $trainer_confirmation;
@@ -2410,6 +2748,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $trainer_cancellation->body = $template->body;
         $trainer_cancellation->managerprefix = $template->managerprefix;
         $trainer_cancellation->conditiontype = MDL_F2F_CONDITION_TRAINER_SESSION_CANCELLATION;
+        $trainer_cancellation->ccmanager = $template->ccmanager;
         $trainer_cancellation->status = $template->status;
         $trainer_cancellation->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_TRAINER_SESSION_CANCELLATION] = $trainer_cancellation;
@@ -2424,6 +2763,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $trainer_unassigned->body = $template->body;
         $trainer_unassigned->managerprefix = $template->managerprefix;
         $trainer_unassigned->conditiontype = MDL_F2F_CONDITION_TRAINER_SESSION_UNASSIGNMENT;
+        $trainer_unassigned->ccmanager = $template->ccmanager;
         $trainer_unassigned->status = $template->status;
         $trainer_unassigned->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_TRAINER_SESSION_UNASSIGNMENT] = $trainer_unassigned;
@@ -2438,6 +2778,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $cancelreservation->body = $template->body;
         $cancelreservation->managerprefix = $template->managerprefix;
         $cancelreservation->conditiontype = MDL_F2F_CONDITION_RESERVATION_CANCELLED;
+        $cancelreservation->ccmanager = $template->ccmanager;
         $cancelreservation->cancelled = 1;
         $cancelreservation->status = $template->status;
         $cancelreservation->templateid = $template->id;
@@ -2453,6 +2794,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $cancelallreservations->body = $template->body;
         $cancelallreservations->managerprefix = $template->managerprefix;
         $cancelallreservations->conditiontype = MDL_F2F_CONDITION_RESERVATION_ALL_CANCELLED;
+        $cancelallreservations->ccmanager = $template->ccmanager;
         $cancelallreservations->cancelled = 1;
         $cancelallreservations->status = $template->status;
         $cancelallreservations->templateid = $template->id;
@@ -2468,6 +2810,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $sessioncancellation->body = $template->body;
         $sessioncancellation->managerprefix = $template->managerprefix;
         $sessioncancellation->conditiontype = MDL_F2F_CONDITION_SESSION_CANCELLATION;
+        $sessioncancellation->ccmanager = $template->ccmanager;
         $sessioncancellation->cancelled = 1;
         $sessioncancellation->status = $template->status;
         $sessioncancellation->templateid = $template->id;
@@ -2483,6 +2826,7 @@ function facetoface_get_default_notifications($facetofaceid) {
         $registrationexpired->body = $template->body;
         $registrationexpired->managerprefix = $template->managerprefix;
         $registrationexpired->conditiontype = MDL_F2F_CONDITION_REGISTRATION_DATE_EXPIRED;
+        $registrationexpired->ccmanager = $template->ccmanager;
         $registrationexpired->status = $template->status;
         $registrationexpired->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_REGISTRATION_DATE_EXPIRED] = $registrationexpired;
@@ -2497,12 +2841,45 @@ function facetoface_get_default_notifications($facetofaceid) {
         $registrationclosure->body = $template->body;
         $registrationclosure->managerprefix = $template->managerprefix;
         $registrationclosure->conditiontype = MDL_F2F_CONDITION_BEFORE_REGISTRATION_ENDS;
-        $registrationclosure->ccmanager = 1;
+        $registrationclosure->ccmanager = $template->ccmanager;
+        $registrationclosure->status = $template->status;
         $registrationclosure->requested = 1;
         $registrationclosure->templateid = $template->id;
         $notifications[MDL_F2F_CONDITION_BEFORE_REGISTRATION_ENDS] = $registrationclosure;
     } else {
         $missingtemplates[] = 'registrationclosure';
+    }
+
+    if (isset($templates['waitlistautoclean'])) {
+        $template = $templates['waitlistautoclean'];
+        $waitlistautoclean = new facetoface_notification($defaults, false);
+        $waitlistautoclean->title = $template->title;
+        $waitlistautoclean->body = $template->body;
+        $waitlistautoclean->managerprefix = $template->managerprefix;
+        $waitlistautoclean->conditiontype = MDL_F2F_CONDITION_WAITLIST_AUTOCLEAN;
+        $waitlistautoclean->ccmanager = $template->ccmanager;
+        $waitlistautoclean->status = $template->status;
+        $waitlistautoclean->requested = 1;
+        $waitlistautoclean->templateid = $template->id;
+        $notifications[MDL_F2F_CONDITION_WAITLIST_AUTOCLEAN] = $waitlistautoclean;
+    } else {
+        $missingtemplates[] = 'waitlistautoclean';
+    }
+
+    if (isset($templates['undercapacity'])) {
+        $template = $templates['undercapacity'];
+        $undercapacity = new facetoface_notification($defaults, false);
+        $undercapacity->title = $template->title;
+        $undercapacity->body = $template->body;
+        $undercapacity->managerprefix = $template->managerprefix;
+        $undercapacity->conditiontype = MDL_F2F_CONDITION_SESSION_UNDER_CAPACITY;
+        $undercapacity->ccmanager = $template->ccmanager;
+        $undercapacity->status = $template->status;
+        $undercapacity->requested = 1;
+        $undercapacity->templateid = $template->id;
+        $notifications[MDL_F2F_CONDITION_SESSION_UNDER_CAPACITY] = $undercapacity;
+    } else {
+        $missingtemplates[] = 'undercapacity';
     }
 
     return array($notifications, $missingtemplates);
@@ -2601,4 +2978,146 @@ function facetoface_notification_get_templates_with_old_placeholders() {
     $cache->set('oldnotifications', $oldnotifcations);
 
     return $oldnotifcations;
+}
+
+/**
+ * Remove all whitespaces, new lines, <br> html tags
+ *
+ * @param $string
+ * @return string
+ */
+function facetoface_prepare_match($string) {
+    $string = preg_replace('/\s*\s+/S', '', $string);
+    $string = str_replace("\n", '', $string);
+    $string = preg_replace("#<br\s*/?>#i", "", $string);
+    return $string;
+}
+
+/**
+ * Compare 2 notifications by tile, body and mangerprefix
+ *
+ * @param $data1 stdClass updated activity notification
+ * @param $data2 stdClass default notification template
+ * @return bool
+ */
+function facetoface_notification_match($data1, $data2) {
+
+    $title1 = facetoface_prepare_match($data1->title);
+    $title2 = facetoface_prepare_match($data2->title);
+
+    $body1 = facetoface_prepare_match($data1->body);
+    $body2 = facetoface_prepare_match($data2->body);
+
+    $managerprefix1 = facetoface_prepare_match($data1->managerprefix);
+    $managerprefix2 = facetoface_prepare_match($data2->managerprefix);
+
+    if ($title1 != $title2 || $body1 != $body2 || $managerprefix1 != $managerprefix2) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Get a list reference -> conditiontype of notification templates which are not existed in active seminars.
+ *
+ * @return array list of notification templates
+ */
+function facetoface_notification_get_missing_templates() {
+    global $DB;
+
+    $type = MDL_F2F_NOTIFICATION_AUTO;
+    $result = [];
+    $sqlqueries = [];
+    foreach (facetoface_notification::get_references() as $reference => $conditiontype) {
+        $sqlqueries[] =
+            "SELECT f.id as fid, fnt.reference, fnt.title
+               FROM {facetoface_notification_tpl} fnt
+         CROSS JOIN {facetoface} f
+          LEFT JOIN {facetoface_notification} fn
+                 ON (fn.type = $type AND fn.facetofaceid=f.id AND fn.conditiontype = $conditiontype)
+              WHERE fnt.reference = '$reference' AND fn.id IS NULL";
+    }
+    $sql = implode(" UNION ", $sqlqueries);
+    $records = $DB->get_recordset_sql($sql);
+
+    foreach ($records as $record) {
+        $result[$record->reference] = true;
+    }
+    return $result;
+}
+
+/**
+ * Create new seminar notifications for active seminars from notification templates.
+ *
+ * @param int $conditiontype seminar notification condition type
+ * @return int how many records are affected
+ */
+function facetoface_notification_restore_missing_template($conditiontype) {
+    global $DB;
+
+    $referencelist = facetoface_notification::get_references();
+    $reference = array_flip($referencelist)[$conditiontype];
+
+    $sql = "SELECT f.id as fid, f.course as courseid, fnt.reference
+              FROM {facetoface_notification_tpl} fnt
+        CROSS JOIN {facetoface} f
+         LEFT JOIN {facetoface_notification} fn
+                ON (fn.type = :type AND fn.facetofaceid=f.id AND fn.conditiontype = :conditiontype)
+             WHERE fnt.reference = :reference AND fn.id IS NULL";
+    $params = ['type' => MDL_F2F_NOTIFICATION_AUTO, 'conditiontype' => $conditiontype, 'reference' => $reference];
+    if (!($records = $DB->get_recordset_sql($sql, $params))) {
+        return 0;
+    }
+
+    $template = $DB->get_record('facetoface_notification_tpl', ['reference' => $reference], '*', MUST_EXIST);
+
+    $default = [];
+    $default['type'] = MDL_F2F_NOTIFICATION_AUTO;
+    $default['booked'] = 0;
+    $default['waitlisted'] = 0;
+    $default['cancelled'] = 0;
+    $default['requested'] = 0;
+    $default['issent'] = 0;
+    $default['status'] = 1;
+    $default['ccmanager'] = 0;
+
+    $rows = 0;
+    foreach ($records as $record) {
+        $rows++;
+        $default['facetofaceid'] = $record->fid;
+        $default['courseid'] = $record->courseid;
+
+        $notification = new facetoface_notification($default, false);
+        $notification->title = $template->title;
+        $notification->body = $template->body;
+        $notification->managerprefix = $template->managerprefix;
+        $notification->conditiontype = $conditiontype;
+        $notification->ccmanager = $template->ccmanager;
+        $notification->status = $template->status;
+        $notification->templateid = $template->id;
+
+        switch ($conditiontype) {
+            case MDL_F2F_CONDITION_CANCELLATION_CONFIRMATION:
+            case MDL_F2F_CONDITION_RESERVATION_CANCELLED:
+            case MDL_F2F_CONDITION_RESERVATION_ALL_CANCELLED:
+            case MDL_F2F_CONDITION_SESSION_CANCELLATION:
+                $notification->cancelled = 1;
+                break;
+            case MDL_F2F_CONDITION_BEFORE_SESSION:
+                $notification->scheduleunit = MDL_F2F_SCHEDULE_UNIT_DAY;
+                $notification->scheduleamount = 2;
+                $notification->booked = 1;
+                break;
+            case MDL_F2F_CONDITION_SESSION_DATETIME_CHANGE:
+                $notification->booked = 1;
+                $notification->waitlisted = 1;
+                break;
+            case MDL_F2F_CONDITION_BEFORE_REGISTRATION_ENDS:
+                $notification->requested = 1;
+                break;
+        }
+
+        $notification->save();
+    }
+    return $rows;
 }
