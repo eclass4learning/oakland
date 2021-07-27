@@ -6488,7 +6488,7 @@ function reportbuilder_get_embedded_report($embedname, $data = array(), $nocache
     $config = new rb_config();
     $config->set_sid($sid)
         ->set_nocache($nocache)
-        ->set_embeddata($data)
+        ->set_embeddata(isset($data) ? $data : [])
         ->set_global_restriction_set($globalrestrictionset);
     return reportbuilder::create_embedded($embedname, $config);
 }
