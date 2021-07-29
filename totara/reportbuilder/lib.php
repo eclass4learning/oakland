@@ -2566,7 +2566,7 @@ class reportbuilder {
         if (empty($this->embedded)) {
             return true;
         } else {
-            return $this->embedobj->needs_require_login();
+            return isset($this->embedobj) ? $this->embedobj->needs_require_login() : true;
         }
     }
 
@@ -4670,7 +4670,7 @@ class reportbuilder {
                     array('toolbarsearchtext' => $toolbarsearchtext), 'post', '', null, true, null, 'toolbarsearch');
             $table->add_toolbar_content($mform->render());
 
-            if ($this->embedded && $content = $this->embedobj->get_extrabuttons()) {
+            if ($this->embedded && $this->embedobj && $content = $this->embedobj->get_extrabuttons()) {
                 $table->add_toolbar_content($content, 'right');
             }
         }

@@ -66,9 +66,9 @@ trait base_deprecated_t12_trait {
 
             public function extract_addeduserjoins() {
                 $reflector = new \ReflectionObject($this);
-                $joins = $reflector->getProperty('addeduserjoins');
-                $joins->setAccessible(true);
-                return $joins->getValue($this);
+                //$joins = $reflector->getProperty('addeduserjoins');
+                //$joins->setAccessible(true);
+                //return $joins->getValue($this);
             }
         };
 
