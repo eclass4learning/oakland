@@ -1209,6 +1209,18 @@ function totara_cohort_notify_del_users($cohortid, $deluserids, $delaymessages=f
     return totara_cohort_notify_users($cohortid, $deluserids, 'membersremoved', $delaymessages);
 }
 
+function totara_cohort_notify_group_creators($cohortid, $groupcreatorids, $delaymessages=false, $requester_userid=null) {
+    return totara_cohort_notify_users($cohortid, $groupcreatorids, 'groupcreators', $delaymessages, $requester_userid);
+}
+
+function totara_cohort_notify_join_request_approved($cohortid, $adduserids, $delaymessages=false) {
+    return totara_cohort_notify_users($cohortid, $adduserids, 'joinrequestapproved', $delaymessages);
+}
+
+function totara_cohort_notify_join_request_denied($cohortid, $adduserids, $delaymessages=false) {
+	return totara_cohort_notify_users($cohortid, $adduserids, 'joinrequestdenied', $delaymessages);
+}
+
 /**
  * Processor function to be passed in to {@link insert_records_via_batch()}. Used by
  * {@link totara_cohort_notify_users()}.
