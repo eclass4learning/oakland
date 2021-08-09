@@ -1,5 +1,5 @@
 <?php
-require_once('/var/www/html/google-api-php-client-2.2.2/vendor/autoload.php');
+require_once('/var/www/html/vendor/autoload.php');
 putenv('GOOGLE_APPLICATION_CREDENTIALS=/opt/data/keys/manifest-design-95119-e210c3de7a09.json');
 
 
