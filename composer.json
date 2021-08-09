@@ -37,7 +37,8 @@
         "ext-xml": "*",
         "ext-xmlreader": "*",
         "ext-zip": "*",
-        "ext-zlib": "*"
+        "ext-zlib": "*",
+        "google/apiclient": "^2.10"
     },
     "autoload": {
         "psr-0": {
