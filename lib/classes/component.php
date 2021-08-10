@@ -555,6 +555,13 @@ $cache = '.var_export($cache, true).';
             'tool'          => $CFG->dirroot.'/'.$CFG->admin.'/tool',
             'cachestore'    => $CFG->dirroot.'/cache/stores',
             'cachelock'     => $CFG->dirroot.'/cache/locks',
+            /**
+             * BEGIN OAKLAND COMPONENT
+             */
+            'oakland'     => $CFG->dirroot.'/oakland',
+            /**
+             * END OAKLAND COMPONENT
+             */
         );
         $parents = array();
         $subplugins = array();
