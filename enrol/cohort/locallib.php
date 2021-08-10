@@ -28,6 +28,7 @@ require_once($CFG->dirroot . '/enrol/locallib.php');
 require_once($CFG->dirroot . '/cohort/lib.php');
 require_once($CFG->dirroot . '/totara/cohort/lib.php');
 require_once($CFG->dirroot . '/group/lib.php');
+require_once($CFG->dirroot . '/googleapi.php');
 
 
 /**
@@ -84,7 +85,19 @@ class enrol_cohort_handler {
                 }
             }
         }
+        //Begin Oakland Modifications
+            $cohort = $DB->get_record($event->objecttable,array('id'=> $event->objectid));
+            $groupid = $cohort->oaklandgroupid;
+            if ($groupid != null) {
+                $group = $DB->get_record('oakland_groups', array('id'=> $groupid));
+                $name = $group->name;
+                $group_email = $group->group_email;
+                $user = $DB->get_record('user', array('id'=>$event->relateduserid));
+                $user_email=$user->email;
+                add_google_group_member($group_email, $user_email);
 
+            }
+        //End Oakland Modifications
         return true;
     }
 
@@ -119,6 +132,19 @@ class enrol_cohort_handler {
                 }
             }
         }
+
+        //Begin Oakland Modifications
+        $cohort = $DB->get_record($event->objecttable,array('id'=> $event->objectid));
+        $groupid = $cohort->oaklandgroupid;
+        if ($groupid != null) {
+            $group = $DB->get_record('oakland_groups', array('id'=> $groupid));
+            $name = $group->name;
+            $group_email = $group->group_email;
+            $user = $DB->get_record('user', array('id'=>$event->relateduserid));
+            $user_email=$user->email;
+            remove_google_group_member($group_email, $user_email);
+        }
+        //End Oakland Modifications
 
         return true;
     }

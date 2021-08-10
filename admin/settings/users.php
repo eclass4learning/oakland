@@ -13,6 +13,8 @@ if ($hassiteconfig
  or has_capability('moodle/cohort:manage', $systemcontext)
  or has_capability('moodle/cohort:view', $systemcontext)) { // speedup for non-admins, add all caps used on this page
 
+    $ADMIN->add('users', new admin_category('groups', new lang_string('groups', 'oakland_groups')));
+    $ADMIN->add('users', new admin_externalpage('groups', new lang_string('groups','oakland_groups'), "$CFG->wwwroot/oakland/groups/index.php"));
 
     // Totara: stuff under the "Users" subcategory
     $ADMIN->add('users', new admin_externalpage('editusers', new lang_string('userlist','admin'), "$CFG->wwwroot/$CFG->admin/user.php", array('moodle/user:update', 'moodle/user:delete')));
@@ -57,7 +59,7 @@ if ($hassiteconfig
     $ADMIN->add('users', $temp);
     $ADMIN->add('users', new admin_externalpage('profilefields', new lang_string('profilefields','admin'), "$CFG->wwwroot/user/profile/index.php", array('moodle/site:config', 'totara/core:manageprofilefields')));
     $ADMIN->add('users', new admin_externalpage('profilepage', new lang_string('myprofile', 'admin'), $CFG->wwwroot . '/user/profilesys.php', array('totara/core:appearance')));
-
+    $ADMIN->add('groups',new admin_externalpage('managegroups', new lang_string('managegroups','oakland_groups'), "$CFG->wwwroot/oakland/groups/index.php"));
     // "userpolicies" settingpage
     $temp = new admin_settingpage('userpolicies', new lang_string('userpolicies', 'admin'));
     if ($ADMIN->fulltree) {
