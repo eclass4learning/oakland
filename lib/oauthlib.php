@@ -564,7 +564,14 @@ abstract class oauth2_client extends curl {
         }
 
         if ($this->info['http_code'] !== 200) {
-            throw new moodle_exception('Could not upgrade oauth token');
+            // throw new moodle_exception('Could not upgrade oauth token');
+            $error = "";
+            if ($this->error) {
+                $error = $this->error;
+            } else if ($this->info['http_code']) {
+                $error = "HTTP status: {$this->info['http_code']}";
+            }
+            throw new moodle_exception('Could not upgrade oauth token', 'core_error', '', $response, $error);            
         }
 
         $r = json_decode($response);

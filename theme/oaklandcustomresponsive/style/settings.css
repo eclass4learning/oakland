@@ -101,7 +101,7 @@ input[type="reset"][disabled] {
     background-color: [[setting:headerbgc]];
 }
 
-.navbar-inner, .navbar-inner > .container-fluid {
+.totaraNav_prim, .totaraNav_prim > .container-fluid {
     background: -webkit-linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* For Safari 5.1 to 6.0 */
     background: -o-linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* For Opera 11.1 to 12.0 */
     background: -moz-linear-gradient([[setting:headerbgc]], [[setting:headergradient]]); /* For Firefox 3.6 to 15 */
@@ -146,11 +146,11 @@ div.header h6 {
     color: [[setting:text-on-headerbgc]];
 }
 
-.navbar-inner {
+.totaraNav_prim {
     color:#fff;
 }
 
-.navbar { 
+.totaraNav { 
     -moz-box-shadow:    1px 4px 3px rgba(0,0,0, 0.4);
     -webkit-box-shadow: 1px 4px 3px rgba(0,0,0, 0.4);
     box-shadow:         1px 4px 3px rgba(0,0,0, 0.4);
@@ -211,13 +211,13 @@ div.header h6 {
 .navbar .nav-collapse.active { 
     height:auto!important;
 }
-.navbar {
+.totaraNav {
 	position:relative;
 	overflow:visible;
 	margin-bottom:0px;
 }
 
-.navbar:before {
+.totaraNav:before {
 	content: ' ';
     display: block;
     position: absolute;

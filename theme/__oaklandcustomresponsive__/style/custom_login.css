@@ -1,0 +1,99 @@
+.loginbox.threecolumns {
+    margin: 15px
+}
+
+.loginbox.threecolumns .leftpanel, .loginbox.threecolumns .middlepanel, .loginbox.threecolumns .rightpanel {
+    display: block;
+    float: left;
+    width: 48%;
+    min-height: 30px;
+    padding: 0;
+    padding-bottom: 2000px;
+    margin: 0;
+    margin-bottom: -2000px;
+    margin-left: 2.76243%;
+    border: 0;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box
+}
+
+.dir-rtl .loginbox.threecolumns .leftpanel, .dir-rtl .loginbox.threecolumns .middlepanel, dir-rtl .loginbox.threecolumns .rightpanel {
+    float: right
+}
+
+.loginbox.threecolumns .middlepanel, .loginbox.threecolumns .middlepanel, .loginbox.threecolumns .leftpanel, .loginbox.threecolumns .leftpanel, .loginbox.threecolumns .rightpanel, .loginbox.threecolumns .rightpanel  {
+    padding: 0;
+    margin: 0
+}
+
+@media (min-width:1200px) {
+    .loginbox.threecolumns .leftpanel {
+        margin-left: 0
+    }
+
+    .loginbox.threecolumns .leftpanel, .loginbox.threecolumns .middlepanel, .loginbox.threecolumns .rightpanel  {
+        width: 32.47863247863248%;
+        *width: 32.44317148572468%
+    }
+}
+
+@media (min-width:980px) {
+    .loginbox.threecolumns .leftpanel {
+        margin-left: 0
+    }
+
+    .loginbox.threecolumns .leftpanel, .loginbox.threecolumns .middlepanel {
+        width: 32.47863247863248%;
+        *width: 32.44317148572468%
+    }
+}
+
+@media (min-width:768px) and (max-width:979px) {
+    .loginbox.threecolumns .leftpanel {
+        margin-left: 0
+    }
+
+    .loginbox.threecolumns .leftpanel, .loginbox.threecolumns .middlepanel {
+        width: 32.47863247863248%;
+        *width: 32.44317148572468%
+    }
+
+}
+
+@media (max-width:767px) {
+    .loginbox.threecolumns .leftpanel, .loginbox.threecolumns .middlepanel, .loginbox.threecolumns .rightpanel  {
+        display: block;
+        float: none;
+        width: 100%;
+        margin-left: 0;
+        -webkit-box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        box-sizing: border-box
+    }
+}
+
+
+.loginbox .middlepanel .subcontent {
+    text-align: left
+}
+
+.dir-rtl .loginbox .middlepanel .subcontent {
+    text-align: right
+}
+
+#adminsettings .error, .loginpanel .error, .mform .error {
+    color: #b94a48
+}
+
+.collab_logo {
+    margin-left:70px;
+    width:400px;
+    height:400px;
+}
+
+.hub_logo {
+    margin-left:70px;
+    width:400px;
+    height:300px;
+}

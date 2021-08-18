@@ -81,7 +81,13 @@ class totara_dashboard {
      * @var array of int id's
      */
     private $cohorts = null;
-
+    
+    /**
+     * Related to group id
+     *
+     * @var int id
+     */
+    private $oaklandgroupid = null;
 
     /**
      * Get List of all dashboards
@@ -160,6 +166,7 @@ class totara_dashboard {
         $this->published = $record->published;
         $this->locked = $record->locked;
         $this->sortorder = $record->sortorder;
+	$this->oaklandgroupid = $record->oaklandgroupid;
     }
 
     /**
@@ -265,6 +272,7 @@ class totara_dashboard {
         $instance->locked = (int)$this->locked;
         $instance->sortorder = (int)$this->sortorder;
         $instance->cohorts = implode(',', $this->get_cohorts());
+	$instance->oaklandgroupid = (int)$this->oaklandgroupid;
 
         return $instance;
     }
@@ -280,6 +288,7 @@ class totara_dashboard {
         $this->locked = 0;
         $this->published = 0;
         $this->set_cohorts(array());
+	$this->oaklandgroupid = 0;
 
         if (isset($data->name)) {
             $this->name = $data->name;
@@ -290,6 +299,9 @@ class totara_dashboard {
         if (isset($data->published)) {
             $this->published = (int)$data->published;
         }
+	if (isset($data->oaklandgroupid)) {
+	    $this->oaklandgroupid = (int)$data->oaklandgroupid;
+	}
 
         if (isset($data->cohorts)) {
             if (is_array($data->cohorts)) {

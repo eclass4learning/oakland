@@ -316,6 +316,7 @@ function create_group_dashboard($group,$cohortid){
     $data->allowguest = 1;
     $data->oaklandgroupid = $group->id;
     $dashboard->set_from_form($data)->save();
+    
     return $dashboard;
 }
 
