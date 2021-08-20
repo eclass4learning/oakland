@@ -87,7 +87,7 @@ class totara_dashboard {
      *
      * @var int id
      */
-    private $oaklandgroupid = null;
+    public $oaklandgroupid = null;
 
     /**
      * Get List of all dashboards
