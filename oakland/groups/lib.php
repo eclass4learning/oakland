@@ -210,7 +210,7 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $DB->insert_record('block_instances', $dashboardblock);
     $DB->insert_record('block_instances', $gaccess_block);
     $DB->insert_record('block_instances', $activity_block);
-    $DB->insert_record('block_instances', $quicklink_block);
+    //$DB->insert_record('block_instances', $quicklink_block);
     $groupbioid = $DB->insert_record('block_instances', $groupbio_block);
     $DB->insert_record('block_instances', $forum_block);
     $DB->insert_record('block_instances', $admin_block);
