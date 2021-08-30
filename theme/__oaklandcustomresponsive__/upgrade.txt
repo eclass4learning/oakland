@@ -1,0 +1,24 @@
+This file describes API changes for 'theme_oaklandcustomresponsive'.
+
+=== 12.0 ===
+
+* Altered theme/oaklandcustomresponsive/layout/partials/footer.php, removing reference to page_footer_nav
+* Deprecated page_footer_nav.mustage template
+* Deprecated theme_oaklandcustomresponsive_renderer::page_footer_nav()
+* Deprecated theme_oaklandcustomresponsive_renderer::render_page_footer_nav()
+* Deprecated theme_oaklandcustomresponsive\output\page_footer_nav
+* Changed totara/core/templates/totara_menu.mustache, adding aria menu attributes
+* Added theme setting for navigation text color
+* Added propagation of color theme settings to new navigation in settings-noprocess.css
+* Changed totara/core/templates/totara_menu.mustache, adding aria menu attributes
+* Deprecated class theme_oaklandcustomresponsive_totara_core_renderer
+* Deprecated templates\totara_core\totara_menu.mustache
+* Redesigned navigation implemented, deprecated navigation hasn't been removed
+
+=== 10.0 ===
+
+* Ensured block action icons conform to WCAG AA contrast for text and background
+
+=== 9.2 ===
+
+* Additional grid classes added to template 'theme_oaklandcustomresponsive/page_footer_nav' for a 4 column layout for small devices

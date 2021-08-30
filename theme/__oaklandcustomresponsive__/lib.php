@@ -2,7 +2,7 @@
 /*
  * This file is part of Totara LMS
  *
- * Copyright (C) 2010 onwards Totara Learning Solutions LTD
+ * Copyright (C) 2016 onwards Totara Learning Solutions LTD
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,15 +17,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * @author Brian Barnes <brian.barnes@totaralms.com>
- * @package theme
- * @subpackage crownequipmentresponsive
+ * @author Brian Barnes <brian.barnes@totaralearning.com>
+ * @author Joby Harding <joby.harding@totaralearning.com>
+ * @package theme_oaklandcustomresponsive
  */
 
 defined('MOODLE_INTERNAL') || die();
 
+use theme_oaklandcustomresponsive\css_processor;
+
 /**
  * Makes our changes to the CSS
+ *
+ * This is only called when compiling CSS after cache clearing.
  *
  * @param string $css
  * @param theme_config $theme
@@ -33,7 +37,22 @@ defined('MOODLE_INTERNAL') || die();
  */
 function theme_oaklandcustomresponsive_process_css($css, $theme) {
 
-    $substitutions = array(
+    $processor   = new css_processor($theme);
+    $settingscss = $processor->get_settings_css($css);
+
+    if (empty($theme->settings->enablestyleoverrides)) {
+        // Replace all instances ($settingscss is an array).
+        $css = str_replace($settingscss, '', $css);
+        // Always insert settings-based custom CSS.
+        return $processor->replace_tokens(array('customcss' => css_processor::$DEFAULT_CUSTOMCSS), $css);
+    }
+
+    $replacements = $settingscss;
+
+    // Based on oaklandcustomresponsive Bootswatch.
+    // These defaults will also be used to generate and replace
+    // variant colours (e.g. linkcolor-dark, linkcolor-darker).
+    $variantdefaults = array(
         'linkcolor' => '#087BB1',
         'linkvisitedcolor' => '#087BB1',
         'headerbgc' => '',
@@ -57,68 +76,28 @@ function theme_oaklandcustomresponsive_process_css($css, $theme) {
         'hoversubmenucolor' => '#808080',
         'logged_in_usernamecolor' => '#ffffff'
     );
-    $css = totara_theme_generate_autocolors($css, $theme, $substitutions);
 
-    $fonts = array(
-        'h1size' => '24',
-        'h2size' => '22',
-        'h3size' => '18',
-        'h4size' => '16',
-        'h5size' => '12',
-        'h6size' => '10',
-        'ptagsize' => '14'
+    // These default values do not have programmatic variants.
+    $nonvariantdefaults = array(
+        'contentbackground' => css_processor::$DEFAULT_CONTENTBACKGROUND,
+        'bodybackground'    => css_processor::$DEFAULT_BODYBACKGROUND,
+        'textcolor'         => css_processor::$DEFAULT_TEXTCOLOR,
+        'navtextcolor'      => css_processor::$DEFAULT_NAVTEXTCOLOR,
     );
 
-    $css = custom_theme_generate_fontsizes($css, $theme, $fonts);
-	// Set Images.
-    $setting = 'headerbgimg';
-    // Creates the url for image file which is then served up by 'theme_oaklandcustomresponsive_pluginfile' below.
-    $headerbgimage = $theme->setting_file_url($setting, $setting);
-    $css = theme_oaklandcustomresponsive_set_image($css, $headerbgimage, $setting);
-
-    $setting = 'bodybgimg';
-    // Creates the url for image file which is then served up by 'theme_oaklandcustomresponsive_pluginfile' below.
-    $bodybgimage = $theme->setting_file_url($setting, $setting);
-    $css = theme_oaklandcustomresponsive_set_image($css, $bodybgimage, $setting);
-
-    // Set the custom CSS
-    if (!empty($theme->settings->customcss)) {
-        $customcss = $theme->settings->customcss;
-    } else {
-        $customcss = null;
+    foreach (array_values($replacements) as $i => $replacement) {
+        $replacements[$i] = $processor->replace_colours($variantdefaults, $replacement);
+        $replacements[$i] = $processor->replace_tokens($nonvariantdefaults, $replacements[$i]);
+        $replacements[$i] = $processor->remove_delimiters($replacements[$i]);
     }
-    $css = theme_oaklandcustomresponsive_set_customcss($css, $customcss);
 
-    return $css;
-}
-
-
-function theme_oaklandcustomresponsive_set_image($css, $image, $setting) {
-    global $OUTPUT;
-    $tag = 'setting:'.$setting.'';
-    $replacement = $image;
-    if (is_null($replacement)) {
-        // Get default image from themes 'images' folder of the name in $setting.
-        $replacement = $OUTPUT->pix_url('images/'.$setting, 'theme');
+    if (!empty($settingscss)) {
+        $css = str_replace($settingscss, $replacements, $css);
     }
-    $css = str_replace($tag, $replacement, $css);
-    return $css;
-}
 
-/**
- * Sets the custom css variable in CSS
- *
- * @param string $css
- * @param mixed $customcss
- * @return string
- */
-function theme_oaklandcustomresponsive_set_customcss($css, $customcss) {
-    $tag = '[[setting:customcss]]';
-    $replacement = $customcss;
-    if (is_null($replacement)) {
-        $replacement = '';
-    }
-    $css = str_replace($tag, $replacement, $css);
+    // Settings based CSS is not applied conditionally.
+    $css = $processor->replace_tokens(array('customcss' => css_processor::$DEFAULT_CUSTOMCSS), $css);
+
     return $css;
 }
 
@@ -135,68 +114,10 @@ function theme_oaklandcustomresponsive_set_customcss($css, $customcss) {
  * @return bool
  */
 function theme_oaklandcustomresponsive_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = array()) {
-    if ($context->contextlevel == CONTEXT_SYSTEM && ($filearea === 'logo' || $filearea === 'favicon')) {
+    if ($context->contextlevel == CONTEXT_SYSTEM && ($filearea === 'logo' || $filearea === 'favicon' || $filearea === 'backgroundimage' || $filearea === 'headerbgimg')) {
         $theme = theme_config::load('oaklandcustomresponsive');
         return $theme->setting_file_serve($filearea, $args, $forcedownload, $options);
-    } else if ($context->contextlevel == CONTEXT_SYSTEM and $filearea === 'headerbgimg') {
-        $theme = theme_config::load('oaklandcustomresponsive');
-        return $theme->setting_file_serve('headerbgimg', $args, $forcedownload, $options);
-    } else if ($context->contextlevel == CONTEXT_SYSTEM and $filearea === 'bodybgimg') {
-        $theme = theme_config::load('oaklandcustomresponsive');
-        return $theme->setting_file_serve('bodybgimg', $args, $forcedownload, $options);
-    } else if($context->contextlevel == CONTEXT_SYSTEM and $filearea === 'collablogo'){
-        $theme = theme_config::load('oaklandcustomresponsive');
-        return $theme->setting_file_serve('collablogo', $args, $forcedownload, $options);
-    } else if($context->contextlevel == CONTEXT_SYSTEM and $filearea === 'hublogo'){
-        $theme = theme_config::load('oaklandcustomresponsive');
-        return $theme->setting_file_serve('hublogo', $args, $forcedownload, $options);
-    }else {
-        send_file_not_found();
     }
+
+    send_file_not_found();
 }
-
-function cec_login_info() {
-    global $USER, $CFG;
-
-    $fullname = fullname($USER, true);
-
-    return "<a href=\"$CFG->wwwroot/user/profile.php?id=$USER->id\" style='margin-top: 15px;' title=\"$fullname\" class='text-center white'>$fullname<br/></a>";
-}
-
-function cec_logout() {
-    global $USER, $CFG;
-
-    return "<a class=\"loginstatus\" href=\"$CFG->wwwroot/login/logout.php?loginpage=1&sesskey=".sesskey()."\"><button class=\"btn\">".get_string('logout').'</button></a>';
-}
-
-function cec_login() {
-        global $CFG;
-
-    return "<a class=\"loginstatus\" href=\"$CFG->wwwroot/login/index.php\"><button class=\"btn\">".get_string('login').'</button></a>';
-}
-
-/**
- * Interprets Font Size settings and inserts their values into the stylesheet.
- * @param $css
- * @param $theme
- * @param $fonts
- * @return mixed
- */
-
-function custom_theme_generate_fontsizes($css, $theme, $fonts){
-    $find = array();
-    $replace = array();
-    foreach ($fonts as $setting => $defaultfontsize) {
-        if(!isset($theme->settings->$setting) || $theme->settings->$setting == 0){
-            $value = $defaultfontsize;
-        }else{
-            $value = $theme->settings->$setting;
-        }
-
-        $find[] = "[[setting:{$setting}]]";
-        $replace[] = $value;
-
-    }
-    return str_replace($find, $replace, $css);
-}
-

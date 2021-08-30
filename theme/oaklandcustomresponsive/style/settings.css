@@ -287,9 +287,9 @@ div.header h6 {
 	body { padding-left: 0px; padding-right:0px; }	
 }
 
-div.totara-dialog, #dock, .yui-dialog {
+/*div.totara-dialog, #dock, .yui-dialog {
 	z-index:3!important;
-}
+}*/
 
 .user-enroller-panel, .yui3-overlay, .enrolpanel {
 	z-index:5 !important;

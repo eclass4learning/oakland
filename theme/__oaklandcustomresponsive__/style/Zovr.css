@@ -1,0 +1,85 @@
+/* t12 */
+
+.totaraNav_prim > .container-fluid {
+    display: block;
+}
+
+.totaraNav_prim .masthead_logo {
+    float: left;
+    margin: 10px 0;
+    height: auto;
+}
+
+.totaraNav_prim--side {
+    float: right;
+}
+
+.totaraNav:before {
+    background-image: url(../pix/banner.jpeg);
+}
+
+.totaraNav_prim {
+	background: transparent;
+}
+
+.totaraNav_prim .masthead_logo--header_img {
+	height: auto;
+}
+
+.totaraNav_prim--side {
+	background-color: #f8f8f8;
+    border-color: #e7e7e7;
+    color: #777;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    height: auto;
+}
+
+.totaraNav_prim--side .popover-region .nav-link:hover,
+.totaraNav_prim--side .usermenu .toggle-display:hover {
+	background-color: transparent;
+}
+
+.totaraNav_prim--side .usermenu .toggle-display {
+	color: #777;
+}
+
+.totara_core__QuickAccess .totara_core__QuickAccess_menu {
+	background-color: #f8f8f8;
+}
+
+.totara_core__QuickAccess .totara_core__QuickAccess_group-list li a,
+.totara_core__QuickAccess .totara_core__QuickAccess_footer>a {
+	color: #777;
+}
+
+.block .block-title, #dockeditempanel .dockeditempanel_content h2 {
+	box-shadow: none;
+}
+
+.block .header h2 {
+	background: transparent;
+}
+
+#page-footer {
+	background-color: #f5f5f5;
+    border-top: 1px solid #d4d4d4;
+    color: #6b6b6b;
+}
+
+#page-footer .page-footer-poweredby {
+    color: #ccc;
+    background-color: #f5f5f5;
+}
+
+#page-footer a:not(.btn):link, #page-footer a:not(.btn):visited, #page-footer a:not(.btn):hover, #page-footer a:not(.btn):active {
+	color: #ccc;
+}
+
+/*@media(min-width: 992px) {
+	.totaraNav_prim--list_close {
+		display: none !important;
+	}
+}*/
+
+/* t12 */

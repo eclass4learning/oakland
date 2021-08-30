@@ -167,7 +167,7 @@ if ($ADMIN->fulltree) {
     // Page header background colour 2 setting for Gradient.
     $name = "{$component}/headergradient";
     $title = get_string('headergradient', $component);
-    $description = get_string('headergradient_desc', $component);
+    $description = get_string('headerdescgradient', $component);
     $default = '';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -202,7 +202,7 @@ if ($ADMIN->fulltree) {
     // Block header background colour setting.
     $name = "{$component}/blockheadercolor";
     $title = get_string('blockheadercolor', $component);
-    $description = get_string('blockheadercolor_desc', $component);
+    $description = get_string('blockheadercolordesc', $component);
     $default = '#fc9920';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -211,7 +211,7 @@ if ($ADMIN->fulltree) {
     // Block header background top gradient colour setting.
     $name = "{$component}/blockheadergradientstart";
     $title = get_string('blockheadergradientstart', $component);
-    $description = get_string('blockheadergradientstart_desc', $component);
+    $description = get_string('blockheadergradientstartdesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -220,7 +220,7 @@ if ($ADMIN->fulltree) {
     // Block header text colour setting.
     $name = "{$component}/blockheadertextcolor";
     $title = get_string('blockheadertextcolor', $component);
-    $description = get_string('blockheadertextcolor_desc', $component);
+    $description = get_string('blockheadertextcolordesc', $component);
     $default = '#4e4546';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -229,7 +229,7 @@ if ($ADMIN->fulltree) {
     // Block body background colour setting.
     $name = "{$component}/blockcontentcolor";
     $title = get_string('blockcontentcolor', $component);
-    $description = get_string('blockcontentcolor_desc', $component);
+    $description = get_string('blockcontentcolordesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -240,7 +240,7 @@ if ($ADMIN->fulltree) {
     // Button text color setting.
     $name = "{$component}/buttontextcolor";
     $title = get_string('buttontextcolor', $component);
-    $description = get_string('buttontextcolor_desc', $component);
+    $description = get_string('buttontextcolordesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -249,7 +249,7 @@ if ($ADMIN->fulltree) {
     // Menu Color
     $name = "{$component}/menucolor";
     $title = get_string('menucolor', $component);
-    $description = get_string('menucolor_desc', $component);
+    $description = get_string('menucolordesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -258,7 +258,7 @@ if ($ADMIN->fulltree) {
     // Menu Text Color
     $name = "{$component}/menutextcolor";
     $title = get_string('menutextcolor', $component);
-    $description = get_string('menutextcolor_desc', $component);
+    $description = get_string('menutextcolordesc', $component);
     $default = '#000000';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -267,7 +267,7 @@ if ($ADMIN->fulltree) {
     // Selected Menu Color
     $name = "{$component}/selectedmenucolor";
     $title = get_string('selectedmenucolor', $component);
-    $description = get_string('selectedmenucolor_desc', $component);
+    $description = get_string('selectedmenucolordesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -276,7 +276,7 @@ if ($ADMIN->fulltree) {
     // Selected Menu Text Color
     $name = "{$component}/selectedmenutextcolor";
     $title = get_string('selectedmenutextcolor', $component);
-    $description = get_string('selectedmenutextcolor_desc', $component);
+    $description = get_string('selectedmenutextcolordesc', $component);
     $default = '#000000';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -285,7 +285,7 @@ if ($ADMIN->fulltree) {
     // Sub Menu Item Color
     $name = "{$component}/submenucolor";
     $title = get_string('submenucolor', $component);
-    $description = get_string('submenucolor_desc', $component);
+    $description = get_string('submenucolordesc', $component);
     $default = '#000000';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -294,7 +294,7 @@ if ($ADMIN->fulltree) {
     // Sub Menu Text Color
     $name = "{$component}/submenutextcolor";
     $title = get_string('submenutextcolor', $component);
-    $description = get_string('submenutextcolor_desc', $component);
+    $description = get_string('submenutextcolordesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -303,7 +303,7 @@ if ($ADMIN->fulltree) {
     // Selected Sub-Menu Color
     $name = "{$component}/selectedsubmenucolor";
     $title = get_string('selectedsubmenucolor', $component);
-    $description = get_string('selectedsubmenucolor_desc', $component);
+    $description = get_string('selectedsubmenucolordesc', $component);
     $default = '#000000';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -312,7 +312,7 @@ if ($ADMIN->fulltree) {
     // Selected Sub-Menu Text Color
     $name = "{$component}/selectedsubmenutextcolor";
     $title = get_string('selectedsubmenutextcolor', $component);
-    $description = get_string('selectedsubmenutextcolor_desc', $component);
+    $description = get_string('selectedsubmenutextcolordesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -322,7 +322,7 @@ if ($ADMIN->fulltree) {
     // Hover Menu Item Color
     $name = "{$component}/hovermenucolor";
     $title = get_string('hovermenucolor', $component);
-    $description = get_string('hovermenucolor_desc', $component);
+    $description = get_string('hovermenucolordesc', $component);
     $default = '#808080';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -331,7 +331,7 @@ if ($ADMIN->fulltree) {
     // Hover Sub Menu Item Color
     $name = "{$component}/hoversubmenucolor";
     $title = get_string('hoversubmenucolor', $component);
-    $description = get_string('hoversubmenucolor_desc', $component);
+    $description = get_string('hoversubmenucolordesc', $component);
     $default = '#808080';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');
@@ -340,7 +340,7 @@ if ($ADMIN->fulltree) {
     // Logged in Username Color
     $name = "{$component}/logged_in_usernamecolor";
     $title = get_string('logged_in_usernamecolor', $component);
-    $description = get_string('logged_in_usernamecolor_desc', $component);
+    $description = get_string('logged_in_usernamecolordesc', $component);
     $default = '#ffffff';
     $setting = new admin_setting_configcolourpicker($name, $title, $description, $default, null, false);
     $setting->set_updatedcallback('theme_reset_all_caches');

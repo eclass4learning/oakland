@@ -2,7 +2,7 @@
 /*
  * This file is part of Totara LMS
  *
- * Copyright (C) 2010 onwards Totara Learning Solutions LTD
+ * Copyright (C) 2016 onwards Totara Learning Solutions LTD
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * @author Simon Coggins <simon.coggins@totaralms.com>
- * @author Brian Barnes <brian.barnes@totaralms.com>
- * @package theme
- * @subpackage customtotara
+ * @copyright 2016 onwards Totara Learning Solutions LTD
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @author    Joby Harding <joby.harding@totaralearning.com>
+ * @package   theme_oaklandcustomresponsive
  */
 
 defined('MOODLE_INTERNAL') || die;
 
-$plugin->version   = 2015072400; // The current module version (Date: YYYYMMDDXX)
-$plugin->requires  = 2013050100; // Requires this Moodle version
-$plugin->component = 'theme_oaklandcustomresponsive'; // Full name of the plugin (used for diagnostics)
+$plugin->version  = 2021082300;     // The current module version (Date: YYYYMMDDXX).
+$plugin->requires = 2017051509;       // Requires this Moodle version.
+$plugin->component = 'theme_oaklandcustomresponsive';   // Full name of the plugin (used for diagnostics).
+$plugin->dependencies = array(
+    'theme_roots' => 2018082400,
+);

@@ -27,6 +27,9 @@ $CFG->sslproxy = true;
 
 $CFG->directorypermissions = 0777;
 
+# $CFG->allowlogincsrf = 1;
+# $CFG->alternateloginurl = 'https://oakland.eclass4learning.com/login.php';
+
 # $CFG->debug = E_ALL | E_STRICT;
 # $CFG->debugdisplay = 1;
 # ini_set('display_startup_errors', 1);

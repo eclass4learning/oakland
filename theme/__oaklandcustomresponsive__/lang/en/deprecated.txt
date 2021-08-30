@@ -1,0 +1,6 @@
+alttext,theme_oaklandcustomresponsive
+alttextdesc,theme_oaklandcustomresponsive
+favicon,theme_oaklandcustomresponsive
+favicondesc,theme_oaklandcustomresponsive
+logo,theme_oaklandcustomresponsive
+logodesc,theme_oaklandcustomresponsive

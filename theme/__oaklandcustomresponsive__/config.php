@@ -2,7 +2,7 @@
 /*
  * This file is part of Totara LMS
  *
- * Copyright (C) 2010 onwards Totara Learning Solutions LTD
+ * Copyright (C) 2016 onwards Totara Learning Solutions LTD
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,50 +17,28 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * @author Simon Coggins <simon.coggins@totaralms.com>
- * @author Brian Barnes <brian.barnes@totaralms.com>
- * @package totara
- * @subpackage theme
+ * @copyright 2016 onwards Totara Learning Solutions LTD
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @author    Joby Harding <joby.harding@totaralearning.com>
+ * @package   theme_oaklandcustomresponsive
  */
 
+defined('MOODLE_INTERNAL' || die());
+
+$THEME->doctype = 'html5';
 $THEME->name = 'oaklandcustomresponsive';
-$THEME->parents = array('standardtotararesponsive', 'bootstrapbase', 'base');
-$THEME->sheets = array(
-    'core',     /** Must come first**/
-    'admin',
-    'blocks',
-    'calendar',
-    'course',
-    'user',
-    'dock',
-    'grade',
-    'message',
-    'modules',
-    'question',
-    'pagelayout',
-    'myfontswebfontskit',
-    'settings',
-    'custom_navigation',
-    'custom_login'
-);
+$THEME->parents = array('roots', 'base');
+$THEME->yuicssmodules = array();
+$THEME->enable_dock = true;
+$THEME->enable_hide = true;
+$THEME->sheets = array('totara', 'settings-noprocess', 'myfontswebfontskit', 'custom_navigation', 'custom_login');
+$THEME->enable_dock = true;
 
-$THEME->layouts = array(
-    // The site home page.
-    'frontpage' => array(
-        'file' => 'columns3.php',
-        'regions' => array('side-pre', 'side-post', 'center-content'),
-        'defaultregion' => 'side-pre',
-        'options' => array('nonavbar'=>true),
-    ),
-    'login' => array(
-        'file' => 'login.php',
-        'regions' => array(),                //TODO: It is possible to more directly link a custom login page to the theme, but I will need to completely copy the current login page's setup before being able to use it.
-        'options' => array('nonavbar'=>true),
-    ),
-);
-
-//if (!(core_useragent::is_ie() && !core_useragent::check_ie_version('10.0'))) {
-    $THEME->enable_dock = true;
-//}
 $THEME->rendererfactory = 'theme_overridden_renderer_factory';
 $THEME->csspostprocess = 'theme_oaklandcustomresponsive_process_css';
+
+// Use CSS preprocessing to facilitate style inheritance.
+$THEME->parents_exclude_sheets = array(
+    'roots' => array('totara', 'totara-rtl'),
+    'base' => array('flexible-icons'),
+);
