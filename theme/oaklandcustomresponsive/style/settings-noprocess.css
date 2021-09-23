@@ -242,7 +242,7 @@ div.header h6 {
     height: 100%;
     z-index: 1;
     opacity: [[setting:bodybgimgopacity]];
-    background-image: url(setting:bodybgimg);  
+    /*background-image: url(setting:bodybgimg);*/
     background-repeat: no-repeat;
     background-position: 50% 0;
     -ms-background-size: cover;
@@ -343,10 +343,10 @@ div#totaramenu ul li a {
 }
 /* primary nav - not selected - hover */
 div#totaramenu ul li a:hover {
-    background: [[setting:hovermenucolor]];;
+    background: [[setting:hovermenucolor]];
 }
 /* primary nav - selected */
-div#totaramenu ul li.selected a {
+div#totaramenu ul li.totaraNav_prim--list_item_selected a {
     background: [[setting:selectedmenucolor]];
     color: [[setting:selectedmenutextcolor]];
 }

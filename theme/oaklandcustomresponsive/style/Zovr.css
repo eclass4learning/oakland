@@ -174,3 +174,30 @@
 #page-login-index .potentialidp .btn.btn-default > img {
     display: none;
 }
+
+#page-login-index .totaraNav_prim--side .langmenu {
+    margin-right: 5px;
+}
+
+#page-login-index .custom-select.langmenu {
+    margin-bottom: 0;
+    margin-top: 3px;
+}
+
+@media(max-width: 991px) {
+    .login-container-left {
+        height: auto !important;
+    }
+    .login-container img {
+        width: 100%;
+        height: auto;
+    }
+    #page-login-index .absolute {
+        top: -20px;
+    }
+    #page-login-index .totaraNav_prim--side {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 10px;
+    }
+}

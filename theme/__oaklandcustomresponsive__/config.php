@@ -37,6 +37,14 @@ $THEME->enable_dock = true;
 $THEME->rendererfactory = 'theme_overridden_renderer_factory';
 $THEME->csspostprocess = 'theme_oaklandcustomresponsive_process_css';
 
+$THEME->layouts = array(
+    'login' => array(
+        'file' => 'login.php',
+        'regions' => array(),
+        'options' => array('langmenu' => true, 'nototaramenu' => true, 'nonavbar' => true),
+    )
+);
+
 // Use CSS preprocessing to facilitate style inheritance.
 $THEME->parents_exclude_sheets = array(
     'roots' => array('totara', 'totara-rtl'),

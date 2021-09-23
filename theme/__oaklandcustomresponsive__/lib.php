@@ -68,6 +68,8 @@ function theme_oaklandcustomresponsive_process_css($css, $theme) {
         'headericonscolor' => '#ffffff',
         'menucolor' => '#ffffff',
         'menutextcolor' => '#000000',
+        'selectedmenucolor' => '#ffffff',
+        'selectedmenutextcolor' => '#000000',
         'submenucolor' => '#000000',
         'submenutextcolor' => '#ffffff',
         'selectedsubmenucolor' => '#000000',
