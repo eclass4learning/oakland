@@ -138,18 +138,17 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $usercontextid = context_user::instance($userid)->id;
     $systemcontextid = context_system::instance();
 
-    // Commented out to use the default dashboard instead of the per user
-    //$dashboarduser = new stdClass();
-    //$dashboarduser->userid = $userid;
-    //$dashboarduser->dashboardid = $dashboardid;
-    //$dashboarduser->id = $DB->insert_record("totara_dashboard_user", $dashboarduser);
+    $dashboarduser = new stdClass();
+    $dashboarduser->userid = $userid;
+    $dashboarduser->dashboardid = $dashboardid;
+    $dashboarduser->id = $DB->insert_record("totara_dashboard_user", $dashboarduser);
 
     $dashboardblock = new stdClass();
     $dashboardblock->blockname = 'totara_dashboard';
     $dashboardblock->parentcontextid = 1;
     $dashboardblock->showinsubcontexts = 0;
-    $dashboardblock->pagetypepattern = 'my-totara-dashboard-' . $dashboardid;
-    $dashboardblock->subpagepattern = 'default';
+    $dashboardblock->pagetypepattern = 'totara-dashboard-' . $dashboardid;
+    $dashboardblock->subpagepattern =  $dashboarduser->id;
     $dashboardblock->defaultregion='side-pre';
     $dashboardblock->defaultweight = -1;
 
@@ -157,8 +156,8 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $gaccess_block->blockname = 'gaccess';
     $gaccess_block->parentcontextid = 1;
     $gaccess_block->showinsubcontexts = 0;
-    $gaccess_block->pagetypepattern = 'my-totara-dashboard-' . $dashboardid;
-    $gaccess_block->subpagepattern = 'default';
+    $gaccess_block->pagetypepattern = 'totara-dashboard-' . $dashboardid;
+    $gaccess_block->subpagepattern =  $dashboarduser->id;
     $gaccess_block->defaultregion='side-post';
     $gaccess_block->defaultweight = 2;
 
@@ -166,8 +165,8 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $activity_block->blockname = 'activity_modules';
     $activity_block->parentcontextid = 1;
     $activity_block->showinsubcontexts = 0;
-    $activity_block->pagetypepattern = 'my-totara-dashboard-' . $dashboardid;
-    $activity_block->subpagepattern = 'default';
+    $activity_block->pagetypepattern = 'totara-dashboard-' . $dashboardid;
+    $activity_block->subpagepattern =  $dashboarduser->id;
     $activity_block->defaultregion='side-post';
     $activity_block->defaultweight = 3;
 
@@ -175,8 +174,8 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $quicklink_block->blockname = 'totara_quicklinks';
     $quicklink_block->parentcontextid = 1;
     $quicklink_block->showinsubcontexts = 0;
-    $quicklink_block->pagetypepattern = 'my-totara-dashboard-' . $dashboardid;
-    $quicklink_block->subpagepattern = 'default';
+    $quicklink_block->pagetypepattern = 'totara-dashboard-' . $dashboardid;
+    $quicklink_block->subpagepattern =  $dashboarduser->id;
     $quicklink_block->defaultregion='side-post';
     $quicklink_block->defaultweight = 4;
 
@@ -184,8 +183,8 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $groupbio_block->blockname = 'oakland_group_bio';
     $groupbio_block->parentcontextid = 1;
     $groupbio_block->showinsubcontexts = 0;
-    $groupbio_block->pagetypepattern = 'my-totara-dashboard-' . $dashboardid;
-    $groupbio_block->subpagepattern = 'default';
+    $groupbio_block->pagetypepattern = 'totara-dashboard-' . $dashboardid;
+    $groupbio_block->subpagepattern = $dashboarduser->id;
     $groupbio_block->defaultregion='content';
     $groupbio_block->defaultweight = 5;
 
@@ -193,8 +192,8 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $forum_block->blockname = 'forum';
     $forum_block->parentcontextid = 1;
     $forum_block->showinsubcontexts = 0;
-    $forum_block->pagetypepattern = 'my-totara-dashboard-' . $dashboardid;
-    $forum_block->subpagepattern = 'default';
+    $forum_block->pagetypepattern = 'totara-dashboard-' . $dashboardid;
+    $forum_block->subpagepattern = $dashboarduser->id;
     $forum_block->defaultregion='content';
     $forum_block->defaultweight = 6;
 
@@ -202,8 +201,8 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $admin_block->blockname = 'oakland_group_admin';
     $admin_block->parentcontextid = 1;
     $admin_block->showinsubcontexts = 0;
-    $admin_block->pagetypepattern = 'my-totara-dashboard-' . $dashboardid;
-    $admin_block->subpagepattern = 'default';
+    $admin_block->pagetypepattern = 'totara-dashboard-' . $dashboardid;
+    $admin_block->subpagepattern =  $dashboarduser->id;
     $admin_block->defaultregion='side-pre';
     $admin_block->defaultweight = 7;
 

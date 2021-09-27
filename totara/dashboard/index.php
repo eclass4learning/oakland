@@ -86,11 +86,7 @@ if (!$id) {
     $PAGE->set_subpage($userpageid);
     $PAGE->set_blocks_editing_capability('totara/dashboard:manageblocks');
     $PAGE->set_pagelayout('dashboard');
-    if ($userpageid === 'default' && isset($dashboard->oaklandgroupid) && $dashboard->oaklandgroupid != 0) {
-	$PAGE->set_pagetype('my-totara-dashboard-' . $id);
-    } else {
-        $PAGE->set_pagetype('totara-dashboard-' . $id);
-    }
+    $PAGE->set_pagetype('totara-dashboard-' . $id);
     $PAGE->set_subpage($userpageid);
     // Method add_region requires pagetype set first.
     $PAGE->blocks->add_region('content');
