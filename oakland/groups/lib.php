@@ -20,7 +20,7 @@ require_once($CFG->dirroot . '/cohort/lib.php');
 require_once($CFG->dirroot . '/course/lib.php');
 require_once($CFG->dirroot . '/totara/dashboard/lib.php');
 require_once($CFG->dirroot . '/course/modlib.php');
-require_once($CFG->dirroot . '/googleapi.php');
+#require_once($CFG->dirroot . '/googleapi.php');
 
 function check_group_ownership($group) {
     global $USER, $DB;
@@ -66,7 +66,7 @@ function create_group($form){
     $group->g_hangouts = $form->g_hangouts;
     $group->g_youtube = $form->g_youtube;
     $group->datecreated = time();
-	  create_google_group($group->name,$group->group_email);
+	  //create_google_group($group->name,$group->group_email);
 
     $group->id = $DB->insert_record('oakland_groups',$group);
 

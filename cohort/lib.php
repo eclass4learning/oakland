@@ -88,6 +88,8 @@ function cohort_add_cohort($cohort, $addcollections=true) {
         $rulecol->status = COHORT_COL_STATUS_ACTIVE;
         $rulecol->timecreated = $rulecol->timemodified = $cohort->timecreated;
         $rulecol->modifierid = $USER->id;
+    	$rulecol->addnewmembers = 1;
+    	$rulecol->removeoldmembers = 1;
         $activecolid = $DB->insert_record('cohort_rule_collections', $rulecol);
 
         unset($rulecol->id);
