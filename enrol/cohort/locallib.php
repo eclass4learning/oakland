@@ -28,7 +28,6 @@ require_once($CFG->dirroot . '/enrol/locallib.php');
 require_once($CFG->dirroot . '/cohort/lib.php');
 require_once($CFG->dirroot . '/totara/cohort/lib.php');
 require_once($CFG->dirroot . '/group/lib.php');
-require_once($CFG->dirroot . '/googleapi.php');
 
 
 /**
@@ -94,7 +93,7 @@ class enrol_cohort_handler {
                 $group_email = $group->group_email;
                 $user = $DB->get_record('user', array('id'=>$event->relateduserid));
                 $user_email=$user->email;
-                add_google_group_member($group_email, $user_email);
+                // add_google_group_member($group_email, $user_email);
 
             }
         //End Oakland Modifications

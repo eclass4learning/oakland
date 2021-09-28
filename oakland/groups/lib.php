@@ -398,7 +398,7 @@ function delete_group($id){
     $DB->delete_records('oakland_groups',array('id'=>$group->id));
 
     //delete google group
-    delete_google_group($group->group_email);
+    //delete_google_group($group->group_email);
 
     return true;
 }
