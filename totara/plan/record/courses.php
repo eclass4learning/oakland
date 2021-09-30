@@ -105,11 +105,11 @@ if ($history) {
     }
 }
 // Set report.
+$data['categoryid'] = '!2';
 $config = (new rb_config())->set_sid($sid)->set_embeddata($data);
 if (!$report = reportbuilder::create_embedded($shortname, $config)) {
     print_error('error:couldnotgenerateembeddedreport', 'totara_reportbuilder');
 }
-
 $logurl = $PAGE->url->out_as_local_url();
 if ($format != '') {
     $report->export_data($format);

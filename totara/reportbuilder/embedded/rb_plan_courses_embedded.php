@@ -31,6 +31,7 @@ class rb_plan_courses_embedded extends rb_base_embedded {
 
     public function __construct($data) {
         $userid = array_key_exists('userid', $data) ? $data['userid'] : null;
+        $categoryid = array_key_exists('categoryid', $data) ? $data['categoryid'] : null;
         $rolstatus = array_key_exists('rolstatus', $data) ? $data['rolstatus'] : null;
 
         $this->url = '/totara/plan/record/courses.php';
@@ -104,6 +105,9 @@ class rb_plan_courses_embedded extends rb_base_embedded {
         if (isset($rolstatus)) {
             $this->embeddedparams['rolstatus'] = $rolstatus;
         }
+	if (isset($categoryid)) {
+	    $this->embeddedparams['category'] = $categoryid;
+	}
 
         parent::__construct();
     }

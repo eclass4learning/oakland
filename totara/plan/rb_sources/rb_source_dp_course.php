@@ -601,6 +601,11 @@ class rb_source_dp_course extends rb_base_source {
                 'base.userid',
                 'base'
         );
+	$paramoptions[] = new rb_param_option(
+                'category',
+                'course.category',
+                array('course')
+        );
         $paramoptions[] = new rb_param_option(
                 'rolstatus',
                 // if plan complete use completion status from within plan
