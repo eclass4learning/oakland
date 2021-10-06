@@ -23,7 +23,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 require_once($CFG->dirroot . '/repository/lib.php');
-require_once($CFG->libdir.'/googleapi.php');
+// require_once($CFG->libdir.'/googleapi.php');
 
 /**
  * Picasa Repository Plugin

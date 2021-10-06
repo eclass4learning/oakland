@@ -20,7 +20,7 @@ require_once($CFG->dirroot . '/cohort/lib.php');
 require_once($CFG->dirroot . '/course/lib.php');
 require_once($CFG->dirroot . '/totara/dashboard/lib.php');
 require_once($CFG->dirroot . '/course/modlib.php');
-#require_once($CFG->dirroot . '/googleapi.php');
+// require_once($CFG->dirroot . '/googleapi.php');
 
 function check_group_ownership($group) {
     global $USER, $DB;
