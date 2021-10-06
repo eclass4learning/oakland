@@ -54,7 +54,7 @@ class block_gaccess extends block_list {
     }
 
     function get_content() {
-        global $CFG, $USER, $COURSE, $OUTPUT;
+        global $DB, $CFG, $USER, $COURSE, $OUTPUT;
 
 
         // quick and simple way to prevent block from showing up on front page
@@ -73,7 +73,13 @@ class block_gaccess extends block_list {
         $this->content = new stdClass;
         $this->content->items = array();
         $this->content->icons = array();
-        $this->content->footer = '';
+	$this->content->footer = '';
+
+
+        $instance = $this->instance;
+	$dashboard_user = $DB->get_record('totara_dashboard_user', array('id'=>$instance->subpagepattern));
+	$dashboard = $DB->get_record('totara_dashboard', array('id'=>$dashboard_user->dashboardid));
+	$oakland_group = $DB->get_record('oakland_groups', array('id'=>$dashboard->oaklandgroupid));
 
         // Test for domain settings
         if( empty($domain)) {
@@ -85,7 +91,7 @@ class block_gaccess extends block_list {
         // USE the icons from this page
         // https://www.google.com/a/cpanel/mroomsdev.com/Dashboard
         // Google won't mind ;) (I hope)
-        $google_services = array();
+	$google_services = array();
         if (get_config('blocks/gaccess','gmail')) {
             $google_services []=
                 array(
@@ -95,20 +101,20 @@ class block_gaccess extends block_list {
                 );
         }
 
-        if (get_config('blocks/gaccess','calendar')) {
-            $google_services []=
+	if ($oakland_group->g_calendar) {
+	    $google_services []=
                 array(
                         'service'   => 'Calendar',
-                        'relayurl'  => 'http://www.google.com/calendar/a/'.$domain,
+                        'relayurl'  => $oakland_group->g_calendar,
                         'icon_name' => 'calendar'
                 );
-        }
+	}
 
-        if (get_config('blocks/gaccess','docs')) {
+        if ($oakland_group->g_drive) {
             $google_services []=
                 array(
                         'service'   => 'Drive',
-                        'relayurl'  => 'http://drive.google.com/a/'.$domain,
+                        'relayurl'  => $oakland_group->g_drive,
                         'icon_name' => 'gdocs'
                 );
         }
