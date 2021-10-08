@@ -77,10 +77,11 @@ class block_gaccess extends block_list {
 
 
         $instance = $this->instance;
-	$dashboard_user = $DB->get_record('totara_dashboard_user', array('id'=>$instance->subpagepattern));
-	$dashboard = $DB->get_record('totara_dashboard', array('id'=>$dashboard_user->dashboardid));
-	$oakland_group = $DB->get_record('oakland_groups', array('id'=>$dashboard->oaklandgroupid));
-
+	if ($instance->subpagepattern > 0) {
+	    $dashboard_user = $DB->get_record('totara_dashboard_user', array('id'=>$instance->subpagepattern));
+	    $dashboard = $DB->get_record('totara_dashboard', array('id'=>$dashboard_user->dashboardid));
+	    $oakland_group = $DB->get_record('oakland_groups', array('id'=>$dashboard->oaklandgroupid));
+	}
         // Test for domain settings
         if( empty($domain)) {
             $this->content->items = array(get_string('mustusegoogleauthentication', 'block_gaccess'));
@@ -101,7 +102,7 @@ class block_gaccess extends block_list {
                 );
         }
 
-	if ($oakland_group->g_calendar) {
+	if (isset($oakland_group) && $oakland_group->g_calendar) {
 	    $google_services []=
                 array(
                         'service'   => 'Calendar',
@@ -110,7 +111,7 @@ class block_gaccess extends block_list {
                 );
 	}
 
-        if ($oakland_group->g_drive) {
+        if (isset($oakland_group) && $oakland_group->g_drive) {
             $google_services []=
                 array(
                         'service'   => 'Drive',
