@@ -141,7 +141,7 @@ class enrol_cohort_handler {
             $group_email = $group->group_email;
             $user = $DB->get_record('user', array('id'=>$event->relateduserid));
             $user_email=$user->email;
-            remove_google_group_member($group_email, $user_email);
+            // remove_google_group_member($group_email, $user_email);
         }
         //End Oakland Modifications
 

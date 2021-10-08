@@ -22,7 +22,7 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// require_once($CFG->libdir.'/googleapi.php');
+require_once($CFG->libdir.'/googleapi.php');
 
 /**
  * OAuth 2.0 client for Google Services

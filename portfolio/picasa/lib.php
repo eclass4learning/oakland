@@ -21,7 +21,7 @@
  * @license http://www.gnu.org/copyleft/gpl.html GNU Public License
  */
 require_once($CFG->libdir.'/portfolio/plugin.php');
-// require_once($CFG->libdir.'/googleapi.php');
+require_once($CFG->libdir.'/googleapi.php');
 
 class portfolio_plugin_picasa extends portfolio_plugin_push_base {
     private $googleoauth = null;
