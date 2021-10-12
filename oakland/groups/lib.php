@@ -202,7 +202,7 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     $admin_block->parentcontextid = 1;
     $admin_block->showinsubcontexts = 0;
     $admin_block->pagetypepattern = 'totara-dashboard-' . $dashboardid;
-    $admin_block->subpagepattern =  $dashboarduser->id;
+    $admin_block->subpagepattern =  'default';
     $admin_block->defaultregion='side-pre';
     $admin_block->defaultweight = 7;
 
@@ -220,18 +220,25 @@ function add_blocks_to_dashboard($dashboardid, $groupid, $userid) {
     
     $groupbioid = $DB->insert_record('block_instances', $groupbio_block);
     $groupbio_block->subpagepattern = $dashboarduser->id;
-    $DB->insert_record('block_instances', $groupbio_block);
+    $my_groupbioid = $DB->insert_record('block_instances', $groupbio_block);
 
     $DB->insert_record('block_instances', $forum_block);
     $forum_block->subpagepattern = $dashboarduser->id;
     $DB->insert_record('block_instances', $forum_block);
 
     $DB->insert_record('block_instances', $admin_block);
+    $admin_block->subpagepattern = $dashboarduser->id;
+    $DB->insert_record('block_instances', $admin_block);
 
     $groupbio_instance = new stdClass();
     $groupbio_instance->blockinstanceid = $groupbioid;
     $groupbio_instance->oaklandgroupid = $groupid;
     $DB->insert_record('block_oakland_groups_bio', $groupbio_instance);
+
+    $my_groupbio_instance = new stdClass();
+    $my_groupbio_instance->blockinstanceid = $my_groupbioid;
+    $my_groupbio_instance->oaklandgroupid = $groupid;
+    $DB->insert_record('block_oakland_groups_bio', $my_groupbio_instance);
 }
 
 function add_user_to_cohort($cohortid) {
@@ -454,7 +461,6 @@ function set_alt_admin_alt($altadminuserid, $groupid, $course){
 		$DB->insert_record('oakland_group_alt_admin', $group);
 	
                 $dashboard = $DB->get_record_sql("select id from {totara_dashboard} where oaklandgroupid = ?",array($groupid)); 
-                var_dump($dashboard);	
         add_user_to_role($course, 'editingteacher', $altadminuserid);
         add_user_to_role($course, 'groupcreator', $altadminuserid);
   //       add_blocks_to_dashboard($dashboard->id, $groupid, $altadminuserid);

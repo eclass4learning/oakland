@@ -582,6 +582,12 @@ class totara_dashboard {
             $block = block_instance($instance->blockname, $instance);
             $block->instance_copy($originalid);
             $clonedids[$originalid] = $instance->id;
+	    if ($instance->blockname === 'oakland_group_bio') {
+	    	$groupbio_instance = new stdClass();
+    		$groupbio_instance->blockinstanceid = $instance->id;
+    		$groupbio_instance->oaklandgroupid = $this->oaklandgroupid;
+    		$DB->insert_record('block_oakland_groups_bio', $groupbio_instance);
+	    }
         }
 
         // Copy positions of system blocks.
