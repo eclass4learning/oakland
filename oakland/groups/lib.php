@@ -351,7 +351,6 @@ function update_group($form){
     $group = new stdClass();
     $group->name = $form->name;
     $group->group_email = $form->group_email;
-    $group->userid = $USER->id;
     $group->private = $form->private;
     $group->hidden = 0;
     $group->description = $form->description;
