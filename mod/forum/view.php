@@ -87,7 +87,28 @@
     }
 
     if (!$PAGE->button) {
-        $PAGE->set_button(forum_search_form($course, $search));
+        // $PAGE->set_button(forum_search_form($course, $search));
+        /**
+         * BEGIN OAKLAND CHANGES
+         * - display Back to Group button
+         */
+        if($course->oaklandgroupid != null){
+            global $DB;
+            $buttons = forum_search_form($course, $search);
+            $dashboard = $DB->get_record('totara_dashboard',array('oaklandgroupid'=>$course->oaklandgroupid));
+            $buttons .= "<div style='margin-top:10px; float:right;'>";
+            $buttons .= html_writer::start_tag('form',array('action'=>new moodle_url('/totara/dashboard/index.php')));
+            $buttons .= html_writer::empty_tag('input',array('type'=>'hidden','value'=>$dashboard->id,'name'=>'id'));
+            $buttons .= html_writer::tag('button','Go Back To Group');
+            $buttons .= html_writer::end_tag('form');
+            $buttons .= "</div>";
+            $PAGE->set_button($buttons);
+        }else{
+            $PAGE->set_button(forum_search_form($course, $search));
+        }
+        /**
+         * END OAKLAND CHANGES
+         */
     }
 
     $context = context_module::instance($cm->id);
