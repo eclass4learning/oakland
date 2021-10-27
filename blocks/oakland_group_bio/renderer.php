@@ -23,16 +23,18 @@ class block_oakland_group_bio_renderer extends plugin_renderer_base {
 
         $context = context_system::instance();
         $fs = get_file_storage();
-        $filename = 'f1.png';
         $imagevalue = '';
-        $hasuploadedpicture = $fs->file_exists($context->id, 'oakland_groups', 'grouplogo', $group->id, '/', $filename);
-        if (!empty($group->logo) && $hasuploadedpicture) {
+        if (!empty($group->logo)) {
             global $CFG;
             $component = 'oakland_groups';
             $filearea = 'grouplogo';
             if($file_record = $DB->get_record('files',array('id'=>$group->logo))){
-                $url = moodle_url::make_file_url("$CFG->wwwroot/pluginfile.php", "/$context->id/$component/$filearea/$file_record->itemid".'/'.$filename);
-                $imagevalue = html_writer::img($url,'',array('style'=>'float:left; margin:10px; margin-right:12px;'));
+		$filename = $file_record->filename;
+            	$hasuploadedpicture = $fs->file_exists($context->id, 'oakland_groups', 'grouplogo', $group->id, '/', $filename);
+		if ($hasuploadedpicture) {
+                    $url = moodle_url::make_file_url("$CFG->wwwroot/pluginfile.php", "/$context->id/$component/$filearea/$file_record->itemid".'/'.$filename);
+               	    $imagevalue = html_writer::img($url,'',array('style'=>'float:left; margin:10px; margin-right:12px;'));
+		}
             }
         }
         $html .= $imagevalue;

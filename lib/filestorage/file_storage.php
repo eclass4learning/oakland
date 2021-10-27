@@ -149,8 +149,7 @@ class file_storage {
         if ($filename === '') {
             $filename = '.';
         }
-
-        $pathnamehash = $this->get_pathname_hash($contextid, $component, $filearea, $itemid, $filepath, $filename);
+	$pathnamehash = $this->get_pathname_hash($contextid, $component, $filearea, $itemid, $filepath, $filename);
         return $this->file_exists_by_hash($pathnamehash);
     }
 
