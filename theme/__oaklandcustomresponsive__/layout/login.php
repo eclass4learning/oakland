@@ -154,7 +154,7 @@ echo $totara_core_renderer->masthead($hasguestlangmenu, $nocustommenu);
 
 <div class="row" style="margin-right:0px;background-color: black; padding-top:5px">
     <div class="col-sm-5">
-        <a title="Alternate Login" href="https://oakland.eclass4learning.com/login/index.php?allow=1"><i class="fa fa-archive" style="margin-left: 30px; color: grey;padding-top:2px;"></i></a>
+        <a title="Alternate Login" href="https://www.miplacek12.org/login/index.php?allow=1"><i class="fa fa-archive" style="margin-left: 30px; color: grey;padding-top:2px;"></i></a>
     </div>
     <div class="col-sm-5" style="color: lightgrey; text-align: left;">
                 Copyright © 2021 Oakland Schools

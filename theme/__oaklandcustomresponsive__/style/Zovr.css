@@ -184,6 +184,10 @@
     margin-top: 3px;
 }
 
+.path-mod-assign #page, .path-mod-assign #page-content {
+    position: relative;
+}
+
 @media(max-width: 991px) {
     .login-container-left {
         height: auto !important;

@@ -7,7 +7,7 @@ $CFG = new stdClass();
 $CFG->dbtype    = 'pgsql';
 $CFG->dblibrary = 'native';
 $CFG->dbhost    = 'rds-pgsql-oakland.cjn38es2ruxd.us-west-2.rds.amazonaws.com';
-$CFG->dbname    = 'miplace';
+$CFG->dbname    = 'miplacek12_org';
 $CFG->dbuser    = 'miplace';
 $CFG->dbpass    = '5QVdAfSc4RaX';
 $CFG->prefix    = 'mdl_';
@@ -16,10 +16,11 @@ $CFG->dboptions = array (
   'dbport' => '',
   'dbsocket' => '',
 );
-# $CFG->wwwroot   = 'http://www.miplacek12.org';
-$CFG->wwwroot   = 'https://oakland.eclass4learning.com';
-$CFG->dataroot  = '/var/www/oakland_eclass4learning_com/data/moodledata';
+$CFG->wwwroot   = 'https://www.miplacek12.org';
+$CFG->dataroot  = '/var/www/miplacek12_org/data/sitedata';
 $CFG->directorypermissions = 0777;
+
+# $CFG->alternateloginurl = 'http://www.miplacek12.org/login/index.php';
 
 # $CFG->debug = E_ALL | E_STRICT;
 # $CFG->debugdisplay = 1;

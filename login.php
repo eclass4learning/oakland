@@ -1,4 +1,6 @@
 <?php
+header("Location:https://www.miplacek12.org/login/index.php");
+die();
 require_once('config.php');
 global $OUTPUT;
 # require_once($CFG->dirroot . '/auth/googleoauth2/lib.php');

@@ -292,7 +292,7 @@ div.header h6 {
 }*/
 
 .user-enroller-panel, .yui3-overlay, .enrolpanel {
-	z-index:5 !important;
+	z-index: 1000!important;
 }
 
 /*.ui-dialog-content {*/
